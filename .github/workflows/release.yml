@@ -1,0 +1,84 @@
+name: 📦 Nuget package publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Perform a dry run (pack only, no push or release)'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  extract_information:
+    name: '🔍 Extract release information'
+    uses: sn4k3/Actions/.github/workflows/extract-csproj-information.yml@main
+
+  nuget:
+    name: 📦 Nuget - Publish package
+    needs: extract_information
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      # 🛒 Checkout the repository
+      - name: 🛒 Checkout
+        uses: actions/checkout@v4
+
+      # 🟣 Setup .NET
+      - name: 🟣 Setup .NET 10.0
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # 📦 Pack the project
+      - name: 📦 Pack
+        run: dotnet pack StageKit --configuration Release --output .
+
+      # 🏷️ Create a Git tag
+      - name: 🏷️ Create Git tag
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: |
+          version="${{ needs.extract_information.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git rev-parse "$version" >/dev/null 2>&1; then
+            echo "Tag $version already exists, skipping."
+          else
+            git tag -a "$version" -m "Release v$version"
+            git push origin "$version"
+          fi
+
+      # 🚀 Push to nuget.org
+      - name: 🚀 Push nuget.org
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        env:
+          NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
+        run: dotnet nuget push *.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN} --skip-duplicate
+
+      # 🚀 Push to GitHub Packages
+      - name: 🚀 Push Github
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: dotnet nuget push *.nupkg --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json --api-key ${{ github.token }} --skip-duplicate
+
+      # 📝 Create GitHub release
+      - name: 📝 Create GitHub release
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "${{ env.Version }}"
+          name: "v${{ env.Version }}"
+          body: ${{ env.Changelog }}
+          draft: false
+          prerelease: ${{ contains(env.Version, '-alpha') || contains(env.Version, '-beta') || contains(env.Version, '-preview') || contains(env.Version, '-rc') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          Version: ${{ needs.extract_information.outputs.version }}
+          Changelog: ${{ needs.extract_information.outputs.changelog }}
+
+      # Show dry run message if enabled
+      - name: 🛑 Dry run notice
+        if: ${{ github.event.inputs.dry_run == 'true' }}
+        run: echo "Dry run completed. Package was built but not published."

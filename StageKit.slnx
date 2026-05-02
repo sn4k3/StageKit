@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="StageKit/StageKit.csproj" />
+  <Folder Name="/Root/" />
+  <Project Path="StageKit.Tests/StageKit.Tests.csproj" />
+</Solution>

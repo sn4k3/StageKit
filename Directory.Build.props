@@ -1,0 +1,61 @@
+<Project>
+    <PropertyGroup>
+        <!-- Project -->
+        <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+        <LangVersion>latest</LangVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
+
+        <!-- Metadata -->
+        <ProductName>StageKit</ProductName>
+        <Company>PTRTECH</Company>
+        <CompanyRDNS>pt.ptrtech</CompanyRDNS>
+        <Authors>Tiago Conceição</Authors>
+        <Copyright>Copyright 2026-$([System.DateTime]::Now.ToString(`yyyy`)) © PTRTECH</Copyright>
+        <Description>StageKit is a lightweight .NET application infrastructure library for JSON settings files, observable settings objects, crash report capture, and unhandled exception handling.</Description>
+        <Version>0.1.0</Version>
+
+        <!-- Package -->
+        <ApplicationIcon>$(MSBuildThisFileDirectory)media\$(ProductName).ico</ApplicationIcon>
+        <PackageIcon>$(ProductName)_128.png</PackageIcon>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+        <EnablePackageValidation>true</EnablePackageValidation>
+        <RepositoryType>Git</RepositoryType>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <RepositoryUrl>https://github.com/sn4k3/StageKit</RepositoryUrl>
+        <PackageProjectUrl>$(RepositoryUrl)</PackageProjectUrl>
+        <PackageReleaseNotes>$(RepositoryUrl)/releases</PackageReleaseNotes>
+        <PackageTags>application-toolkit;bootstrap;crash-reporting;exception-handling</PackageTags>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+
+        <!-- Set the path map and artifacts path. -->
+        <PathMap>$(MSBuildProjectDirectory)=$(MSBuildProjectName)</PathMap>
+        <ArtifactsPath>$(MSBuildThisFileDirectory)artifacts</ArtifactsPath>
+        <CommonPublishDir>$(ArtifactsPath)\publish</CommonPublishDir>
+
+        <!-- Enable Build Acceleration in Visual Studio. -->
+        <AccelerateBuildsInVisualStudio>true</AccelerateBuildsInVisualStudio>
+
+        <!-- Sign -->
+        <SignAssembly>True</SignAssembly>
+        <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)$(ProductName).snk</AssemblyOriginatorKeyFile>
+
+        <!-- No pack under Debug -->
+        <IsPackable Condition="'$(Configuration)' == 'Debug'">false</IsPackable>
+
+        <!-- ContinuousIntegrationBuild -->
+        <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+        <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="$(MSBuildThisFileDirectory)media\$(ProductName)_128.png" Pack="true" PackagePath="" Visible="false"/>
+        <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="" Visible="false"/>
+    </ItemGroup>
+</Project>
