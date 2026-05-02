@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using StageKit.Interfaces;
 
 namespace StageKit;
 
@@ -49,6 +50,11 @@ public static class UnhandledExceptions
     /// Concurrent mutation while exceptions are being handled is undefined behavior.
     /// </remarks>
     public static HashSet<string> IgnoredExceptionMessages { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Gets settings files that should be saved before process termination when a fatal unhandled exception occurs.
+    /// </summary>
+    public static HashSet<ISavable> SettingsFilesToSaveBeforeCrash { get; } = [];
 
     /// <summary>
     /// Gets or sets the process exit code used after a fatal unhandled exception.
@@ -214,20 +220,23 @@ public static class UnhandledExceptions
                 }
 
 
+                var spawnProcess = true;
                 if (HandleCrashReport is not null)
                 {
-                    if (!HandleCrashReport.Invoke(report))
+                    spawnProcess = !HandleCrashReport.Invoke(report);
+                }
+
+                if (spawnProcess && !string.IsNullOrWhiteSpace(ApplicationKit.CrashReportFlag))
+                {
+                    if (!string.IsNullOrWhiteSpace(Environment.ProcessPath))
                     {
-                        if (!string.IsNullOrWhiteSpace(Environment.ProcessPath))
+                        var psi = new ProcessStartInfo(Environment.ProcessPath)
                         {
-                            var psi = new ProcessStartInfo(Environment.ProcessPath)
-                            {
-                                UseShellExecute = true
-                            };
-                            psi.ArgumentList.Add(ApplicationKit.CrashReportFlag);
-                            psi.ArgumentList.Add(report.Id.ToString());
-                            using var process = Process.Start(psi);
-                        }
+                            UseShellExecute = true
+                        };
+                        psi.ArgumentList.Add(ApplicationKit.CrashReportFlag);
+                        psi.ArgumentList.Add(report.Id.ToString());
+                        using var process = Process.Start(psi);
                     }
                 }
             }
@@ -239,6 +248,7 @@ public static class UnhandledExceptions
 
         try
         {
+            PanicSaveSettingsFiles();
             BeforeForcedExit?.Invoke(null, EventArgs.Empty);
         }
         catch (Exception e)
@@ -269,6 +279,24 @@ public static class UnhandledExceptions
         catch (Exception e)
         {
             Debug.WriteLine(e);
+        }
+    }
+
+    /// <summary>
+    /// Saves all settings files in <see cref="SettingsFilesToSaveBeforeCrash"/>. Should be called from a process-wide unhandled exception handler before process termination to attempt to preserve user settings.
+    /// </summary>
+    public static void PanicSaveSettingsFiles()
+    {
+        foreach (var savable in SettingsFilesToSaveBeforeCrash)
+        {
+            try
+            {
+                savable.Save();
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine(e);
+            }
         }
     }
 

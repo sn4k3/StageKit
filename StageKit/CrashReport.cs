@@ -57,6 +57,11 @@ public record CrashReport
     public int ThreadCount { get; init; }
 
     /// <summary>
+    /// Gets the elapsed runtime of the application at crash time. This value is calculated from the moment the application process began until the crash report was created.
+    /// </summary>
+    public TimeSpan ElapsedRuntime { get; init; }
+
+    /// <summary>
     /// Gets the privileged CPU time used by the process at crash time.
     /// </summary>
     public TimeSpan CpuPrivilegedTime { get; init; }
@@ -75,6 +80,11 @@ public record CrashReport
     /// Gets the process working set size captured at crash time.
     /// </summary>
     public long ProcessWorkingSet64 { get; init; }
+
+    /// <summary>
+    /// Gets the elapsed runtime of the system at crash time. This value is calculated from the moment the system began until the crash report was created.
+    /// </summary>
+    public TimeSpan SystemElapsedRuntime { get; init; }
 
     /// <summary>
     /// Gets a formatted, human-readable crash report message.
@@ -118,8 +128,10 @@ public record CrashReport
 
             sb.AppendLine($"Runtime: {RuntimeInformation.RuntimeIdentifier}");
             sb.AppendLine($"Processor cores: {Environment.ProcessorCount}   Thread usage: {ThreadPoolCount} / {ThreadCount}");
+            sb.AppendLine($"Elapsed: {ElapsedRuntime}");
             sb.AppendLine($"CPU usage: System={CpuPrivilegedTime}   User={CpuUserTime}   Total={CpuTotalTime}");
             sb.AppendLine($"RAM usage: {Helpers.ToFileSizeString(ProcessWorkingSet64)}");
+            sb.AppendLine($"System elapsed: {SystemElapsedRuntime}");
             FormatMessageFunc?.Invoke(this, sb);
             return sb.ToString();
         }
@@ -147,6 +159,8 @@ public record CrashReport
         Category = category;
         DateTimeUtc = dateTimeUtc;
         ThreadPoolCount = ThreadPool.ThreadCount;
+        ElapsedRuntime = ApplicationKit.RuntimeElapsed;
+        SystemElapsedRuntime = TimeSpan.FromMilliseconds(Environment.TickCount64);
 
         try
         {
@@ -172,6 +186,17 @@ public record CrashReport
     {
     }
 
+    /// <inheritdoc />
+    public override string ToString()
+    {
+        return FormattedMessage;
+    }
+
+    /// <summary>
+    /// Appends the details of an exception to the provided StringBuilder, including message, type, source, and stack trace.
+    /// </summary>
+    /// <param name="sb">The StringBuilder to append the exception details to.</param>
+    /// <param name="exception">The exception information to append.</param>
     private static void AppendException(StringBuilder sb, ExceptionInfo exception)
     {
         sb.AppendLine(exception.Message);

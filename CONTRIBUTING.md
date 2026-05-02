@@ -19,6 +19,8 @@ dotnet build StageKit/StageKit.csproj
 dotnet test StageKit.Tests/StageKit.Tests.csproj
 ```
 
+The library multi-targets `net8.0` and `net10.0`; tests run for both target frameworks.
+
 ## Code Guidelines
 
 - **C# latest (.NET 8 minimum)** with nullable reference types enabled
@@ -27,6 +29,7 @@ dotnet test StageKit.Tests/StageKit.Tests.csproj
 - Private fields use `_camelCase` naming
 - Use `#region` blocks to organize large files
 - Follow existing codebase conventions, naming, and patterns
+- Preserve each file's existing line endings when editing
 - Name variables, properties, and methods with clear, descriptive names
 - Keep code clean — avoid leaving large blocks of commented-out code unless essential
 - Factory methods are prefixed with `Create`; measurement/query methods are prefixed with `Get`

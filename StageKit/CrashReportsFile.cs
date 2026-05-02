@@ -14,7 +14,7 @@ public class CrashReportFile : RootCollectionFile<CrashReportFile, CrashReport>
     /// <summary>
     /// Gets or sets the crash report JSON file name.
     /// </summary>
-    public static string CrashReportFileName { get; set; } = "crash_reports.json";
+    public static string CrashReportFileName { get; set; } = "CrashReports.json";
 
     /// <summary>
     /// Gets or sets the maximum number of crash reports retained in the file.
@@ -30,6 +30,12 @@ public class CrashReportFile : RootCollectionFile<CrashReportFile, CrashReport>
 
     /// <inheritdoc />
     public override int TrimCollectionWhenExceeding => MaxCrashReports;
+
+    /// <inheritdoc />
+    public CrashReportFile()
+    {
+        AutoSave = true;
+    }
 
     /// <summary>
     /// Gets the crash report with the specified identifier.

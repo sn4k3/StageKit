@@ -77,9 +77,10 @@ If you are unsure whether something is in scope, report it anyway and we will ro
 
 A few notes for applications using StageKit:
 
-- **Settings files.** `RootSettingsFile<T>` writes JSON files under `ApplicationKit.ConfigPath`. Applications should set this path to a trusted per-user location and avoid sharing it with untrusted users.
+- **Settings files.** `RootSettingsFile<T>` writes JSON files under `ApplicationKit.ConfigPath`. Applications should set this path to a trusted per-user location and avoid sharing it with untrusted users. `AutoSave` is opt-in and debounced by default.
 - **Crash reports.** Crash reports can include exception messages, stack traces, process information, and custom text appended by `CrashReport.FormatMessageFunc`. Treat generated crash report files as potentially sensitive.
-- **Process relaunch.** `UnhandledExceptions` can launch a new process instance for crash report handling. Applications should validate custom `ApplicationKit.CrashReportArg` values and avoid passing untrusted command-line content.
+- **Process relaunch.** `UnhandledExceptions` can launch a new process instance for crash report handling. Applications should validate custom `ApplicationKit.CrashReportFlag` values and avoid passing untrusted command-line content.
+- **Panic save.** `UnhandledExceptions.SettingsFilesToSaveBeforeCrash` calls registered `ISavable.Save()` implementations before forced exit. Only register trusted settings objects whose save behavior is safe during exception handling.
 - **Thread-safety guarantees.** StageKit settings and crash report types follow standard .NET instance-member-not-thread-safe conventions unless explicitly documented otherwise.
 - **NativeAOT / trimming.** This library is not currently validated for NativeAOT or aggressive trimming. Do not assume trim safety.
 

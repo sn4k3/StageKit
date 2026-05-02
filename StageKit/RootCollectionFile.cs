@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Text.Json.Serialization;
 
 namespace StageKit;
@@ -33,16 +35,32 @@ public abstract class RootCollectionFile<T, TO> : RootSettingsFile<T>, IList<TO>
     [JsonIgnore]
     public virtual CollectionSide TrimCollectionSide => CollectionSide.Head;
 
-    /// <summary>
-    /// Initializes a new root collection file and subscribes to collection changes.
-    /// </summary>
-    protected RootCollectionFile()
+    /// <inheritdoc />
+    protected override void OnPropertyChanged(PropertyChangedEventArgs e)
     {
-        Items.CollectionChanged += ItemsOnCollectionChanged;
+        if (e.PropertyName == nameof(AutoSave))
+        {
+            if (AutoSave)
+            {
+                Items.CollectionChanged += ItemsOnCollectionChanged;
+            }
+            else
+            {
+                Items.CollectionChanged -= ItemsOnCollectionChanged;
+            }
+        }
+        base.OnPropertyChanged(e);
     }
 
+    /// <summary>
+    /// Handles collection changes by triggering a debounced save if AutoSave is enabled.
+    /// </summary>
+    /// <param name="sender"></param>
+    /// <param name="e"></param>
     private void ItemsOnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        if (!AutoSave || !IsLoaded) return;
+        Debug.WriteLine($"[{GetType().Name}] Collection changed: {e.Action}, NewItems: {e.NewItems?.Count ?? 0}, OldItems: {e.OldItems?.Count ?? 0}");
         DebouncedSave(DefaultDebounceSaveMilliseconds);
     }
 
@@ -50,7 +68,8 @@ public abstract class RootCollectionFile<T, TO> : RootSettingsFile<T>, IList<TO>
     protected override void BeforeSave()
     {
         base.BeforeSave();
-        if (TrimCollectionWhenExceeding > 0)
+        if (TrimCollectionWhenExceeding <= 0) return;
+        if (AutoSave)
         {
             Items.CollectionChanged -= ItemsOnCollectionChanged;
             try
@@ -62,8 +81,13 @@ public abstract class RootCollectionFile<T, TO> : RootSettingsFile<T>, IList<TO>
                 Items.CollectionChanged += ItemsOnCollectionChanged;
             }
         }
+        else
+        {
+            Items.RemoveExceedingAt(TrimCollectionWhenExceeding, TrimCollectionSide);
+        }
     }
 
+    #region IList
     /// <inheritdoc />
     public IEnumerator<TO> GetEnumerator()
     {
@@ -136,14 +160,21 @@ public abstract class RootCollectionFile<T, TO> : RootSettingsFile<T>, IList<TO>
         get => Items[index];
         set => Items[index] = value;
     }
+    #endregion
+
+    #region Dispose
 
     /// <inheritdoc />
     protected override void Dispose(bool disposing)
     {
+        if (IsDisposed) return;
         if (disposing)
         {
             Items.CollectionChanged -= ItemsOnCollectionChanged;
         }
         base.Dispose(disposing);
     }
+
+    #endregion
+
 }

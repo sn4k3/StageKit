@@ -458,3 +458,5 @@ $RECYCLE.BIN/
 
 # nuke
 .nuke/temp/
+
+.dotnet-home

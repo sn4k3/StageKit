@@ -9,12 +9,12 @@ public static partial class ApplicationKit
     /// Gets or sets the date and time of birth for this application. This value is used to calculate the age of the application.
     /// </summary>
     /// <example><code>DateTime.SpecifyKind(new(2025, 7, 1, 2, 00, 00), DateTimeKind.Utc);</code></example>
-    public static DateTime Born { get; set; } = DateTime.UtcNow;
+    public static DateTime Birth { get; set; } = DateTime.UtcNow;
 
     /// <summary>
     /// Return full age in years
     /// </summary>
-    public static int YearsOld => Born.Age();
+    public static int YearsOld => Birth.Age();
 
     /// <summary>
     /// Return full age in a readable string including hours, minutes, and seconds.
@@ -34,7 +34,7 @@ public static partial class ApplicationKit
         get
         {
             var today = DateTime.UtcNow.Date;
-            return AnniversaryFor(Born, today.Year) == today;
+            return AnniversaryFor(Birth, today.Year) == today;
         }
     }
 
@@ -54,10 +54,10 @@ public static partial class ApplicationKit
         if (daysOffset < 0) return false;
 
         var today = DateTime.UtcNow.Date;
-        if (Born.Date > today) return false;
+        if (Birth.Date > today) return false;
 
-        var anniversary = AnniversaryFor(Born, today.Year);
-        if (anniversary > today) anniversary = AnniversaryFor(Born, today.Year - 1);
+        var anniversary = AnniversaryFor(Birth, today.Year);
+        if (anniversary > today) anniversary = AnniversaryFor(Birth, today.Year - 1);
 
         var diff = (today - anniversary).Days;
         return diff >= 0 && diff <= daysOffset;
@@ -87,7 +87,7 @@ public static partial class ApplicationKit
     /// hours, minutes, and seconds. Returns "0 years" if the current time is before the date of birth.</returns>
     private static string BuildAgeString(bool includeTime)
     {
-        var born = Born;
+        var born = Birth;
         var now = DateTime.UtcNow;
         if (now < born) return "0 years";
 

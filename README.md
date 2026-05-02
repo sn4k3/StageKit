@@ -8,15 +8,18 @@
 [![Nuget](https://img.shields.io/nuget/v/StageKit?style=for-the-badge)](https://www.nuget.org/packages/StageKit)
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/sn4k3?color=red&style=for-the-badge)](https://github.com/sponsors/sn4k3)
 
-StageKit is a lightweight .NET application infrastructure library for JSON settings files, observable settings objects, crash report capture, and unhandled exception handling.
+StageKit is a lightweight .NET application infrastructure library for JSON settings files, observable settings objects, crash report capture, application runtime metadata, and unhandled exception handling.
 
 ## Features
 
-- Singleton JSON settings files with lazy load and debounced save support
-- Observable settings base classes with `INotifyPropertyChanged` and `INotifyPropertyChanging`
+- Singleton JSON settings files with lazy load, manual save, AutoSave, and debounced save support
+- Observable settings base classes powered by `CommunityToolkit.Mvvm`
 - Collection-backed settings files using `ObservableCollection<T>`
+- Save hooks through `BeforeSave()` and `AfterSave()`
+- Pending debounce tracking with timeout-aware wait support
 - Serializable crash reports with exception chains, stack traces, runtime information, and process stats
 - AppDomain and task scheduler unhandled exception helpers
+- Panic-save support for registered `ISavable` settings before forced process exit
 - Configurable profile, config, and log paths
 - Small application "birthday" helpers for version/about screens
 
@@ -30,6 +33,7 @@ dotnet add package StageKit
 
 - .NET 8 or newer
 - C# latest language version
+- `CommunityToolkit.Mvvm` is used by StageKit for observable settings support
 
 ## Quick Start
 
@@ -42,10 +46,13 @@ using StageKit;
 ApplicationKit.ApplicationName = "MyApp";
 ApplicationKit.ApplicationArgs = args;
 ApplicationKit.Logger = logger;
-ApplicationKit.UiFrameworkInfo = "Avalonia";
+ApplicationKit.UiFrameworkInfo = $"Avalonia {typeof(AvaloniaObject).Assembly.GetName().Version!.ToString(3)}";
+ApplicationKit.Birth = DateTime.SpecifyKind(new DateTime(2026, 1, 1), DateTimeKind.Utc);
 
 UnhandledExceptions.RegisterAppDomainUnhandledException();
 UnhandledExceptions.RegisterTaskSchedulerUnobservedTaskException();
+
+CrashReportFile.IsEnabled = true;
 ```
 
 ## Settings Files
@@ -64,25 +71,45 @@ public sealed class AppSettings : RootSettingsFile<AppSettings>
     public string Theme
     {
         get => _theme;
-        set
-        {
-            if (SetProperty(ref _theme, value))
-            {
-                DebouncedSave();
-            }
-        }
+        set => SetProperty(ref _theme, value);
     }
 }
 ```
 
-Use it as a lazy singleton:
+Enable `AutoSave` when property changes should save automatically:
 
 ```csharp
 var settings = AppSettings.Instance;
+settings.AutoSave = true;
 settings.Theme = "Dark";
+```
+
+`AutoSave` defaults to `false`. It starts reacting only after the settings object is loaded, so property changes caused by JSON hydration or `OnLoaded(...)` do not rewrite the file during startup.
+
+Keep `AutoSave` disabled when you prefer manual control:
+
+```csharp
+AppSettings.Instance.AutoSave = false;
 
 AppSettings.SaveInstance();
 ```
+
+Use debounced save APIs when you want to batch rapid changes:
+
+```csharp
+settings.DebouncedSave();
+
+var saved = await settings.WaitForDebouncedSaveAsync(
+    TimeSpan.FromSeconds(5),
+    cancellationToken);
+
+if (!saved)
+{
+    // timeout elapsed while the save was still pending
+}
+```
+
+`Save()` cancels any pending debounced save before writing. `CancelDebouncedSave()` cancels a scheduled save without writing.
 
 By default, settings are stored under:
 
@@ -116,12 +143,12 @@ RecentFiles.SaveInstance();
 
 ## Observable Objects
 
-`ObservableObjectKit` provides property notification helpers without requiring `CommunityToolkit.Mvvm`:
+`SubSettings` is based on `CommunityToolkit.Mvvm.ComponentModel.ObservableObject`:
 
 ```csharp
 using StageKit;
 
-public sealed class ViewState : ObservableObjectKit
+public sealed class ViewState : SubSettings
 {
     private bool _isBusy;
 
@@ -133,7 +160,22 @@ public sealed class ViewState : ObservableObjectKit
 }
 ```
 
-Projects that reference `CommunityToolkit.Mvvm` can still use `[ObservableProperty]` in classes derived from `ObservableObjectKit`, because the base class exposes compatible `OnPropertyChanged`, `OnPropertyChanging`, and `SetProperty` helpers.
+Classes deriving from `SubSettings`, `RootSettingsFile<T>`, or `RootCollectionFile<T, TO>` can use CommunityToolkit's `[ObservableProperty]` generator:
+
+```csharp
+using CommunityToolkit.Mvvm.ComponentModel;
+using StageKit;
+
+public sealed partial class AppSettings : RootSettingsFile<AppSettings>
+{
+    public override string FileName => "appsettings.json";
+
+    [ObservableProperty]
+    private string _theme = "System";
+}
+```
+
+StageKit references `CommunityToolkit.Mvvm`, but if your app uses generator attributes such as `[ObservableProperty]`, reference `CommunityToolkit.Mvvm` directly in that app too so the analyzer/source generator runs in the consuming project.
 
 ## Crash Reports
 
@@ -163,6 +205,14 @@ UnhandledExceptions.HandleCrashReport = report =>
 
 If `CrashReportFile.IsEnabled` is `true`, fatal unhandled exceptions are added to `CrashReportFile.Instance`.
 
+Register settings that should be saved before StageKit forces process exit after a fatal exception:
+
+```csharp
+UnhandledExceptions.SettingsFilesToSaveBeforeCrash.Add(AppSettings.Instance);
+```
+
+`SettingsFilesToSaveBeforeCrash` stores `StageKit.Interfaces.ISavable`, so any object with a public `Save()` implementation can participate.
+
 ## Ignoring Known Safe Exceptions
 
 Ignore by exception type:
@@ -186,11 +236,27 @@ UnhandledExceptions.IgnoreAvaloniaSafeExceptions();
 ## Application Birthday Helpers
 
 ```csharp
-ApplicationKit.Born = DateTime.SpecifyKind(new DateTime(2026, 1, 1), DateTimeKind.Utc);
+ApplicationKit.Birth = DateTime.SpecifyKind(new DateTime(2026, 1, 1), DateTimeKind.Utc);
 
 Console.WriteLine(ApplicationKit.YearsOld);
 Console.WriteLine(ApplicationKit.AgeShortStr);
 Console.WriteLine(ApplicationKit.IsBirthday);
+```
+
+Runtime duration since library initialization is available through:
+
+```csharp
+Console.WriteLine(ApplicationKit.RuntimeElapsed);
+```
+
+## Demo
+
+See [StageKit.Demo/Program.cs](StageKit.Demo/Program.cs) for a runnable console demo covering startup configuration, Serilog integration, AutoSave settings, collection settings, panic-save registration, crash report launch handling, and debounced save waiting.
+
+Run it with:
+
+```bash
+dotnet run --project StageKit.Demo/StageKit.Demo.csproj
 ```
 
 ## Development

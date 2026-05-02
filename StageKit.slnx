@@ -1,5 +1,11 @@
 <Solution>
-  <Project Path="StageKit/StageKit.csproj" />
-  <Folder Name="/Root/" />
+  <Folder Name="/Root/">
+    <File Path="CHANGELOG.md" />
+    <File Path="Directory.Build.props" />
+    <File Path="LICENSE" />
+    <File Path="README.md" />
+  </Folder>
+  <Project Path="StageKit.Demo/StageKit.Demo.csproj" Id="8a2537af-e246-4e2c-aa96-e62580f80130" />
   <Project Path="StageKit.Tests/StageKit.Tests.csproj" />
+  <Project Path="StageKit/StageKit.csproj" />
 </Solution>

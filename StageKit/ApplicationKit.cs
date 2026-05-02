@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -15,6 +17,18 @@ public static partial class ApplicationKit
     public static ILogger? Logger { get; set; }
 
     /// <summary>
+    /// Gets the timestamp when the application started, used as a reference point for calculating runtime durations.
+    /// </summary>
+    public static long StartingTimestamp { get; } = Stopwatch.GetTimestamp();
+
+    /// <summary>
+    /// Gets the elapsed time since the application started.
+    /// </summary>
+    /// <remarks>This property provides a high-resolution measurement of the application's runtime duration.
+    /// The value is calculated from the moment the application process began.</remarks>
+    public static TimeSpan RuntimeElapsed => Stopwatch.GetElapsedTime(StartingTimestamp);
+
+    /// <summary>
     /// Gets or sets the command-line arguments for the current application instance.
     /// </summary>
     /// <remarks>
@@ -27,20 +41,20 @@ public static partial class ApplicationKit
         set
         {
             field = value;
-            var crashReportIndex = Array.IndexOf(value, CrashReportFlag);
-            if (crashReportIndex >= 0 && value.Length > crashReportIndex + 1)
+            HasCrashReportFlag = false;
+            if (!string.IsNullOrWhiteSpace(CrashReportFlag))
             {
-                _ = long.TryParse(value[crashReportIndex + 1], out var crashReportHashCode);
-                if (crashReportHashCode > 0)
+                var crashReportIndex = Array.IndexOf(value, CrashReportFlag);
+                if (crashReportIndex >= 0 && value.Length > crashReportIndex + 1)
                 {
-                    CrashReportIndex = crashReportHashCode;
-                }
+                    _ = long.TryParse(value[crashReportIndex + 1], out var crashReportHashCode);
+                    if (crashReportHashCode > 0)
+                    {
+                        CrashReportIndex = crashReportHashCode;
+                    }
 
-                HasCrashReportFlag = true;
-            }
-            else
-            {
-                HasCrashReportFlag = false;
+                    HasCrashReportFlag = true;
+                }
             }
         }
     } = [];
@@ -58,11 +72,12 @@ public static partial class ApplicationKit
     /// <summary>
     /// Gets or sets the command-line argument used to open a crash report instance.
     /// </summary>
-    public static string CrashReportFlag { get; set; } = "--crash-report";
+    public static string? CrashReportFlag { get; set; } = "--crash-report";
 
     /// <summary>
     /// Gets a value indicating whether <see cref="ApplicationArgs"/> contains <see cref="CrashReportFlag"/>.
     /// </summary>
+    [MemberNotNullWhen(true, nameof(CrashReport))]
     public static bool HasCrashReportFlag { get; private set; }
 
     /// <summary>
@@ -70,6 +85,11 @@ public static partial class ApplicationKit
     /// </summary>
     /// <remarks>0 indicates no crash report is active.</remarks>
     public static long CrashReportIndex { get; private set; }
+
+    /// <summary>
+    /// Gets the active crash report when <see cref="HasCrashReportFlag"/> is <see langword="true"/> and <see cref="CrashReportIndex"/> is greater than 0; otherwise, <see langword="null"/>.
+    /// </summary>
+    public static CrashReport? CrashReport => HasCrashReportFlag && CrashReportIndex > 0 ? CrashReportFile.Instance.GetActual(CrashReportIndex) : null;
 
     /// <summary>
     /// Gets or sets the root profile directory for application data.

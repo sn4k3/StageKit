@@ -1,5 +1,3 @@
-using StageKit;
-
 namespace StageKit.Tests;
 
 public sealed class ExceptionInfoTests
