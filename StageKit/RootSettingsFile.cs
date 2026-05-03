@@ -86,7 +86,7 @@ public abstract partial class RootSettingsFile<T> : SubSettings, ISavable, IDisp
     /// Gets the file system path to the application's configuration directory.
     /// </summary>
     [JsonIgnore]
-    public virtual string DirectoryPath => ApplicationKit.ConfigPath;
+    public virtual string DirectoryPath => ApplicationKit.ConfigsPath;
 
     /// <summary>
     /// Gets the file name of this settings file.

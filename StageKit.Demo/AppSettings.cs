@@ -1,4 +1,5 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿using System.Text.Json.Serialization;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace StageKit.Demo;
 
@@ -25,6 +26,7 @@ public partial class AppSettings : RootSettingsFile<AppSettings>
     [ObservableProperty]
     public partial GeneralAppSettings General { get; set; } = new();
 
+    [JsonIgnore]
     public override SubSettings[] SubSettingsCollection => [General];
 
     public AppSettings()

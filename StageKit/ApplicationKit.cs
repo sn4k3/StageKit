@@ -95,14 +95,34 @@ public static partial class ApplicationKit
     public static string ProfilePath { get; set; } = GetDefaultProfilePath();
 
     /// <summary>
+    /// Gets or sets the directory name used for log and crash report files within the profile path.
+    /// </summary>
+    public static string LogsDirectoryName { get; set; } = "logs";
+
+    /// <summary>
     /// Gets the directory used for log and crash report files.
     /// </summary>
-    public static string LogsPath => Path.Combine(ProfilePath, "logs");
+    public static string LogsPath => Path.Combine(ProfilePath, LogsDirectoryName);
+
+    /// <summary>
+    /// Gets or sets the directory name used for config files within the profile path.
+    /// </summary>
+    public static string ConfigsDirectoryName { get; set; } = "configs";
 
     /// <summary>
     /// Gets the directory used for config files.
     /// </summary>
-    public static string ConfigPath => Path.Combine(ProfilePath, "configs");
+    public static string ConfigsPath => Path.Combine(ProfilePath, ConfigsDirectoryName);
+
+    /// <summary>
+    /// Gets or sets the directory name used for backup files within the profile path.
+    /// </summary>
+    public static string BackupsDirectoryName { get; set; } = "backups";
+
+    /// <summary>
+    /// Gets the directory used for backup files.
+    /// </summary>
+    public static string BackupsPath => Path.Combine(ProfilePath, BackupsDirectoryName);
 
     /// <summary>
     /// Gets the default profile path for the current operating system.
@@ -138,6 +158,7 @@ public static partial class ApplicationKit
         WriteIndented = true,
         NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
         IgnoreReadOnlyFields = true,
+        IgnoreReadOnlyProperties = true,
         Converters =
         {
             new JsonStringEnumConverter(),
