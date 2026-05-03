@@ -36,20 +36,20 @@ public abstract class RootCollectionFile<T, TO> : RootSettingsFile<T>, IList<TO>
     /// </summary>
     /// <remarks>Use 0 to disable trimming.</remarks>
     [JsonIgnore]
-    public virtual int TrimCollectionWhenExceeding => 0;
+    public int TrimCollectionWhenExceeding { get; set; }
 
     /// <summary>
     /// Gets the side of the collection trimmed when <see cref="TrimCollectionWhenExceeding"/> is exceeded.
     /// </summary>
     [JsonIgnore]
-    public virtual CollectionSide TrimCollectionSide => CollectionSide.Head;
+    public CollectionSide TrimCollectionSide { get; init; } = CollectionSide.Head;
 
     /// <summary>
     /// Gets a value indicating whether to track items that implement <see cref="INotifyPropertyChanged"/> for changes, and trigger saves when they change. If <see langword="false"/>, only changes to the collection itself will trigger saves.
     /// </summary>
     /// <remarks>Use <see langword="false"/> when items are immutable. Also keep in mind this can be heavy with a lot of items in the collection.</remarks>
     [JsonIgnore]
-    public virtual bool TrackItemsWithChangeNotification => false;
+    protected bool TrackItemsWithChangeNotification { get; init; } = false;
     #endregion
 
     #region Constructor

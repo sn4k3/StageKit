@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace StageKit;
 
 /// <summary>
@@ -14,7 +16,7 @@ public class CrashReportsFile : RootCollectionFile<CrashReportsFile, CrashReport
     /// <summary>
     /// Gets or sets the crash report JSON file name.
     /// </summary>
-    public static string CrashReportFileName { get; set; } = "CrashReports.json";
+    public static string CrashReportsFileName { get; set; } = "CrashReports.json";
 
     /// <summary>
     /// Gets or sets the maximum number of crash reports retained in the file.
@@ -23,18 +25,13 @@ public class CrashReportsFile : RootCollectionFile<CrashReportsFile, CrashReport
     #endregion
 
     /// <inheritdoc />
-    public override string FileName => CrashReportFileName;
-
-    /// <inheritdoc />
-    protected override int DefaultDebounceSaveMilliseconds => 0;
-
-    /// <inheritdoc />
-    public override int TrimCollectionWhenExceeding => MaxCrashReports;
-
-    /// <inheritdoc />
     public CrashReportsFile()
     {
         AutoSave = true;
+        DirectoryPath = ApplicationKit.LogsPath;
+        FileName = CrashReportsFileName;
+        DefaultDebounceSaveMilliseconds = 0; // Need instant save when capturing crash reports
+        TrimCollectionWhenExceeding = MaxCrashReports;
     }
 
     /// <summary>

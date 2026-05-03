@@ -8,7 +8,7 @@ public sealed class RootSettingsFileAutoSaveTests
         var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
         var settings = new AutoSaveSettings
         {
-            DirectoryPathOverride = directoryPath,
+            DirectoryPath = directoryPath,
             AutoSave = true
         };
         settings.EnableSaving();
@@ -26,7 +26,7 @@ public sealed class RootSettingsFileAutoSaveTests
         var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
         var settings = new AutoSaveSettings
         {
-            DirectoryPathOverride = directoryPath,
+            DirectoryPath = directoryPath,
             AutoSave = false
         };
         settings.EnableSaving();
@@ -42,7 +42,7 @@ public sealed class RootSettingsFileAutoSaveTests
         var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
         var settings = new AutoSaveSettings
         {
-            DirectoryPathOverride = directoryPath
+            DirectoryPath = directoryPath
         };
         settings.EnableSaving();
         settings.ClearDirty();
@@ -59,7 +59,7 @@ public sealed class RootSettingsFileAutoSaveTests
         var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
         var settings = new NoTrimCollectionSettings
         {
-            DirectoryPathOverride = directoryPath
+            DirectoryPath = directoryPath
         };
         settings.EnableSaving();
 
@@ -77,7 +77,7 @@ public sealed class RootSettingsFileAutoSaveTests
         var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
         var settings = new DelayedAutoSaveSettings
         {
-            DirectoryPathOverride = directoryPath,
+            DirectoryPath = directoryPath,
             AutoSave = true
         };
         settings.EnableSaving();
@@ -97,7 +97,7 @@ public sealed class RootSettingsFileAutoSaveTests
         var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
         var settings = new DelayedAutoSaveSettings
         {
-            DirectoryPathOverride = directoryPath,
+            DirectoryPath = directoryPath,
             AutoSave = true
         };
         settings.EnableSaving();
@@ -122,7 +122,7 @@ public sealed class RootSettingsFileAutoSaveTests
         var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
         var settings = new DelayedAutoSaveSettings
         {
-            DirectoryPathOverride = directoryPath,
+            DirectoryPath = directoryPath,
             AutoSave = true
         };
         settings.EnableSaving();
@@ -144,7 +144,7 @@ public sealed class RootSettingsFileAutoSaveTests
         var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
         var settings = new DelayedAutoSaveSettings
         {
-            DirectoryPathOverride = directoryPath,
+            DirectoryPath = directoryPath,
             AutoSave = true
         };
         settings.EnableSaving();
@@ -200,7 +200,7 @@ public sealed class RootSettingsFileAutoSaveTests
         var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
         var settings = new AutoSaveSettings
         {
-            DirectoryPathOverride = directoryPath
+            DirectoryPath = directoryPath
         };
         settings.EnableSaving();
 
@@ -238,7 +238,7 @@ public sealed class RootSettingsFileAutoSaveTests
         var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
         var settings = new DelayedAutoSaveSettings
         {
-            DirectoryPathOverride = directoryPath,
+            DirectoryPath = directoryPath,
             AutoSave = true
         };
         settings.EnableSaving();
@@ -265,7 +265,7 @@ public sealed class RootSettingsFileAutoSaveTests
         var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
         var settings = new TrimTrackingSettings
         {
-            DirectoryPathOverride = directoryPath
+            DirectoryPath = directoryPath
         };
         settings.EnableSaving();
 
@@ -292,13 +292,11 @@ public sealed class RootSettingsFileAutoSaveTests
     {
         private string _name = string.Empty;
 
-        public override string DirectoryPath => DirectoryPathOverride;
-
-        public string DirectoryPathOverride { get; init; } = string.Empty;
-
-        public override string FileName { get; } = $"{Guid.NewGuid():N}.json";
-
-        protected override int DefaultDebounceSaveMilliseconds => 0;
+        public AutoSaveSettings()
+        {
+            FileName = $"{Guid.NewGuid():N}.json";
+            DefaultDebounceSaveMilliseconds = 0;
+        }
 
         public string Name
         {
@@ -320,11 +318,10 @@ public sealed class RootSettingsFileAutoSaveTests
 
     private sealed class NoTrimCollectionSettings : RootCollectionFile<NoTrimCollectionSettings, int>
     {
-        public override string DirectoryPath => DirectoryPathOverride;
-
-        public string DirectoryPathOverride { get; init; } = string.Empty;
-
-        public override string FileName { get; } = $"{Guid.NewGuid():N}.json";
+        public NoTrimCollectionSettings()
+        {
+            FileName = $"{Guid.NewGuid():N}.json";
+        }
 
         public void EnableSaving()
         {
@@ -341,13 +338,11 @@ public sealed class RootSettingsFileAutoSaveTests
 
         public int SaveCount { get; private set; }
 
-        public override string DirectoryPath => DirectoryPathOverride;
-
-        public string DirectoryPathOverride { get; init; } = string.Empty;
-
-        public override string FileName { get; } = $"{Guid.NewGuid():N}.json";
-
-        protected override int DefaultDebounceSaveMilliseconds => DebounceMilliseconds;
+        public DelayedAutoSaveSettings()
+        {
+            FileName = $"{Guid.NewGuid():N}.json";
+            DefaultDebounceSaveMilliseconds = DebounceMilliseconds;
+        }
 
         public string Name
         {
@@ -378,13 +373,10 @@ public sealed class RootSettingsFileAutoSaveTests
         public LoadingAutoSaveSettings()
         {
             AutoSave = true;
+            DirectoryPath = DirectoryPathOverride;
+            FileName = SettingsFileName;
+            DefaultDebounceSaveMilliseconds = 0;
         }
-
-        public override string DirectoryPath => DirectoryPathOverride;
-
-        public override string FileName => SettingsFileName;
-
-        protected override int DefaultDebounceSaveMilliseconds => 0;
 
         public string Name
         {
@@ -410,17 +402,15 @@ public sealed class RootSettingsFileAutoSaveTests
         public NestedAutoSaveSettings()
         {
             AutoSave = true;
+            DirectoryPath = DirectoryPathOverride;
+            FileName = SettingsFileName;
+            DefaultDebounceSaveMilliseconds = 0;
         }
-
-        public override string DirectoryPath => DirectoryPathOverride;
-
-        public override string FileName => SettingsFileName;
 
         public ChildSettings Child { get; set; } = new();
 
         public override SubSettings[] SubSettingsCollection => [Child];
 
-        protected override int DefaultDebounceSaveMilliseconds => 0;
     }
 
     private sealed class ChildSettings : SubSettings
@@ -440,11 +430,12 @@ public sealed class RootSettingsFileAutoSaveTests
 
         public static string DirectoryPathOverride { get; set; } = string.Empty;
 
-        public override string DirectoryPath => DirectoryPathOverride;
-
-        public override string FileName => SettingsFileName;
-
-        protected override int DefaultDebounceSaveMilliseconds => 0;
+        public CorruptLoadSettings()
+        {
+            DirectoryPath = DirectoryPathOverride;
+            FileName = SettingsFileName;
+            DefaultDebounceSaveMilliseconds = 0;
+        }
 
         public string Name { get; set; } = string.Empty;
     }
@@ -459,19 +450,14 @@ public sealed class RootSettingsFileAutoSaveTests
 
     private sealed class TrimTrackingSettings : RootCollectionFile<TrimTrackingSettings, TrackingItem>
     {
-        public override string DirectoryPath => DirectoryPathOverride;
-
-        public string DirectoryPathOverride { get; init; } = string.Empty;
-
-        public override string FileName { get; } = $"{Guid.NewGuid():N}.json";
-
-        public override int TrimCollectionWhenExceeding => 2;
-
-        public override CollectionSide TrimCollectionSide => CollectionSide.Head;
-
-        public override bool TrackItemsWithChangeNotification => true;
-
-        protected override int DefaultDebounceSaveMilliseconds => 0;
+        public TrimTrackingSettings()
+        {
+            FileName = $"{Guid.NewGuid():N}.json";
+            TrimCollectionWhenExceeding = 2;
+            TrimCollectionSide = CollectionSide.Head;
+            TrackItemsWithChangeNotification = true;
+            DefaultDebounceSaveMilliseconds = 0;
+        }
 
         public void EnableSaving()
         {

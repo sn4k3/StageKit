@@ -80,25 +80,31 @@ public abstract partial class RootSettingsFile<T> : SubSettings, ISavable, IDisp
     /// cref="JsonSerializerOptions"/> instance. Use these options to ensure consistent serialization and
     /// deserialization behavior across the application.</remarks>
     [JsonIgnore]
-    protected virtual JsonSerializerOptions JsonOptions => ApplicationKit.JsonSerializerOptions;
+    protected JsonSerializerOptions JsonOptions { get; init; } = ApplicationKit.JsonSerializerOptions;
 
     /// <summary>
     /// Gets the file system path to the application's configuration directory.
     /// </summary>
     [JsonIgnore]
-    public virtual string DirectoryPath => ApplicationKit.ConfigsPath;
+    public string DirectoryPath { get; init; } = ApplicationKit.ConfigsPath;
 
     /// <summary>
     /// Gets the file name of this settings file.
     /// </summary>
     [JsonIgnore]
-    public virtual string FileName => $"{GetType().Name}.json";
+    public string FileName { get; init; }
 
     /// <summary>
     /// Gets the full file system path to the configuration file.
     /// </summary>
     [JsonIgnore]
     public string FilePath => Path.Combine(DirectoryPath, FileName);
+
+    /// <summary>
+    /// Checks if the settings file exists.
+    /// </summary>
+    [JsonIgnore]
+    public bool FileExists => File.Exists(FilePath);
 
     /// <summary>
     /// Backing field for <see cref="CanSave"/>. Volatile to ensure cross-thread visibility for unlocked readers.
@@ -139,7 +145,7 @@ public abstract partial class RootSettingsFile<T> : SubSettings, ISavable, IDisp
     /// scenarios with rapid consecutive changes.<br/>
     /// 0 = Instant save without debounce.</remarks>
     [JsonIgnore]
-    protected virtual int DefaultDebounceSaveMilliseconds => 1000;
+    public int DefaultDebounceSaveMilliseconds { get; set; } = 1000;
 
     /// <summary>
     /// Gets a collection of nested <see cref="SubSettings"/> objects that are part of this settings file.<br/>
@@ -150,6 +156,16 @@ public abstract partial class RootSettingsFile<T> : SubSettings, ISavable, IDisp
     [JsonIgnore]
     public virtual SubSettings[] SubSettingsCollection => [];
 
+    #endregion
+
+    #region Constructor
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RootSettingsFile{T}"/> class.
+    /// </summary>
+    protected RootSettingsFile()
+    {
+        FileName = $"{GetType().Name}.json";
+    }
     #endregion
 
     #region Events
@@ -520,12 +536,7 @@ public abstract partial class RootSettingsFile<T> : SubSettings, ISavable, IDisp
         }
     }
 
-    /// <summary>
-    /// Checks if the settings file exists.
-    /// </summary>
-    [JsonIgnore]
-    public bool FileExists => File.Exists(FilePath);
-
+    #region Dispose
     /// <inheritdoc />
     public void Dispose()
     {
@@ -555,4 +566,5 @@ public abstract partial class RootSettingsFile<T> : SubSettings, ISavable, IDisp
         }
         IsDisposed = true;
     }
+    #endregion
 }

@@ -1,6 +1,9 @@
+# v0.1.3 (03/05/2026)
+- Convert several virtual/static settings members into instance-level properties and initializers to allow per-instance configuration. 
+- Fix `CrashReportsFile` default directory to be under `ApplicationKit.LogsPath` instead of `ApplicationKit.ConfigsPath`
+
 # v0.1.2 (03/05/2026)
 - Allow to change profile configuration directories
-
 
 # v0.1.1 (03/05/2026)
 - Add `ObservableCollections` package to support thread-safe observable collections
