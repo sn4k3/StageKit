@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using ObservableCollections;
 
 namespace StageKit.Tests;
 
@@ -32,5 +33,15 @@ public sealed class CollectionExtensionsTests
         collection.RemoveExceedingAt(2, CollectionSide.Head);
 
         Assert.Equal([1, 2], collection);
+    }
+
+    [Fact]
+    public void RemoveExceedingAt_WhenObservableListHead_RemovesOldestItems()
+    {
+        var collection = new ObservableList<int>([1, 2, 3, 4]);
+
+        collection.RemoveExceedingAt(2, CollectionSide.Head);
+
+        Assert.Equal([3, 4], collection);
     }
 }

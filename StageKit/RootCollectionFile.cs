@@ -1,9 +1,7 @@
 using System.Collections;
-using System.Collections.ObjectModel;
-using System.Collections.Specialized;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Text.Json.Serialization;
+using ObservableCollections;
 
 namespace StageKit;
 
@@ -14,13 +12,24 @@ namespace StageKit;
 /// <typeparam name="TO">The item type stored in the collection.</typeparam>
 public abstract class RootCollectionFile<T, TO> : RootSettingsFile<T>, IList<TO> where T : RootCollectionFile<T, TO>, new()
 {
+    #region Properties
     /// <summary>
     /// Gets the collection of items contained in the list.
     /// </summary>
     /// <remarks>
     /// Collection changes trigger debounced saves when saving is enabled.
     /// </remarks>
-    public ObservableCollection<TO> Items { get; } = [];
+    public ObservableList<TO> Items { get; } = [];
+
+    /// <summary>
+    /// Gets a thread-safe view of the items collection that can be safely bound to from any thread without needing to marshal to the UI thread.
+    /// </summary>
+    /// <remarks>
+    /// The view captures <see cref="SynchronizationContext.Current"/> at construction time. To bind to a UI thread,
+    /// ensure the UI <see cref="SynchronizationContext"/> is installed on the calling thread before the settings
+    /// instance is first accessed (e.g., via <c>Instance</c>).
+    /// </remarks>
+    public NotifyCollectionChangedSynchronizedViewList<TO> ItemsView { get; }
 
     /// <summary>
     /// Gets the maximum number of items retained when saving.
@@ -35,57 +44,68 @@ public abstract class RootCollectionFile<T, TO> : RootSettingsFile<T>, IList<TO>
     [JsonIgnore]
     public virtual CollectionSide TrimCollectionSide => CollectionSide.Head;
 
+    /// <summary>
+    /// Gets a value indicating whether to track items that implement <see cref="INotifyPropertyChanged"/> for changes, and trigger saves when they change. If <see langword="false"/>, only changes to the collection itself will trigger saves.
+    /// </summary>
+    /// <remarks>Use <see langword="false"/> when items are immutable. Also keep in mind this can be heavy with a lot of items in the collection.</remarks>
+    [JsonIgnore]
+    public virtual bool TrackItemsWithChangeNotification => false;
+    #endregion
+
+    #region Constructor
     /// <inheritdoc />
-    protected override void OnPropertyChanged(PropertyChangedEventArgs e)
+    protected RootCollectionFile()
     {
-        if (e.PropertyName == nameof(AutoSave))
+        ItemsView = SynchronizationContext.Current is { } synchronizationContext
+            ? Items.ToNotifyCollectionChanged(new SynchronizationContextCollectionEventDispatcher(synchronizationContext))
+            : Items.ToNotifyCollectionChanged();
+        Items.CollectionChanged += ItemsOnCollectionChanged;
+    }
+    #endregion
+
+    #region Events
+    private void ItemsOnCollectionChanged(in NotifyCollectionChangedEventArgs<TO> e)
+    {
+        if (TrackItemsWithChangeNotification)
         {
-            if (AutoSave)
+            foreach (var item in e.OldItems)
             {
-                Items.CollectionChanged += ItemsOnCollectionChanged;
+                if (item is INotifyPropertyChanged notify)
+                {
+                    notify.PropertyChanged -= TrackItemsOnPropertyChanged;
+                }
             }
-            else
+
+            foreach (var item in e.NewItems)
             {
-                Items.CollectionChanged -= ItemsOnCollectionChanged;
+                if (item is INotifyPropertyChanged notify)
+                {
+                    notify.PropertyChanged += TrackItemsOnPropertyChanged;
+                }
             }
         }
-        base.OnPropertyChanged(e);
+
+        if (!IsLoaded) return;
+        HasUnsavedChanges = true;
+        if (AutoSave) DebouncedSave(DefaultDebounceSaveMilliseconds);
     }
 
-    /// <summary>
-    /// Handles collection changes by triggering a debounced save if AutoSave is enabled.
-    /// </summary>
-    /// <param name="sender"></param>
-    /// <param name="e"></param>
-    private void ItemsOnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    private void TrackItemsOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (!AutoSave || !IsLoaded) return;
-        Debug.WriteLine($"[{GetType().Name}] Collection changed: {e.Action}, NewItems: {e.NewItems?.Count ?? 0}, OldItems: {e.OldItems?.Count ?? 0}");
-        DebouncedSave(DefaultDebounceSaveMilliseconds);
+        if (!IsLoaded) return;
+        HasUnsavedChanges = true;
+        if (AutoSave) DebouncedSave(DefaultDebounceSaveMilliseconds);
     }
 
     /// <inheritdoc />
     protected override void BeforeSave()
     {
         base.BeforeSave();
-        if (TrimCollectionWhenExceeding <= 0) return;
-        if (AutoSave)
-        {
-            Items.CollectionChanged -= ItemsOnCollectionChanged;
-            try
-            {
-                Items.RemoveExceedingAt(TrimCollectionWhenExceeding, TrimCollectionSide);
-            }
-            finally
-            {
-                Items.CollectionChanged += ItemsOnCollectionChanged;
-            }
-        }
-        else
-        {
-            Items.RemoveExceedingAt(TrimCollectionWhenExceeding, TrimCollectionSide);
-        }
+        var maxItemCount = TrimCollectionWhenExceeding;
+        if (maxItemCount <= 0 || Items.Count <= maxItemCount) return;
+        Items.RemoveExceedingAt(maxItemCount, TrimCollectionSide);
     }
+    #endregion
 
     #region IList
     /// <inheritdoc />
@@ -171,6 +191,15 @@ public abstract class RootCollectionFile<T, TO> : RootSettingsFile<T>, IList<TO>
         if (disposing)
         {
             Items.CollectionChanged -= ItemsOnCollectionChanged;
+            ItemsView.Dispose();
+
+            foreach (var item in Items)
+            {
+                if (item is INotifyPropertyChanged notify)
+                {
+                    notify.PropertyChanged -= TrackItemsOnPropertyChanged;
+                }
+            }
         }
         base.Dispose(disposing);
     }

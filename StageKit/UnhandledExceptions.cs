@@ -91,15 +91,20 @@ public static class UnhandledExceptions
         foreach (var exception in TraverseExceptions(ex))
         {
             var exceptionType = exception.GetType();
-            if (IgnoredExceptionList.Contains(exceptionType) ||
-                IgnoredExceptionList.Any(type => type.IsAssignableFrom(exceptionType)))
+            foreach (var ignoredType in IgnoredExceptionList)
             {
-                return true;
+                if (ignoredType.IsAssignableFrom(exceptionType))
+                {
+                    return true;
+                }
             }
 
-            if (IgnoredExceptionMessages.Any(msg => exception.Message.Contains(msg, StringComparison.OrdinalIgnoreCase)))
+            foreach (var msg in IgnoredExceptionMessages)
             {
-                return true;
+                if (exception.Message.Contains(msg, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
             }
         }
 
@@ -200,23 +205,30 @@ public static class UnhandledExceptions
     {
         ArgumentNullException.ThrowIfNull(ex);
 
+        if (searchForIgnoredExceptions && CanIgnoreException(ex))
+        {
+            try
+            {
+                ApplicationKit.Logger?.LogWarning(ex, category);
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine(e);
+            }
+            return;
+        }
+
         try
         {
             ApplicationKit.Logger?.LogCritical(ex, category);
-
-            if (searchForIgnoredExceptions && CanIgnoreException(ex))
-            {
-                ApplicationKit.Logger?.LogWarning(ex, category);
-                return;
-            }
 
             if (!ApplicationKit.HasCrashReportFlag)
             {
                 var report = new CrashReport(ex, category ?? string.Empty);
 
-                if (CrashReportFile.IsEnabled)
+                if (CrashReportsFile.IsEnabled)
                 {
-                    CrashReportFile.Instance.Add(report);
+                    CrashReportsFile.Instance.Add(report);
                 }
 
 

@@ -28,13 +28,13 @@ StageKit is a small standalone .NET infrastructure library. Most public APIs liv
 
 - **Settings hierarchy**: `SubSettings` (`CommunityToolkit.Mvvm.ComponentModel.ObservableObject`) → `RootSettingsFile<T>` (singleton JSON file) and `RootCollectionFile<T,TO>` (singleton list-backed file). `RootSettingsFile<T>` uses `Lazy<T>` for `Instance`, has `LoadOrCreate` that swallows deserialization errors via `UnhandledExceptions.HandleSafeException`, and exposes `Save`/`DebouncedSave` (default 1000 ms), `CancelDebouncedSave`, `IsDebounceSavePending`, and `WaitForDebouncedSaveAsync`. `AutoSave` defaults to false and only reacts after `IsLoaded` is true. Saves are guarded by a single `_saveLock` (uses `Lock` on net10+, `object` on net8). Override `FileName`, `DirectoryPath` (defaults to `ApplicationKit.ConfigPath`), `JsonOptions`, `BeforeSave`, or `AfterSave` to customize.
 
-- **Crash reporting**: `ExceptionInfo` captures one exception (type, message, stack, data, source), `CrashReport` walks `InnerException`/`AggregateException` chains and adds runtime/process info, `CrashReportFile` is a `RootCollectionFile` of crash reports (opt-in via `CrashReportFile.IsEnabled`).
+- **Crash reporting**: `ExceptionInfo` captures one exception (type, message, stack, data, source), `CrashReport` walks `InnerException`/`AggregateException` chains and adds runtime/process info, `CrashReportsFile` is a `RootCollectionFile` of crash reports (opt-in via `CrashReportsFile.IsEnabled`).
 
 - **`UnhandledExceptions`**: registers `AppDomain.UnhandledException` and `TaskScheduler.UnobservedTaskException` handlers (idempotent, lock-guarded). Filters via `IgnoredExceptionList` (types) and `IgnoredExceptionMessages` (case-insensitive substrings). `HandleCrashReport` callback returning `false` lets StageKit relaunch the app with `CrashReportFlag`. `SettingsFilesToSaveBeforeCrash` stores `StageKit.Interfaces.ISavable` and calls `Save()` before `Environment.Exit`. **Configure ignore/save lists during startup only** — they are not thread-safe under concurrent exception handling.
 
 - **CommunityToolkit.Mvvm** is a runtime package reference. StageKit-derived classes can use `[ObservableProperty]`, but consuming apps that use generator attributes should reference `CommunityToolkit.Mvvm` directly so analyzers/source generators run in that project.
 
-Runtime package dependencies are `CommunityToolkit.Mvvm` and `Microsoft.Extensions.Logging`. SourceLink is enabled for Release packages.
+Runtime package dependencies are `CommunityToolkit.Mvvm`, `ObservableCollections`, and `Microsoft.Extensions.Logging.Abstractions`. SourceLink is enabled for Release packages.
 
 ## Code Conventions
 

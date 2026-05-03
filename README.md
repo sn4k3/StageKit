@@ -14,7 +14,7 @@ StageKit is a lightweight .NET application infrastructure library for JSON setti
 
 - Singleton JSON settings files with lazy load, manual save, AutoSave, and debounced save support
 - Observable settings base classes powered by `CommunityToolkit.Mvvm`
-- Collection-backed settings files using `ObservableCollection<T>`
+- Collection-backed settings files using `ObservableList<T>` with `ItemsView` for synchronized binding
 - Save hooks through `BeforeSave()` and `AfterSave()`
 - Pending debounce tracking with timeout-aware wait support
 - Serializable crash reports with exception chains, stack traces, runtime information, and process stats
@@ -33,7 +33,6 @@ dotnet add package StageKit
 
 - .NET 8 or newer
 - C# latest language version
-- `CommunityToolkit.Mvvm` is used by StageKit for observable settings support
 
 ## Quick Start
 
@@ -52,7 +51,7 @@ ApplicationKit.Birth = DateTime.SpecifyKind(new DateTime(2026, 1, 1), DateTimeKi
 UnhandledExceptions.RegisterAppDomainUnhandledException();
 UnhandledExceptions.RegisterTaskSchedulerUnobservedTaskException();
 
-CrashReportFile.IsEnabled = true;
+CrashReportsFile.IsEnabled = true;
 ```
 
 ## Settings Files
@@ -62,16 +61,23 @@ Create a root settings file by inheriting from `RootSettingsFile<T>`:
 ```csharp
 using StageKit;
 
-public sealed class AppSettings : RootSettingsFile<AppSettings>
+public partial class AppSettings : RootSettingsFile<AppSettings>
 {
-    private string _theme = "System";
+    [ObservableProperty]
+    public partial string Theme { get; set; } = "System";
 
-    public override string FileName => "appsettings.json";
+    [ObservableProperty]
+    public partial string ThemeColor { get; set; } = "Blue";
 
-    public string Theme
+    [ObservableProperty]
+    public partial bool EnableCrashReporting { get; set; } = true;
+
+    [ObservableProperty]
+    public partial long LastRunTimestamp { get; set; }
+
+    public AppSettings()
     {
-        get => _theme;
-        set => SetProperty(ref _theme, value);
+        AutoSave = true;
     }
 }
 ```
@@ -119,6 +125,8 @@ ApplicationKit.ConfigPath
 
 Override `DirectoryPath` or set `ApplicationKit.ProfilePath` to customize storage.
 
+If a settings file fails to deserialize on load (corrupt JSON, schema mismatch), StageKit renames it to `<file>.corrupt-<timestampUtc>` and falls back to a fresh instance. Original data is preserved on disk for inspection or recovery.
+
 ## Collection Settings
 
 Use `RootCollectionFile<T, TO>` when a settings file is mainly a list:
@@ -140,6 +148,8 @@ public sealed class RecentFiles : RootCollectionFile<RecentFiles, string>
 RecentFiles.Instance.Add(@"C:\work\project.txt");
 RecentFiles.SaveInstance();
 ```
+
+`RootCollectionFile<T, TO>` exposes `Items` as an `ObservableList<TO>` and `ItemsView` as a synchronized view for UI binding. Override `TrackItemsWithChangeNotification` when collection items implement `INotifyPropertyChanged` and item property changes should mark the file dirty and trigger `AutoSave`; keep it disabled for immutable items or very large collections.
 
 ## Observable Objects
 
@@ -203,7 +213,7 @@ UnhandledExceptions.HandleCrashReport = report =>
 };
 ```
 
-If `CrashReportFile.IsEnabled` is `true`, fatal unhandled exceptions are added to `CrashReportFile.Instance`.
+If `CrashReportsFile.IsEnabled` is `true`, fatal unhandled exceptions are added to `CrashReportsFile.Instance`.
 
 Register settings that should be saved before StageKit forces process exit after a fatal exception:
 
@@ -211,7 +221,7 @@ Register settings that should be saved before StageKit forces process exit after
 UnhandledExceptions.SettingsFilesToSaveBeforeCrash.Add(AppSettings.Instance);
 ```
 
-`SettingsFilesToSaveBeforeCrash` stores `StageKit.Interfaces.ISavable`, so any object with a public `Save()` implementation can participate.
+`SettingsFilesToSaveBeforeCrash` is a `HashSet<StageKit.Interfaces.ISavable>`, so any type implementing `ISavable` can participate.
 
 ## Ignoring Known Safe Exceptions
 

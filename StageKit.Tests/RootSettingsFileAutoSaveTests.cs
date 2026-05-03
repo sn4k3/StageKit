@@ -37,6 +37,41 @@ public sealed class RootSettingsFileAutoSaveTests
     }
 
     [Fact]
+    public void Save_WhenFileMissingAndNoChanges_CreatesFile()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        var settings = new AutoSaveSettings
+        {
+            DirectoryPathOverride = directoryPath
+        };
+        settings.EnableSaving();
+        settings.ClearDirty();
+
+        settings.Save();
+
+        Assert.True(File.Exists(settings.FilePath));
+        settings.DeleteFile();
+    }
+
+    [Fact]
+    public void Save_WhenCollectionTrimDisabled_SavesItems()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        var settings = new NoTrimCollectionSettings
+        {
+            DirectoryPathOverride = directoryPath
+        };
+        settings.EnableSaving();
+
+        settings.Add(1);
+        settings.Save();
+
+        Assert.True(File.Exists(settings.FilePath));
+        Assert.Contains("1", File.ReadAllText(settings.FilePath));
+        settings.DeleteFile();
+    }
+
+    [Fact]
     public async Task Save_WhenDebouncedSaveIsPending_CancelsPendingSave()
     {
         var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
@@ -144,6 +179,21 @@ public sealed class RootSettingsFileAutoSaveTests
         Assert.Contains("\"loaded\"", File.ReadAllText(filePath));
     }
 
+    [Fact]
+    public void SubSettingsPropertyChanged_WhenAutoSaveEnabled_SavesRootFile()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        NestedAutoSaveSettings.DirectoryPathOverride = directoryPath;
+        var settings = NestedAutoSaveSettings.Instance;
+
+        settings.Child.Name = "nested";
+
+        Assert.True(File.Exists(settings.FilePath));
+        Assert.Contains("nested", File.ReadAllText(settings.FilePath));
+        Assert.False(settings.HasUnsavedChanges);
+        settings.DeleteFile();
+    }
+
     private sealed class AutoSaveSettings : RootSettingsFile<AutoSaveSettings>
     {
         private string _name = string.Empty;
@@ -161,6 +211,26 @@ public sealed class RootSettingsFileAutoSaveTests
             get => _name;
             set => SetProperty(ref _name, value);
         }
+
+        public void EnableSaving()
+        {
+            CanSave = true;
+            MarkLoaded(this);
+        }
+
+        public void ClearDirty()
+        {
+            ClearUnsavedChangesCore();
+        }
+    }
+
+    private sealed class NoTrimCollectionSettings : RootCollectionFile<NoTrimCollectionSettings, int>
+    {
+        public override string DirectoryPath => DirectoryPathOverride;
+
+        public string DirectoryPathOverride { get; init; } = string.Empty;
+
+        public override string FileName { get; } = $"{Guid.NewGuid():N}.json";
 
         public void EnableSaving()
         {
@@ -234,6 +304,39 @@ public sealed class RootSettingsFileAutoSaveTests
             {
                 Name = "normalized";
             }
+        }
+    }
+
+    private sealed class NestedAutoSaveSettings : RootSettingsFile<NestedAutoSaveSettings>
+    {
+        public const string SettingsFileName = "nested-settings.json";
+
+        public static string DirectoryPathOverride { get; set; } = string.Empty;
+
+        public NestedAutoSaveSettings()
+        {
+            AutoSave = true;
+        }
+
+        public override string DirectoryPath => DirectoryPathOverride;
+
+        public override string FileName => SettingsFileName;
+
+        public ChildSettings Child { get; set; } = new();
+
+        public override SubSettings[] SubSettingsCollection => [Child];
+
+        protected override int DefaultDebounceSaveMilliseconds => 0;
+    }
+
+    private sealed class ChildSettings : SubSettings
+    {
+        private string _name = string.Empty;
+
+        public string Name
+        {
+            get => _name;
+            set => SetProperty(ref _name, value);
         }
     }
 

@@ -15,7 +15,7 @@
         <Authors>Tiago Conceição</Authors>
         <Copyright>Copyright 2026-$([System.DateTime]::Now.ToString(`yyyy`)) © PTRTECH</Copyright>
         <Description>StageKit is a lightweight .NET application infrastructure library for JSON settings files, observable settings objects, crash report capture, and unhandled exception handling.</Description>
-        <Version>0.1.0</Version>
+        <Version>0.1.1</Version>
 
         <!-- Package -->
         <ApplicationIcon>$(MSBuildThisFileDirectory)media\$(ProductName).ico</ApplicationIcon>

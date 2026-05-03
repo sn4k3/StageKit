@@ -30,7 +30,7 @@ UnhandledExceptions.RegisterTaskSchedulerUnobservedTaskException();
 UnhandledExceptions.SettingsFilesToSaveBeforeCrash.Add(AppSettings.Instance);
 UnhandledExceptions.SettingsFilesToSaveBeforeCrash.Add(RecentDocuments.Instance);
 
-CrashReportFile.IsEnabled = AppSettings.Instance.EnableCrashReporting;
+CrashReportsFile.IsEnabled = AppSettings.Instance.EnableCrashReporting;
 ///////////////////////
 // End configuration //
 ///////////////////////
@@ -52,7 +52,7 @@ if (ApplicationKit.HasCrashReportFlag && ApplicationKit.CrashReportIndex > 0)
 ///////////////////////
 //     Main Logic    //
 ///////////////////////
-CrashReportFile.IsEnabled = AppSettings.Instance.EnableCrashReporting;
+CrashReportsFile.IsEnabled = AppSettings.Instance.EnableCrashReporting;
 AppSettings.Instance.Theme = Random.Shared.Next(0, 3) switch
 {
     0 => "System",

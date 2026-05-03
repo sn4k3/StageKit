@@ -3,7 +3,7 @@ namespace StageKit;
 /// <summary>
 /// Persists recent crash reports in the application's settings storage.
 /// </summary>
-public class CrashReportFile : RootCollectionFile<CrashReportFile, CrashReport>
+public class CrashReportsFile : RootCollectionFile<CrashReportsFile, CrashReport>
 {
     #region Static Configuration
     /// <summary>
@@ -32,7 +32,7 @@ public class CrashReportFile : RootCollectionFile<CrashReportFile, CrashReport>
     public override int TrimCollectionWhenExceeding => MaxCrashReports;
 
     /// <inheritdoc />
-    public CrashReportFile()
+    public CrashReportsFile()
     {
         AutoSave = true;
     }
@@ -46,6 +46,6 @@ public class CrashReportFile : RootCollectionFile<CrashReportFile, CrashReport>
     {
         return id == 0
             ? null
-            : this.LastOrDefault(report => report.Id == id);
+            : this.FirstOrDefault(report => report.Id == id);
     }
 }

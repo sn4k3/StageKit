@@ -8,6 +8,9 @@ public partial class AppSettings : RootSettingsFile<AppSettings>
     public partial string Theme { get; set; } = "System";
 
     [ObservableProperty]
+    public partial string ThemeColor { get; set; } = "Blue";
+
+    [ObservableProperty]
     public partial bool EnableCrashReporting { get; set; } = true;
 
     [ObservableProperty]
@@ -21,6 +24,6 @@ public partial class AppSettings : RootSettingsFile<AppSettings>
     public override string ToString()
     {
         return
-            $"{nameof(Theme)}: {Theme}, {nameof(EnableCrashReporting)}: {EnableCrashReporting}, {nameof(LastRunTimestamp)}: {LastRunTimestamp}";
+            $"{nameof(Theme)}: {Theme}, {nameof(ThemeColor)}: {ThemeColor}, {nameof(EnableCrashReporting)}: {EnableCrashReporting}, {nameof(LastRunTimestamp)}: {LastRunTimestamp}";
     }
 }

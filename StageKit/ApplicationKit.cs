@@ -35,29 +35,27 @@ public static partial class ApplicationKit
     /// Setting this property updates <see cref="HasCrashReportFlag"/> and
     /// <see cref="CrashReportIndex"/> when <see cref="CrashReportFlag"/> is present.
     /// </remarks>
-    public static string[] ApplicationArgs
+    public static string[]? ApplicationArgs
     {
         get;
         set
         {
             field = value;
             HasCrashReportFlag = false;
-            if (!string.IsNullOrWhiteSpace(CrashReportFlag))
+            if (field is null || string.IsNullOrWhiteSpace(CrashReportFlag)) return;
+            var crashReportIndex = Array.IndexOf(field, CrashReportFlag);
+            if (crashReportIndex >= 0 && field.Length > crashReportIndex + 1)
             {
-                var crashReportIndex = Array.IndexOf(value, CrashReportFlag);
-                if (crashReportIndex >= 0 && value.Length > crashReportIndex + 1)
+                _ = long.TryParse(field[crashReportIndex + 1], out var crashReportHashCode);
+                if (crashReportHashCode > 0)
                 {
-                    _ = long.TryParse(value[crashReportIndex + 1], out var crashReportHashCode);
-                    if (crashReportHashCode > 0)
-                    {
-                        CrashReportIndex = crashReportHashCode;
-                    }
-
-                    HasCrashReportFlag = true;
+                    CrashReportIndex = crashReportHashCode;
                 }
+
+                HasCrashReportFlag = true;
             }
         }
-    } = [];
+    }
 
     /// <summary>
     /// Gets or sets the application name used to build default data paths.
@@ -89,7 +87,7 @@ public static partial class ApplicationKit
     /// <summary>
     /// Gets the active crash report when <see cref="HasCrashReportFlag"/> is <see langword="true"/> and <see cref="CrashReportIndex"/> is greater than 0; otherwise, <see langword="null"/>.
     /// </summary>
-    public static CrashReport? CrashReport => HasCrashReportFlag && CrashReportIndex > 0 ? CrashReportFile.Instance.GetActual(CrashReportIndex) : null;
+    public static CrashReport? CrashReport => HasCrashReportFlag && CrashReportIndex > 0 ? CrashReportsFile.Instance.GetActual(CrashReportIndex) : null;
 
     /// <summary>
     /// Gets or sets the root profile directory for application data.

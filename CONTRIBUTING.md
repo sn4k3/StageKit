@@ -19,7 +19,7 @@ dotnet build StageKit/StageKit.csproj
 dotnet test StageKit.Tests/StageKit.Tests.csproj
 ```
 
-The library multi-targets `net8.0` and `net10.0`; tests run for both target frameworks.
+The library multi-targets `net8.0` and `net10.0`; the test project targets `net10.0` only.
 
 ## Code Guidelines
 
