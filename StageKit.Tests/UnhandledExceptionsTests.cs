@@ -55,4 +55,29 @@ public sealed class UnhandledExceptionsTests
 
         Assert.Equal(["first", "second"], messages);
     }
+
+    [Fact]
+    public void CanIgnoreException_WhenAggregateInnerMatchesBaseType_ReturnsTrue()
+    {
+        try
+        {
+            UnhandledExceptions.IgnoredExceptionList.Add(typeof(IOException));
+
+            var aggregate = new AggregateException(new FileNotFoundException("missing"));
+            var result = UnhandledExceptions.CanIgnoreException(aggregate);
+
+            Assert.True(result);
+        }
+        finally
+        {
+            UnhandledExceptions.IgnoredExceptionList.Remove(typeof(IOException));
+        }
+    }
+
+    [Fact]
+    public void CanIgnoreException_WhenNoMatch_ReturnsFalse()
+    {
+        var result = UnhandledExceptions.CanIgnoreException(new InvalidOperationException("unexpected"));
+        Assert.False(result);
+    }
 }

@@ -194,6 +194,100 @@ public sealed class RootSettingsFileAutoSaveTests
         settings.DeleteFile();
     }
 
+    [Fact]
+    public void Save_AfterSuccess_LeavesNoTempFile()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        var settings = new AutoSaveSettings
+        {
+            DirectoryPathOverride = directoryPath
+        };
+        settings.EnableSaving();
+
+        settings.Name = "atomic";
+        settings.Save();
+
+        Assert.True(File.Exists(settings.FilePath));
+        Assert.False(File.Exists(settings.FilePath + ".tmp"));
+        settings.DeleteFile();
+    }
+
+    [Fact]
+    public void Instance_WhenFileCorrupt_RenamesToBackupAndCreatesFreshInstance()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directoryPath);
+
+        CorruptLoadSettings.DirectoryPathOverride = directoryPath;
+        var filePath = Path.Combine(directoryPath, CorruptLoadSettings.SettingsFileName);
+        File.WriteAllText(filePath, "{ this is not valid json");
+
+        var settings = CorruptLoadSettings.Instance;
+
+        Assert.NotNull(settings);
+        Assert.Equal(string.Empty, settings.Name);
+
+        var backups = Directory.GetFiles(directoryPath, $"{CorruptLoadSettings.SettingsFileName}.corrupt-*");
+        Assert.Single(backups);
+        Assert.False(File.Exists(filePath));
+    }
+
+    [Fact]
+    public async Task WaitForDebouncedSaveAsync_WhenCancelDebouncedSave_ReturnsTrue()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        var settings = new DelayedAutoSaveSettings
+        {
+            DirectoryPathOverride = directoryPath,
+            AutoSave = true
+        };
+        settings.EnableSaving();
+
+        settings.Name = "pending";
+        Assert.True(settings.IsDebounceSavePending);
+
+        var waitTask = settings.WaitForDebouncedSaveAsync(
+            TimeSpan.FromSeconds(5),
+            TestContext.Current.CancellationToken);
+
+        settings.CancelDebouncedSave();
+
+        var completed = await waitTask;
+
+        Assert.True(completed);
+        Assert.False(settings.IsDebounceSavePending);
+        Assert.Equal(0, settings.SaveCount);
+    }
+
+    [Fact]
+    public void Save_WhenTrimRemovesTrackedItems_DoesNotMarkDirtyWhenStaleItemsChange()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        var settings = new TrimTrackingSettings
+        {
+            DirectoryPathOverride = directoryPath
+        };
+        settings.EnableSaving();
+
+        var item1 = new TrackingItem();
+        var item2 = new TrackingItem();
+        var item3 = new TrackingItem();
+        settings.Add(item1);
+        settings.Add(item2);
+        settings.Add(item3);
+
+        settings.Save();
+        settings.ClearDirty();
+
+        Assert.Equal(2, settings.Count);
+        Assert.DoesNotContain(item1, settings);
+
+        item1.RaisePropertyChanged();
+
+        Assert.False(settings.HasUnsavedChanges);
+        settings.DeleteFile();
+    }
+
     private sealed class AutoSaveSettings : RootSettingsFile<AutoSaveSettings>
     {
         private string _name = string.Empty;
@@ -338,6 +432,54 @@ public sealed class RootSettingsFileAutoSaveTests
             get => _name;
             set => SetProperty(ref _name, value);
         }
+    }
+
+    private sealed class CorruptLoadSettings : RootSettingsFile<CorruptLoadSettings>
+    {
+        public const string SettingsFileName = "corrupt-settings.json";
+
+        public static string DirectoryPathOverride { get; set; } = string.Empty;
+
+        public override string DirectoryPath => DirectoryPathOverride;
+
+        public override string FileName => SettingsFileName;
+
+        protected override int DefaultDebounceSaveMilliseconds => 0;
+
+        public string Name { get; set; } = string.Empty;
+    }
+
+    private sealed class TrackingItem : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+        public void RaisePropertyChanged() =>
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(RaisePropertyChanged)));
+    }
+
+    private sealed class TrimTrackingSettings : RootCollectionFile<TrimTrackingSettings, TrackingItem>
+    {
+        public override string DirectoryPath => DirectoryPathOverride;
+
+        public string DirectoryPathOverride { get; init; } = string.Empty;
+
+        public override string FileName { get; } = $"{Guid.NewGuid():N}.json";
+
+        public override int TrimCollectionWhenExceeding => 2;
+
+        public override CollectionSide TrimCollectionSide => CollectionSide.Head;
+
+        public override bool TrackItemsWithChangeNotification => true;
+
+        protected override int DefaultDebounceSaveMilliseconds => 0;
+
+        public void EnableSaving()
+        {
+            CanSave = true;
+            MarkLoaded(this);
+        }
+
+        public void ClearDirty() => ClearUnsavedChangesCore();
     }
 
     private static void MarkLoaded(SubSettings settings)
