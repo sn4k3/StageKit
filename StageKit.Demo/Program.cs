@@ -81,6 +81,7 @@ RecentDocuments.Instance.Add("document7.docx");
 Console.WriteLine("Choose an option:");
 Console.WriteLine("1. Throw divide by zero exception");
 Console.WriteLine("2. Throw overflow exception");
+Console.WriteLine("3. Test SubSetting change with save");
 Console.WriteLine("q/quit/exit = Quit application");
 
 
@@ -103,6 +104,18 @@ while (true)
         checked
         {
             overflow *= 2;
+        }
+    }
+    else if (line.Equals("3", StringComparison.OrdinalIgnoreCase))
+    {
+        Console.WriteLine($"{nameof(AppSettings.Instance.HasUnsavedChanges)}: {AppSettings.Instance.HasUnsavedChanges}");
+        AppSettings.Instance.General.MaxThreads = Random.Shared.Next(1, 101);
+        Console.WriteLine($"{nameof(AppSettings.Instance.HasUnsavedChanges)}: {AppSettings.Instance.HasUnsavedChanges}");
+        if (AppSettings.Instance.HasUnsavedChanges)
+        {
+            Console.WriteLine($"Waiting for save: {AppSettings.Instance.CanSave}");
+            await AppSettings.Instance.WaitForDebouncedSaveAsync(TimeSpan.FromSeconds(5));
+            Console.WriteLine($"Saved, {nameof(AppSettings.Instance.HasUnsavedChanges)}: {AppSettings.Instance.HasUnsavedChanges}");
         }
     }
     else if (line.Equals("exit", StringComparison.OrdinalIgnoreCase)

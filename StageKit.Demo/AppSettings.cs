@@ -2,6 +2,12 @@
 
 namespace StageKit.Demo;
 
+public partial class GeneralAppSettings : SubSettings
+{
+    [ObservableProperty]
+    public partial int MaxThreads { get; set; } = -1;
+}
+
 public partial class AppSettings : RootSettingsFile<AppSettings>
 {
     [ObservableProperty]
@@ -15,6 +21,11 @@ public partial class AppSettings : RootSettingsFile<AppSettings>
 
     [ObservableProperty]
     public partial long LastRunTimestamp { get; set; }
+
+    [ObservableProperty]
+    public partial GeneralAppSettings General { get; set; } = new();
+
+    public override SubSettings[] SubSettingsCollection => [General];
 
     public AppSettings()
     {
