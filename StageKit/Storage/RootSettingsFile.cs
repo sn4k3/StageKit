@@ -1,6 +1,5 @@
-using System.Text.Json;
 using System.ComponentModel;
-using System.Diagnostics;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using StageKit.Interfaces;
 
@@ -10,7 +9,7 @@ namespace StageKit;
 /// Base class for singleton settings objects persisted as JSON files.
 /// </summary>
 /// <typeparam name="T">The concrete settings file type.</typeparam>
-public abstract partial class RootSettingsFile<T> : SubSettings, ISavable, IDisposable where T : RootSettingsFile<T>, new()
+public abstract class RootSettingsFile<T> : SubSettings, ISavable, IDisposable where T : RootSettingsFile<T>, new()
 {
     #region Static members
     /// <summary>
@@ -66,6 +65,21 @@ public abstract partial class RootSettingsFile<T> : SubSettings, ISavable, IDisp
     private readonly HashSet<SubSettings> _trackedSubSettings = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
+    /// Tracks nested auto-save suspension scopes.
+    /// </summary>
+    private int _autoSaveSuspensionDepth;
+
+    /// <summary>
+    /// Indicates whether settings changed while auto-save was suspended.
+    /// </summary>
+    private bool _autoSaveSuspensionChanged;
+
+    /// <summary>
+    /// Indicates whether suspended changes should be saved when the outermost suspension scope is disposed.
+    /// </summary>
+    private bool _autoSaveSuspensionSaveOnDispose = true;
+
+    /// <summary>
     /// Indicates whether the object has been disposed. Once disposed, the object should not be used and any further operations may throw exceptions or have undefined behavior.
     /// </summary>
     protected bool IsDisposed;
@@ -83,10 +97,21 @@ public abstract partial class RootSettingsFile<T> : SubSettings, ISavable, IDisp
     protected JsonSerializerOptions JsonOptions { get; init; } = ApplicationKit.JsonSerializerOptions;
 
     /// <summary>
+    /// Gets or sets the persisted settings schema version.
+    /// </summary>
+    public int SettingsVersion { get; set; }
+
+    /// <summary>
+    /// Gets the settings schema version expected by the current application.
+    /// </summary>
+    [JsonIgnore]
+    protected virtual int CurrentSettingsVersion => 1;
+
+    /// <summary>
     /// Gets the file system path to the application's configuration directory.
     /// </summary>
     [JsonIgnore]
-    public string DirectoryPath { get; init; } = ApplicationKit.ConfigsPath;
+    public string DirectoryPath { get; init; } = ApplicationKit.ProfilePath;
 
     /// <summary>
     /// Gets the file name of this settings file.
@@ -109,6 +134,7 @@ public abstract partial class RootSettingsFile<T> : SubSettings, ISavable, IDisp
     /// <summary>
     /// Backing field for <see cref="CanSave"/>. Volatile to ensure cross-thread visibility for unlocked readers.
     /// </summary>
+    [JsonIgnore]
     private volatile bool _canSave;
 
     /// <summary>
@@ -126,6 +152,12 @@ public abstract partial class RootSettingsFile<T> : SubSettings, ISavable, IDisp
     /// </summary>
     [JsonIgnore]
     public bool IsDebounceSavePending => _isDebounceSavePending;
+
+    /// <summary>
+    /// Gets the number of successful saves completed by this in-memory settings instance.
+    /// </summary>
+    [JsonIgnore]
+    public int SaveCount { get; private set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether property changes automatically schedule a save.
@@ -164,7 +196,12 @@ public abstract partial class RootSettingsFile<T> : SubSettings, ISavable, IDisp
     /// </summary>
     protected RootSettingsFile()
     {
-        FileName = $"{GetType().Name}.json";
+        var typeName = GetType().Name;
+        if (typeName.EndsWith("File", StringComparison.OrdinalIgnoreCase))
+        {
+            typeName = typeName[..^"File".Length];
+        }
+        FileName = $"{typeName}.json";
     }
     #endregion
 
@@ -175,20 +212,14 @@ public abstract partial class RootSettingsFile<T> : SubSettings, ISavable, IDisp
         base.OnPropertyChanged(e);
 
         if (!IsLoaded) return;
-        if (AutoSave)
-        {
-            DebouncedSave();
-        }
+        ScheduleAutoSaveAfterChange();
     }
 
     private void SubSettingsOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (!IsLoaded) return;
         HasUnsavedChanges = true;
-        if (AutoSave)
-        {
-            DebouncedSave();
-        }
+        ScheduleAutoSaveAfterChange();
     }
     #endregion
 
@@ -200,49 +231,72 @@ public abstract partial class RootSettingsFile<T> : SubSettings, ISavable, IDisp
         var instance = new T();
         var filePath = instance.FilePath;
         var loadFromFile = false;
+        var hasPostLoadChanges = false;
 
         if (File.Exists(filePath))
         {
             T? loaded = null;
             try
             {
-                using var stream = new FileStream(
-                    filePath,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.Read,
-                    4096,
-                    FileOptions.SequentialScan);
-
-                loaded = JsonSerializer.Deserialize<T>(stream, instance.JsonOptions);
+                using (var stream = new FileStream(
+                           filePath,
+                           FileMode.Open,
+                           FileAccess.Read,
+                           FileShare.Read,
+                           4096,
+                           FileOptions.SequentialScan))
+                {
+                    loaded = JsonSerializer.Deserialize<T>(stream, instance.JsonOptions);
+                }
 
                 if (loaded is not null)
                 {
-                    instance.Dispose();
-                    instance = loaded;
-                    loaded = null;
-                    loadFromFile = true;
+                    var currentSettingsVersion = loaded.CurrentSettingsVersion;
+                    if (loaded.SettingsVersion > currentSettingsVersion)
+                    {
+                        loaded.Dispose();
+                        loaded = null;
+                        RenameInvalidSettingsFile(filePath, instance.FileName, "unsupported-version");
+                    }
+                    else
+                    {
+                        instance.Dispose();
+                        instance = loaded;
+                        loaded = null;
+                        loadFromFile = true;
+
+                        if (instance.SettingsVersion < currentSettingsVersion)
+                        {
+                            var migrationContext = new SettingsMigrationContext(
+                                instance.SettingsVersion,
+                                currentSettingsVersion);
+                            instance.MigrateSettings(migrationContext);
+                            instance.SettingsVersion = currentSettingsVersion;
+                            hasPostLoadChanges = true;
+                        }
+                    }
                 }
             }
             catch (Exception e)
             {
                 UnhandledExceptions.HandleSafeException(e, $"LoadOrCreate {instance.FileName}");
 
-                try
-                {
-                    var corruptPath = $"{filePath}.corrupt-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}";
-                    File.Move(filePath, corruptPath);
-                }
-                catch (Exception moveEx)
-                {
-                    UnhandledExceptions.HandleSafeException(moveEx, $"Backup corrupt {instance.FileName}");
-                }
+                RenameInvalidSettingsFile(filePath, instance.FileName, "corrupt");
             }
             finally
             {
                 loaded?.Dispose();
             }
         }
+
+        if (!loadFromFile)
+        {
+            instance.SettingsVersion = instance.CurrentSettingsVersion;
+        }
+
+        var validationContext = new SettingsValidationContext(loadFromFile);
+        instance.ValidateSettings(validationContext);
+        hasPostLoadChanges |= validationContext.HasChanges;
 
         instance.CanSave = true;
         instance.OnLoadedCore(loadFromFile);
@@ -252,9 +306,47 @@ public abstract partial class RootSettingsFile<T> : SubSettings, ISavable, IDisp
             subSettings.OnLoadedCore(loadFromFile);
         }
 
+        if (hasPostLoadChanges)
+        {
+            instance.HasUnsavedChanges = true;
+        }
+
         instance.TrackSubSettings();
+        if (hasPostLoadChanges)
+        {
+            instance.ScheduleAutoSaveAfterChange();
+        }
 
         return instance;
+    }
+
+    private static void RenameInvalidSettingsFile(string filePath, string fileName, string reason)
+    {
+        try
+        {
+            var backupPath = $"{filePath}.{reason}-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}";
+            File.Move(filePath, backupPath);
+        }
+        catch (Exception moveEx)
+        {
+            UnhandledExceptions.HandleSafeException(moveEx, $"Backup {reason} {fileName}");
+        }
+    }
+
+    /// <summary>
+    /// Migrates loaded settings from an older schema version to <see cref="CurrentSettingsVersion"/>.
+    /// </summary>
+    /// <param name="context">The migration context.</param>
+    protected virtual void MigrateSettings(SettingsMigrationContext context)
+    {
+    }
+
+    /// <summary>
+    /// Validates and optionally repairs settings before the settings object is marked as loaded.
+    /// </summary>
+    /// <param name="context">The validation context.</param>
+    protected virtual void ValidateSettings(SettingsValidationContext context)
+    {
     }
 
     /// <summary>
@@ -304,41 +396,22 @@ public abstract partial class RootSettingsFile<T> : SubSettings, ISavable, IDisp
                 CanSave = false;
                 _dirty = false;
 
-                var tempPath = $"{FilePath}.tmp";
                 try
                 {
-                    Directory.CreateDirectory(DirectoryPath);
-
                     BeforeSave();
 
-                    using (var stream = new FileStream(
-                               tempPath,
-                               FileMode.Create,
-                               FileAccess.Write,
-                               FileShare.None,
-                               4096,
-                               FileOptions.None))
+                    SafeFile.Write(FilePath, stream =>
                     {
                         JsonSerializer.Serialize(stream, this, GetType(), JsonOptions);
-                    }
+                    });
 
-                    File.Move(tempPath, FilePath, overwrite: true);
-
+                    SaveCount++;
                     ClearUnsavedChangesCore();
                     AfterSave();
                 }
                 catch (Exception e)
                 {
                     UnhandledExceptions.HandleSafeException(e, $"Save {FileName}");
-                }
-
-                try
-                {
-                    if (File.Exists(tempPath)) File.Delete(tempPath);
-                }
-                catch (Exception exception)
-                {
-                    Debug.WriteLine(exception);
                 }
 
                 CanSave = true;
@@ -414,6 +487,101 @@ public abstract partial class RootSettingsFile<T> : SubSettings, ISavable, IDisp
             {
                 _saveTimer.Change(debounceMilliseconds, Timeout.Infinite);
             }
+        }
+    }
+
+    /// <summary>
+    /// Temporarily suspends automatic save scheduling.
+    /// </summary>
+    /// <param name="saveOnDispose">Whether to schedule one save when the outermost suspension scope is disposed and settings changed.</param>
+    /// <returns>A disposable scope that resumes auto-save scheduling when disposed.</returns>
+    public IDisposable SuspendAutoSave(bool saveOnDispose = true)
+    {
+        lock (_saveLock)
+        {
+            if (_autoSaveSuspensionDepth == 0)
+            {
+                _autoSaveSuspensionChanged = false;
+                _autoSaveSuspensionSaveOnDispose = true;
+            }
+
+            _autoSaveSuspensionDepth++;
+            _autoSaveSuspensionSaveOnDispose &= saveOnDispose;
+        }
+
+        return new AutoSaveSuspensionScope(this);
+    }
+
+    /// <summary>
+    /// Runs a group of settings changes while automatic save scheduling is suspended.
+    /// </summary>
+    /// <param name="update">The update action to run.</param>
+    /// <param name="saveOnComplete">Whether to schedule one save after the update completes and settings changed.</param>
+    public void BatchUpdate(Action update, bool saveOnComplete = true)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+
+        using var scope = SuspendAutoSave(saveOnComplete);
+        update();
+    }
+
+    /// <summary>
+    /// Schedules auto-save for a detected settings change, respecting suspended auto-save scopes.
+    /// </summary>
+    /// <param name="debounceMilliseconds">The debounce interval to use, or 0 for the default.</param>
+    protected void ScheduleAutoSaveAfterChange(int debounceMilliseconds = 0)
+    {
+        lock (_saveLock)
+        {
+            if (_autoSaveSuspensionDepth > 0)
+            {
+                _autoSaveSuspensionChanged = true;
+                return;
+            }
+        }
+
+        if (!AutoSave) return;
+
+        DebouncedSave(debounceMilliseconds);
+    }
+
+    private void ResumeAutoSaveSuspension()
+    {
+        var shouldSave = false;
+        lock (_saveLock)
+        {
+            if (_autoSaveSuspensionDepth <= 0)
+            {
+                return;
+            }
+
+            _autoSaveSuspensionDepth--;
+            if (_autoSaveSuspensionDepth == 0)
+            {
+                shouldSave = AutoSave && _autoSaveSuspensionChanged && _autoSaveSuspensionSaveOnDispose;
+                _autoSaveSuspensionChanged = false;
+                _autoSaveSuspensionSaveOnDispose = true;
+            }
+        }
+
+        if (shouldSave)
+        {
+            DebouncedSave();
+        }
+    }
+
+    private sealed class AutoSaveSuspensionScope : IDisposable
+    {
+        private RootSettingsFile<T>? _owner;
+
+        public AutoSaveSuspensionScope(RootSettingsFile<T> owner)
+        {
+            _owner = owner;
+        }
+
+        public void Dispose()
+        {
+            Interlocked.Exchange(ref _owner, null)?.ResumeAutoSaveSuspension();
         }
     }
 

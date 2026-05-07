@@ -1,7 +1,9 @@
 using System.Collections;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Text.Json.Serialization;
 using ObservableCollections;
+using StageKit.Extensions;
 
 namespace StageKit;
 
@@ -12,6 +14,10 @@ namespace StageKit;
 /// <typeparam name="TO">The item type stored in the collection.</typeparam>
 public abstract class RootCollectionFile<T, TO> : RootSettingsFile<T>, IList<TO> where T : RootCollectionFile<T, TO>, new()
 {
+    #region Members
+    private readonly Dictionary<INotifyPropertyChanged, int> _trackedItemReferenceCounts = new(ReferenceEqualityComparer.Instance);
+    #endregion
+
     #region Properties
     /// <summary>
     /// Gets the collection of items contained in the list.
@@ -68,33 +74,34 @@ public abstract class RootCollectionFile<T, TO> : RootSettingsFile<T>, IList<TO>
     {
         if (TrackItemsWithChangeNotification)
         {
-            foreach (var item in e.OldItems)
+            switch (e.Action)
             {
-                if (item is INotifyPropertyChanged notify)
-                {
-                    notify.PropertyChanged -= TrackItemsOnPropertyChanged;
-                }
-            }
-
-            foreach (var item in e.NewItems)
-            {
-                if (item is INotifyPropertyChanged notify)
-                {
-                    notify.PropertyChanged += TrackItemsOnPropertyChanged;
-                }
+                case NotifyCollectionChangedAction.Add:
+                    TrackNewItems(e);
+                    break;
+                case NotifyCollectionChangedAction.Remove:
+                    UntrackOldItems(e);
+                    break;
+                case NotifyCollectionChangedAction.Replace:
+                    UntrackOldItems(e);
+                    TrackNewItems(e);
+                    break;
+                case NotifyCollectionChangedAction.Reset:
+                    RebuildTrackedItems();
+                    break;
             }
         }
 
         if (!IsLoaded) return;
         HasUnsavedChanges = true;
-        if (AutoSave) DebouncedSave(DefaultDebounceSaveMilliseconds);
+        ScheduleAutoSaveAfterChange(DefaultDebounceSaveMilliseconds);
     }
 
     private void TrackItemsOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (!IsLoaded) return;
         HasUnsavedChanges = true;
-        if (AutoSave) DebouncedSave(DefaultDebounceSaveMilliseconds);
+        ScheduleAutoSaveAfterChange(DefaultDebounceSaveMilliseconds);
     }
 
     /// <inheritdoc />
@@ -104,6 +111,106 @@ public abstract class RootCollectionFile<T, TO> : RootSettingsFile<T>, IList<TO>
         var maxItemCount = TrimCollectionWhenExceeding;
         if (maxItemCount <= 0 || Items.Count <= maxItemCount) return;
         Items.RemoveExceedingAt(maxItemCount, TrimCollectionSide);
+    }
+    #endregion
+
+    #region Methods
+
+    /// <summary>
+    /// Adds tracking for new items added to the collection, as described by the specified event arguments. This ensures that property change notifications are handled for any new items that implement <see cref="INotifyPropertyChanged"/>, allowing changes to those items to trigger saves when <see cref="TrackItemsWithChangeNotification"/> is enabled.
+    /// </summary>
+    /// <param name="e">The event data containing information about the items that were added to the collection. Must not be null.</param>
+    private void TrackNewItems(in NotifyCollectionChangedEventArgs<TO> e)
+    {
+        if (e.IsSingleItem)
+        {
+            TrackItem(e.NewItem);
+            return;
+        }
+
+        foreach (var item in e.NewItems)
+        {
+            TrackItem(item);
+        }
+    }
+
+    /// <summary>
+    /// Removes tracking for items that have been removed from the collection, as described by the specified event
+    /// arguments.
+    /// </summary>
+    /// <param name="e">The event data containing information about the items that were removed from the collection. Must not be null.</param>
+    private void UntrackOldItems(in NotifyCollectionChangedEventArgs<TO> e)
+    {
+        if (e.IsSingleItem)
+        {
+            UntrackItem(e.OldItem);
+            return;
+        }
+
+        foreach (var item in e.OldItems)
+        {
+            UntrackItem(item);
+        }
+    }
+
+    /// <summary>
+    /// Tracks the specified item for property change notifications if it implements the INotifyPropertyChanged
+    /// interface.
+    /// </summary>
+    /// <remarks>If the item is already being tracked, its reference count is incremented. This method ensures
+    /// that property change events are handled only for items that support notification.</remarks>
+    /// <param name="item">The item to be tracked for property changes. If the item implements INotifyPropertyChanged, it will be monitored
+    /// for changes; otherwise, no action is taken.</param>
+    private void TrackItem(TO item)
+    {
+        if (item is not INotifyPropertyChanged notify) return;
+
+        if (_trackedItemReferenceCounts.TryGetValue(notify, out var referenceCount))
+        {
+            _trackedItemReferenceCounts[notify] = referenceCount + 1;
+            return;
+        }
+
+        _trackedItemReferenceCounts.Add(notify, 1);
+        notify.PropertyChanged += TrackItemsOnPropertyChanged;
+    }
+
+    /// <summary>
+    /// Stops tracking property changes for the specified item if it is no longer referenced.
+    /// </summary>
+    /// <remarks>If the item is referenced multiple times, only the reference count is decremented. Property
+    /// change tracking is removed only when the last reference is released.</remarks>
+    /// <param name="item">The item to stop tracking. Must implement <see cref="INotifyPropertyChanged"/> to be untracked.</param>
+    private void UntrackItem(TO item)
+    {
+        if (item is not INotifyPropertyChanged notify) return;
+        if (!_trackedItemReferenceCounts.TryGetValue(notify, out var referenceCount)) return;
+
+        if (referenceCount > 1)
+        {
+            _trackedItemReferenceCounts[notify] = referenceCount - 1;
+            return;
+        }
+
+        _trackedItemReferenceCounts.Remove(notify);
+        notify.PropertyChanged -= TrackItemsOnPropertyChanged;
+    }
+
+    /// <summary>
+    /// Rebuilds the tracked items based on the current collection contents. This is used to reset tracking after a <see cref="NotifyCollectionChangedAction.Reset"/> action, which doesn't provide the old items that were removed.
+    /// </summary>
+    private void RebuildTrackedItems()
+    {
+        foreach (var item in _trackedItemReferenceCounts.Keys)
+        {
+            item.PropertyChanged -= TrackItemsOnPropertyChanged;
+        }
+
+        _trackedItemReferenceCounts.Clear();
+        foreach (var item in Items)
+        {
+            TrackItem(item);
+        }
     }
     #endregion
 
@@ -193,13 +300,11 @@ public abstract class RootCollectionFile<T, TO> : RootSettingsFile<T>, IList<TO>
             Items.CollectionChanged -= ItemsOnCollectionChanged;
             ItemsView.Dispose();
 
-            foreach (var item in Items)
+            foreach (var item in _trackedItemReferenceCounts.Keys)
             {
-                if (item is INotifyPropertyChanged notify)
-                {
-                    notify.PropertyChanged -= TrackItemsOnPropertyChanged;
-                }
+                item.PropertyChanged -= TrackItemsOnPropertyChanged;
             }
+            _trackedItemReferenceCounts.Clear();
         }
         base.Dispose(disposing);
     }

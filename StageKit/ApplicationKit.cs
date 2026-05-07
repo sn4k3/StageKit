@@ -42,6 +42,7 @@ public static partial class ApplicationKit
         {
             field = value;
             HasCrashReportFlag = false;
+            CrashReportIndex = 0;
             if (field is null || string.IsNullOrWhiteSpace(CrashReportFlag)) return;
             var crashReportIndex = Array.IndexOf(field, CrashReportFlag);
             if (crashReportIndex >= 0 && field.Length > crashReportIndex + 1)

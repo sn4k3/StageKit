@@ -1,3 +1,17 @@
+# v0.1.4 (07/05/2026)
+- Add serialized `SettingsVersion`, `CurrentSettingsVersion`, and `MigrateSettings(...)` for settings schema migrations.
+- Add `ValidateSettings(...)` and `SettingsValidationContext` for load-time validation and repair.
+- Add `SuspendAutoSave(...)` and `BatchUpdate(...)` to batch changes without scheduling repeated saves.
+- Add `ApplicationInstanceGuard` for named-semaphore single-instance detection.
+- Add `SafeFile`, `ApplicationBackup`, `SupportBundleExporter`, `ApplicationRetention`, and `OnboardingStateFile` utilities.
+- Use `SafeFile` for `RootSettingsFile<T>` persistence writes.
+- Add in-memory `RootSettingsFile<T>.SaveCount`, ignored in JSON.
+- Fix `ApplicationInstanceGuard` to use a named semaphore so dispose works after async thread switches.
+- Fix duplicate `RootCollectionFile<T,TO>` item instances so item change tracking remains subscribed until the last reference is removed.
+- Fix stale `ApplicationKit.CrashReportIndex` after replacing application args with missing or invalid crash-report values.
+- Fix crash report retention to suppress repeated autosaves and persist once after removals.
+- Fix support bundle exports created under logs/configs so the bundle does not include its own destination or temp file.
+
 # v0.1.3 (03/05/2026)
 - Convert several virtual/static settings members into instance-level properties and initializers to allow per-instance configuration. 
 - Fix `CrashReportsFile` default directory to be under `ApplicationKit.LogsPath` instead of `ApplicationKit.ConfigsPath`
@@ -7,7 +21,7 @@
 
 # v0.1.1 (03/05/2026)
 - Add `ObservableCollections` package to support thread-safe observable collections
-- Use `Microsoft.Extensions.Logging.Abstractions` instead of `Microsoft.Extensions.Logging` to avoid unnecessary dependencies
+- Use `Microsoft.Extensions.Logging.Abstractions` to avoid unnecessary logging implementation dependencies
 - Fix: `UnhandledExceptions.HandleUnhandledException` could terminate the process even when the exception matched the ignore list (`return` only exited the inner `try` block).
 - Fix: `RootCollectionFile<T,TO>` leaked per-item `PropertyChanged` subscriptions when trimming with `TrackItemsWithChangeNotification = true`.
 - Fix: settings files are now written atomically (temp file + flush + `File.Move` overwrite) to prevent corruption on crash mid-write.

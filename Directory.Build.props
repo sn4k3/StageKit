@@ -14,8 +14,8 @@
         <CompanyRDNS>pt.ptrtech</CompanyRDNS>
         <Authors>Tiago Conceição</Authors>
         <Copyright>Copyright 2026-$([System.DateTime]::Now.ToString(`yyyy`)) © PTRTECH</Copyright>
-        <Description>StageKit is a lightweight .NET application infrastructure library for JSON settings files, observable settings objects, crash report capture, and unhandled exception handling.</Description>
-        <Version>0.1.3</Version>
+        <Description>StageKit is a lightweight .NET application infrastructure library for JSON settings, schema migrations, atomic storage, backups, support bundles, retention, onboarding state, single-instance guards, crash reports, and unhandled exception handling.</Description>
+        <Version>0.1.4</Version>
 
         <!-- Package -->
         <ApplicationIcon>$(MSBuildThisFileDirectory)media\$(ProductName).ico</ApplicationIcon>
@@ -29,7 +29,7 @@
         <RepositoryUrl>https://github.com/sn4k3/StageKit</RepositoryUrl>
         <PackageProjectUrl>$(RepositoryUrl)</PackageProjectUrl>
         <PackageReleaseNotes>$(RepositoryUrl)/releases</PackageReleaseNotes>
-        <PackageTags>application-toolkit;bootstrap;crash-reporting;exception-handling</PackageTags>
+        <PackageTags>application-toolkit;settings;autosave;backup;support-bundle;retention;single-instance;crash-reporting;exception-handling</PackageTags>
         <EmbedUntrackedSources>true</EmbedUntrackedSources>
         <IncludeSymbols>true</IncludeSymbols>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>

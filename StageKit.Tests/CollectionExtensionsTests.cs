@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using ObservableCollections;
+using StageKit.Extensions;
 
 namespace StageKit.Tests;
 

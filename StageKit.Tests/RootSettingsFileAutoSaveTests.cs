@@ -169,6 +169,7 @@ public sealed class RootSettingsFileAutoSaveTests
         var filePath = Path.Combine(directoryPath, LoadingAutoSaveSettings.SettingsFileName);
         File.WriteAllText(filePath, """
             {
+              "SettingsVersion": 1,
               "Name": "loaded"
             }
             """);
@@ -209,6 +210,8 @@ public sealed class RootSettingsFileAutoSaveTests
 
         Assert.True(File.Exists(settings.FilePath));
         Assert.False(File.Exists(settings.FilePath + ".tmp"));
+        Assert.Equal(1, settings.SaveCount);
+        Assert.DoesNotContain(nameof(RootSettingsFile<AutoSaveSettings>.SaveCount), File.ReadAllText(settings.FilePath));
         settings.DeleteFile();
     }
 
@@ -288,6 +291,272 @@ public sealed class RootSettingsFileAutoSaveTests
         settings.DeleteFile();
     }
 
+    [Fact]
+    public void Remove_WhenDuplicateTrackedItemStillExists_KeepsItemChangeTracking()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        var settings = new TrimTrackingSettings
+        {
+            DirectoryPath = directoryPath,
+            TrimCollectionWhenExceeding = 0
+        };
+        settings.EnableSaving();
+
+        var item = new TrackingItem();
+        settings.Add(item);
+        settings.Add(item);
+        settings.ClearDirty();
+
+        settings.RemoveAt(0);
+        settings.ClearDirty();
+        Assert.Single(settings);
+
+        item.RaisePropertyChanged();
+
+        Assert.True(settings.HasUnsavedChanges);
+
+        settings.ClearDirty();
+        settings.RemoveAt(0);
+        settings.ClearDirty();
+        Assert.Empty(settings);
+
+        item.RaisePropertyChanged();
+
+        Assert.False(settings.HasUnsavedChanges);
+    }
+
+    [Fact]
+    public void Instance_WhenSettingsVersionIsOlder_RunsMigrationAndPreservesDirtyState()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directoryPath);
+
+        MigrationSettings.DirectoryPathOverride = directoryPath;
+        var filePath = Path.Combine(directoryPath, MigrationSettings.SettingsFileName);
+        File.WriteAllText(filePath, """
+            {
+              "SettingsVersion": 1,
+              "Name": "old"
+            }
+            """);
+
+        var settings = MigrationSettings.Instance;
+
+        Assert.Equal(2, settings.SettingsVersion);
+        Assert.Equal("migrated", settings.Name);
+        Assert.True(settings.MigrationRan);
+        Assert.True(settings.HasUnsavedChanges);
+        settings.DeleteFile();
+    }
+
+    [Fact]
+    public void Instance_WhenSettingsVersionIsCurrent_DoesNotRunMigration()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directoryPath);
+
+        CurrentVersionSettings.DirectoryPathOverride = directoryPath;
+        var filePath = Path.Combine(directoryPath, CurrentVersionSettings.SettingsFileName);
+        File.WriteAllText(filePath, """
+            {
+              "SettingsVersion": 2,
+              "Name": "current"
+            }
+            """);
+
+        var settings = CurrentVersionSettings.Instance;
+
+        Assert.Equal(2, settings.SettingsVersion);
+        Assert.Equal("current", settings.Name);
+        Assert.False(settings.MigrationRan);
+        Assert.False(settings.HasUnsavedChanges);
+        settings.DeleteFile();
+    }
+
+    [Fact]
+    public void Instance_WhenSettingsVersionIsFuture_RenamesFileAndCreatesFreshInstance()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directoryPath);
+
+        FutureVersionSettings.DirectoryPathOverride = directoryPath;
+        var filePath = Path.Combine(directoryPath, FutureVersionSettings.SettingsFileName);
+        File.WriteAllText(filePath, """
+            {
+              "SettingsVersion": 99,
+              "Name": "future"
+            }
+            """);
+
+        var settings = FutureVersionSettings.Instance;
+
+        Assert.Equal(1, settings.SettingsVersion);
+        Assert.Equal(string.Empty, settings.Name);
+        Assert.False(File.Exists(filePath));
+        Assert.Single(Directory.GetFiles(directoryPath, $"{FutureVersionSettings.SettingsFileName}.unsupported-version-*"));
+    }
+
+    [Fact]
+    public void Instance_WhenValidationRepairsSettings_MarksDirtyAndAutoSaves()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directoryPath);
+
+        ValidationRepairSettings.DirectoryPathOverride = directoryPath;
+        var filePath = Path.Combine(directoryPath, ValidationRepairSettings.SettingsFileName);
+        File.WriteAllText(filePath, """
+            {
+              "SettingsVersion": 1,
+              "Theme": ""
+            }
+            """);
+
+        var settings = ValidationRepairSettings.Instance;
+
+        Assert.Equal("System", settings.Theme);
+        Assert.False(settings.HasUnsavedChanges);
+        Assert.Contains("\"System\"", File.ReadAllText(filePath));
+        settings.DeleteFile();
+    }
+
+    [Fact]
+    public void Instance_WhenValidationDoesNotRepairSettings_LeavesClean()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directoryPath);
+
+        ValidationCleanSettings.DirectoryPathOverride = directoryPath;
+        var filePath = Path.Combine(directoryPath, ValidationCleanSettings.SettingsFileName);
+        File.WriteAllText(filePath, """
+            {
+              "SettingsVersion": 1,
+              "Theme": "Dark"
+            }
+            """);
+
+        var settings = ValidationCleanSettings.Instance;
+
+        Assert.Equal("Dark", settings.Theme);
+        Assert.False(settings.HasUnsavedChanges);
+        settings.DeleteFile();
+    }
+
+    [Fact]
+    public void SuspendAutoSave_WhenPropertyChanges_DelaysSaveUntilDisposed()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        var settings = new AutoSaveSettings
+        {
+            DirectoryPath = directoryPath,
+            AutoSave = true
+        };
+        settings.EnableSaving();
+
+        using (settings.SuspendAutoSave())
+        {
+            settings.Name = "batched";
+            Assert.False(File.Exists(settings.FilePath));
+        }
+
+        Assert.True(File.Exists(settings.FilePath));
+        Assert.Contains("batched", File.ReadAllText(settings.FilePath));
+        settings.DeleteFile();
+    }
+
+    [Fact]
+    public void SuspendAutoSave_WhenNested_SavesOnlyAfterOutermostDispose()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        var settings = new DelayedAutoSaveSettings
+        {
+            DirectoryPath = directoryPath,
+            AutoSave = true
+        };
+        settings.EnableSaving();
+
+        using (settings.SuspendAutoSave())
+        {
+            using (settings.SuspendAutoSave())
+            {
+                settings.Name = "nested";
+            }
+
+            Assert.False(settings.IsDebounceSavePending);
+        }
+
+        Assert.True(settings.IsDebounceSavePending);
+        settings.CancelDebouncedSave();
+    }
+
+    [Fact]
+    public void SuspendAutoSave_WhenSaveOnDisposeFalse_LeavesDirtyWithoutSchedulingSave()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        var settings = new DelayedAutoSaveSettings
+        {
+            DirectoryPath = directoryPath,
+            AutoSave = true
+        };
+        settings.EnableSaving();
+
+        using (settings.SuspendAutoSave(saveOnDispose: false))
+        {
+            settings.Name = "dirty";
+        }
+
+        Assert.True(settings.HasUnsavedChanges);
+        Assert.False(settings.IsDebounceSavePending);
+        Assert.False(File.Exists(settings.FilePath));
+    }
+
+    [Fact]
+    public void SuspendAutoSave_WhenAutoSaveEnabledBeforeDispose_SavesSuspendedChanges()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        var settings = new AutoSaveSettings
+        {
+            DirectoryPath = directoryPath,
+            AutoSave = false
+        };
+        settings.EnableSaving();
+
+        using (settings.SuspendAutoSave())
+        {
+            settings.Name = "enabled-later";
+            settings.AutoSave = true;
+        }
+
+        Assert.True(File.Exists(settings.FilePath));
+        Assert.Contains("enabled-later", File.ReadAllText(settings.FilePath));
+        settings.DeleteFile();
+    }
+
+    [Fact]
+    public void BatchUpdate_WhenActionThrows_ResumesAutoSave()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        var settings = new AutoSaveSettings
+        {
+            DirectoryPath = directoryPath,
+            AutoSave = true
+        };
+        settings.EnableSaving();
+
+        Assert.Throws<InvalidOperationException>(() => settings.BatchUpdate(() =>
+        {
+            settings.Name = "before-throw";
+            throw new InvalidOperationException();
+        }, saveOnComplete: false));
+
+        Assert.False(File.Exists(settings.FilePath));
+
+        settings.Name = "after-throw";
+
+        Assert.True(File.Exists(settings.FilePath));
+        Assert.Contains("after-throw", File.ReadAllText(settings.FilePath));
+        settings.DeleteFile();
+    }
+
     private sealed class AutoSaveSettings : RootSettingsFile<AutoSaveSettings>
     {
         private string _name = string.Empty;
@@ -336,8 +605,6 @@ public sealed class RootSettingsFileAutoSaveTests
 
         public int DebounceMilliseconds => 200;
 
-        public int SaveCount { get; private set; }
-
         public DelayedAutoSaveSettings()
         {
             FileName = $"{Guid.NewGuid():N}.json";
@@ -354,11 +621,6 @@ public sealed class RootSettingsFileAutoSaveTests
         {
             CanSave = true;
             MarkLoaded(this);
-        }
-
-        protected override void AfterSave()
-        {
-            SaveCount++;
         }
     }
 
@@ -466,6 +728,122 @@ public sealed class RootSettingsFileAutoSaveTests
         }
 
         public void ClearDirty() => ClearUnsavedChangesCore();
+    }
+
+    private sealed class MigrationSettings : RootSettingsFile<MigrationSettings>
+    {
+        public const string SettingsFileName = "migration-settings.json";
+
+        public static string DirectoryPathOverride { get; set; } = string.Empty;
+
+        public MigrationSettings()
+        {
+            DirectoryPath = DirectoryPathOverride;
+            FileName = SettingsFileName;
+            DefaultDebounceSaveMilliseconds = 0;
+        }
+
+        public string Name { get; set; } = string.Empty;
+
+        public bool MigrationRan { get; private set; }
+
+        protected override int CurrentSettingsVersion => 2;
+
+        protected override void MigrateSettings(SettingsMigrationContext context)
+        {
+            MigrationRan = true;
+            Name = "migrated";
+        }
+    }
+
+    private sealed class CurrentVersionSettings : RootSettingsFile<CurrentVersionSettings>
+    {
+        public const string SettingsFileName = "current-version-settings.json";
+
+        public static string DirectoryPathOverride { get; set; } = string.Empty;
+
+        public CurrentVersionSettings()
+        {
+            DirectoryPath = DirectoryPathOverride;
+            FileName = SettingsFileName;
+            DefaultDebounceSaveMilliseconds = 0;
+        }
+
+        public string Name { get; set; } = string.Empty;
+
+        public bool MigrationRan { get; private set; }
+
+        protected override int CurrentSettingsVersion => 2;
+
+        protected override void MigrateSettings(SettingsMigrationContext context)
+        {
+            MigrationRan = true;
+        }
+    }
+
+    private sealed class FutureVersionSettings : RootSettingsFile<FutureVersionSettings>
+    {
+        public const string SettingsFileName = "future-version-settings.json";
+
+        public static string DirectoryPathOverride { get; set; } = string.Empty;
+
+        public FutureVersionSettings()
+        {
+            DirectoryPath = DirectoryPathOverride;
+            FileName = SettingsFileName;
+            DefaultDebounceSaveMilliseconds = 0;
+        }
+
+        public string Name { get; set; } = string.Empty;
+    }
+
+    private sealed class ValidationRepairSettings : RootSettingsFile<ValidationRepairSettings>
+    {
+        public const string SettingsFileName = "validation-repair-settings.json";
+
+        public static string DirectoryPathOverride { get; set; } = string.Empty;
+
+        public ValidationRepairSettings()
+        {
+            AutoSave = true;
+            DirectoryPath = DirectoryPathOverride;
+            FileName = SettingsFileName;
+            DefaultDebounceSaveMilliseconds = 0;
+        }
+
+        public string Theme { get; set; } = "System";
+
+        protected override void ValidateSettings(SettingsValidationContext context)
+        {
+            if (!string.IsNullOrWhiteSpace(Theme)) return;
+            Theme = "System";
+            context.MarkChanged("Theme was empty.");
+        }
+    }
+
+    private sealed class ValidationCleanSettings : RootSettingsFile<ValidationCleanSettings>
+    {
+        public const string SettingsFileName = "validation-clean-settings.json";
+
+        public static string DirectoryPathOverride { get; set; } = string.Empty;
+
+        public ValidationCleanSettings()
+        {
+            DirectoryPath = DirectoryPathOverride;
+            FileName = SettingsFileName;
+            DefaultDebounceSaveMilliseconds = 0;
+        }
+
+        public string Theme { get; set; } = "System";
+
+        protected override void ValidateSettings(SettingsValidationContext context)
+        {
+            if (string.IsNullOrWhiteSpace(Theme))
+            {
+                Theme = "System";
+                context.MarkChanged("Theme was empty.");
+            }
+        }
     }
 
     private static void MarkLoaded(SubSettings settings)

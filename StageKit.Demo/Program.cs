@@ -12,7 +12,7 @@ Console.WriteLine("Hello from StageKit Demo");
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .WriteTo.Debug()
-    .CreateLogger(); ;
+    .CreateLogger();
 
 var loggerFactory = new SerilogLoggerFactory(Log.Logger, dispose: false);
 
@@ -31,6 +31,11 @@ UnhandledExceptions.SettingsFilesToSaveBeforeCrash.Add(AppSettings.Instance);
 UnhandledExceptions.SettingsFilesToSaveBeforeCrash.Add(RecentDocuments.Instance);
 
 CrashReportsFile.IsEnabled = AppSettings.Instance.EnableCrashReporting;
+
+var onboardingState = OnboardingStateFile.Instance;
+Console.WriteLine(onboardingState);
+onboardingState.RecordLaunch();
+onboardingState.CompleteOnboarding();
 ///////////////////////
 // End configuration //
 ///////////////////////
@@ -48,6 +53,14 @@ if (ApplicationKit.HasCrashReportFlag && ApplicationKit.CrashReportIndex > 0)
     return;
 }
 
+
+using var appGuard = ApplicationInstanceGuard.AcquireGlobal();
+if (appGuard.IsSecondary)
+{
+    Console.WriteLine("The app is already running on another window.");
+    Console.WriteLine("Exiting now.");
+    return;
+}
 
 ///////////////////////
 //     Main Logic    //
@@ -82,6 +95,8 @@ Console.WriteLine("Choose an option:");
 Console.WriteLine("1. Throw divide by zero exception");
 Console.WriteLine("2. Throw overflow exception");
 Console.WriteLine("3. Test SubSetting change with save");
+Console.WriteLine("b. Backup configs");
+Console.WriteLine("e. Export logs");
 Console.WriteLine("q/quit/exit = Quit application");
 
 
@@ -117,6 +132,16 @@ while (true)
             await AppSettings.Instance.WaitForDebouncedSaveAsync(TimeSpan.FromSeconds(5));
             Console.WriteLine($"Saved, {nameof(AppSettings.Instance.HasUnsavedChanges)}: {AppSettings.Instance.HasUnsavedChanges}");
         }
+    }
+    else if (line.Equals("b", StringComparison.OrdinalIgnoreCase))
+    {
+        var backup = ApplicationBackup.Create();
+        Console.WriteLine($"Backup created: {backup}");
+    }
+    else if (line.Equals("e", StringComparison.OrdinalIgnoreCase))
+    {
+        var backup = SupportBundleExporter.Export();
+        Console.WriteLine($"Export created: {backup}");
     }
     else if (line.Equals("exit", StringComparison.OrdinalIgnoreCase)
              || line.Equals("quit", StringComparison.OrdinalIgnoreCase)

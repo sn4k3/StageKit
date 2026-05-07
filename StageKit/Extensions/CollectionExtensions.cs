@@ -1,7 +1,7 @@
 using System.Collections.ObjectModel;
 using ObservableCollections;
 
-namespace StageKit;
+namespace StageKit.Extensions;
 
 /// <summary>
 /// Provides collection helper methods used by StageKit settings files.

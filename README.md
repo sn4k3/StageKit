@@ -13,10 +13,15 @@ StageKit is a lightweight .NET application infrastructure library for JSON setti
 ## Features
 
 - Singleton JSON settings files with lazy load, manual save, AutoSave, and debounced save support
+- Settings schema versioning with migration and validation/repair hooks
+- AutoSave suspension and batch update scopes
 - Observable settings base classes powered by `CommunityToolkit.Mvvm`
 - Collection-backed settings files using `ObservableList<T>` with `ItemsView` for synchronized binding
 - Save hooks through `BeforeSave()` and `AfterSave()`
 - Pending debounce tracking with timeout-aware wait support
+- Single-instance process guard based on a named semaphore
+- Atomic file writes, profile backup/restore, support bundle export, and retention helpers
+- First-run and onboarding state persistence
 - Serializable crash reports with exception chains, stack traces, runtime information, and process stats
 - AppDomain and task scheduler unhandled exception helpers
 - Panic-save support for registered `ISavable` settings before forced process exit
@@ -39,7 +44,6 @@ dotnet add package StageKit
 Configure StageKit during application startup:
 
 ```csharp
-using Microsoft.Extensions.Logging;
 using StageKit;
 
 ApplicationKit.ApplicationName = "MyApp";
@@ -77,6 +81,7 @@ public partial class AppSettings : RootSettingsFile<AppSettings>
 
     public AppSettings()
     {
+        FileName = "appsettings.json";
         AutoSave = true;
     }
 }
@@ -115,17 +120,63 @@ if (!saved)
 }
 ```
 
-`Save()` cancels any pending debounced save before writing. `CancelDebouncedSave()` cancels a scheduled save without writing.
+`Save()` cancels any pending debounced save before writing. `SaveCount` tracks successful saves for the current in-memory instance and is ignored in JSON. `CancelDebouncedSave()` cancels a scheduled save without writing.
+
+Suspend AutoSave while applying several related changes:
+
+```csharp
+settings.BatchUpdate(() =>
+{
+    settings.Theme = "Dark";
+    settings.ThemeColor = "Violet";
+});
+
+using (settings.SuspendAutoSave(saveOnDispose: false))
+{
+    settings.Theme = "Light";
+}
+```
+
+`BatchUpdate(...)` and `SuspendAutoSave(...)` still mark the file dirty while AutoSave is suspended. When the outermost scope exits, StageKit schedules one debounced save if changes happened and saving on dispose is enabled.
 
 By default, settings are stored under:
 
 ```csharp
-ApplicationKit.ConfigPath
+ApplicationKit.ProfilePath
 ```
 
 Override `DirectoryPath` or set `ApplicationKit.ProfilePath` to customize storage.
 
-If a settings file fails to deserialize on load (corrupt JSON, schema mismatch), StageKit renames it to `<file>.corrupt-<timestampUtc>` and falls back to a fresh instance. Original data is preserved on disk for inspection or recovery.
+Use schema versioning and validation hooks for app-owned settings evolution:
+
+```csharp
+public sealed class AppSettings : RootSettingsFile<AppSettings>
+{
+    protected override int CurrentSettingsVersion => 2;
+
+    public string Theme { get; set; } = "System";
+
+    protected override void MigrateSettings(SettingsMigrationContext context)
+    {
+        if (context.FromVersion < 2)
+        {
+            Theme = "System";
+        }
+    }
+
+    protected override void ValidateSettings(SettingsValidationContext context)
+    {
+        if (!string.IsNullOrWhiteSpace(Theme)) return;
+
+        Theme = "System";
+        context.MarkChanged("Theme was empty.");
+    }
+}
+```
+
+`SettingsVersion` is serialized with each settings file. Older files are migrated to `CurrentSettingsVersion` and kept dirty so the upgraded schema can be persisted. If a file was written by a newer app version, StageKit renames it to `<file>.unsupported-version-<timestampUtc>` and falls back to a fresh instance.
+
+If a settings file fails to deserialize on load (corrupt JSON), StageKit renames it to `<file>.corrupt-<timestampUtc>` and falls back to a fresh instance. Original data is preserved on disk for inspection or recovery.
 
 ## Collection Settings
 
@@ -136,11 +187,12 @@ using StageKit;
 
 public sealed class RecentFiles : RootCollectionFile<RecentFiles, string>
 {
-    public override string FileName => "recent-files.json";
-
-    public override int TrimCollectionWhenExceeding => 20;
-
-    public override CollectionSide TrimCollectionSide => CollectionSide.Head;
+    public RecentFiles()
+    {
+        FileName = "recent-files.json";
+        TrimCollectionWhenExceeding = 20;
+        TrimCollectionSide = CollectionSide.Head;
+    }
 }
 ```
 
@@ -149,7 +201,7 @@ RecentFiles.Instance.Add(@"C:\work\project.txt");
 RecentFiles.SaveInstance();
 ```
 
-`RootCollectionFile<T, TO>` exposes `Items` as an `ObservableList<TO>` and `ItemsView` as a synchronized view for UI binding. Override `TrackItemsWithChangeNotification` when collection items implement `INotifyPropertyChanged` and item property changes should mark the file dirty and trigger `AutoSave`; keep it disabled for immutable items or very large collections.
+`RootCollectionFile<T, TO>` exposes `Items` as an `ObservableList<TO>` and `ItemsView` as a synchronized view for UI binding. Set `TrackItemsWithChangeNotification = true` in the constructor when collection items implement `INotifyPropertyChanged` and item property changes should mark the file dirty and trigger `AutoSave`; keep it disabled for immutable items or very large collections.
 
 ## Observable Objects
 
@@ -178,7 +230,10 @@ using StageKit;
 
 public sealed partial class AppSettings : RootSettingsFile<AppSettings>
 {
-    public override string FileName => "appsettings.json";
+    public AppSettings()
+    {
+        FileName = "appsettings.json";
+    }
 
     [ObservableProperty]
     private string _theme = "System";
@@ -222,6 +277,78 @@ UnhandledExceptions.SettingsFilesToSaveBeforeCrash.Add(AppSettings.Instance);
 ```
 
 `SettingsFilesToSaveBeforeCrash` is a `HashSet<StageKit.Interfaces.ISavable>`, so any type implementing `ISavable` can participate.
+
+## Single Instance Guard
+
+Use `ApplicationInstanceGuard` when an app should allow only one primary process:
+
+```csharp
+using var guard = ApplicationInstanceGuard.Acquire("MyCompany.MyApp");
+
+if (guard.IsSecondary)
+{
+    return;
+}
+
+RunApplication();
+```
+
+The guard uses a named semaphore, so it can be disposed safely after async thread switches. It does not forward activation arguments yet, but the API is shaped so named-pipe activation forwarding can be added later.
+
+If your app also launches a crash-report viewer with `ApplicationKit.CrashReportFlag`, check the crash-report mode before blocking secondary instances, or use a different instance name for the viewer process.
+
+## Storage Utilities
+
+Use `SafeFile` when application code needs an atomic write outside `RootSettingsFile<T>`:
+
+```csharp
+SafeFile.WriteAllText(path, json);
+SafeFile.Write(path, stream => JsonSerializer.Serialize(stream, model));
+```
+
+Create and restore profile backups:
+
+```csharp
+var backupPath = ApplicationBackup.Create();
+ApplicationBackup.Restore(backupPath);
+
+var asyncBackupPath = await ApplicationBackup.CreateAsync();
+await ApplicationBackup.RestoreAsync(asyncBackupPath);
+```
+
+Export a diagnostics bundle for support:
+
+```csharp
+var bundlePath = SupportBundleExporter.Export(new SupportBundleOptions
+{
+    Notes = "User reported startup failure"
+});
+
+var asyncBundlePath = await SupportBundleExporter.ExportAsync();
+```
+
+Apply retention to logs and crash reports:
+
+```csharp
+ApplicationRetention.LogRetentionPolicy.MaxAge = TimeSpan.FromDays(14);
+ApplicationRetention.LogRetentionPolicy.MaxFiles = 50;
+ApplicationRetention.ApplyLogRetention();
+
+ApplicationRetention.ApplyCrashReportRetention(maxCrashReports: 25, maxAge: TimeSpan.FromDays(30));
+```
+
+Track first-run and onboarding state:
+
+```csharp
+var state = OnboardingStateFile.Instance;
+state.RecordLaunch();
+
+if (state.IsFirstRun)
+{
+    ShowOnboarding();
+    state.CompleteOnboarding("v1");
+}
+```
 
 ## Ignoring Known Safe Exceptions
 
