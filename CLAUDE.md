@@ -38,7 +38,7 @@ StageKit is a small standalone .NET infrastructure library. Most public APIs liv
 
 Runtime package dependencies are `CommunityToolkit.Mvvm`, `ObservableCollections`, and `Microsoft.Extensions.Logging.Abstractions`. SourceLink is enabled for Release packages.
 
-- **`ApplicationInstanceGuard`**: named-semaphore single-instance helper with `Acquire(instanceName)`, `IsPrimary`, and `IsSecondary`. It intentionally has no IPC or activation forwarding yet.
+- **`ApplicationInstanceGuard`**: direct named-mutex single-instance helper with `Acquire(instanceName)`, `IsPrimary`, and `IsSecondary`. Mutex ownership is thread-affine, so dispose must run on the same thread that acquired the guard. It intentionally has no IPC or activation forwarding yet.
 
 ## Code Conventions
 

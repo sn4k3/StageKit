@@ -8,21 +8,14 @@ public sealed class ApplicationInstanceGuard : IDisposable
     /// <summary>
     /// Gets a suggested global instance name based on the application domain friendly name.
     /// </summary>
-    public static string SuggestedInstanceNameGlobal => $"StageKit\\{AppDomain.CurrentDomain.FriendlyName}";
+    public static string SuggestedInstanceNameGlobal => $"StageKit_{AppDomain.CurrentDomain.FriendlyName}";
 
     /// <summary>
     /// Gets a suggested instance name based on the application domain friendly name and current user identity.
     /// </summary>
-    public static string SuggestedInstanceNamePerUser => $"{SuggestedInstanceNameGlobal}\\{Environment.UserDomainName}_{Environment.UserName}";
+    public static string SuggestedInstanceNamePerUser => $"{SuggestedInstanceNameGlobal}_{Environment.UserDomainName}_{Environment.UserName}";
 
-    /// <summary>
-    /// The semaphore used to enforce single-instance behavior. The guard is primary if the semaphore was acquired successfully.
-    /// </summary>
-    private readonly Semaphore _semaphore;
-
-    /// <summary>
-    /// Indicates whether the guard has been disposed. Once disposed, the guard should not be used and the semaphore will have been released.
-    /// </summary>
+    private readonly Mutex _mutex;
     private bool _isDisposed;
 
     /// <summary>
@@ -40,10 +33,10 @@ public sealed class ApplicationInstanceGuard : IDisposable
     /// </summary>
     public bool IsSecondary => !IsPrimary;
 
-    private ApplicationInstanceGuard(string instanceName, Semaphore semaphore, bool isPrimary)
+    private ApplicationInstanceGuard(string instanceName, Mutex mutex, bool isPrimary)
     {
         InstanceName = instanceName;
-        _semaphore = semaphore;
+        _mutex = mutex;
         IsPrimary = isPrimary;
     }
 
@@ -82,15 +75,24 @@ public sealed class ApplicationInstanceGuard : IDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(instanceName);
 
-        var semaphore = new Semaphore(1, 1, instanceName);
+        var mutex = new Mutex(false, instanceName);
         try
         {
-            var isPrimary = semaphore.WaitOne(0);
-            return new ApplicationInstanceGuard(instanceName, semaphore, isPrimary);
+            var isPrimary = false;
+            try
+            {
+                isPrimary = mutex.WaitOne(0);
+            }
+            catch (AbandonedMutexException)
+            {
+                isPrimary = true;
+            }
+
+            return new ApplicationInstanceGuard(instanceName, mutex, isPrimary);
         }
         catch
         {
-            semaphore.Dispose();
+            mutex.Dispose();
             throw;
         }
     }
@@ -99,19 +101,13 @@ public sealed class ApplicationInstanceGuard : IDisposable
     public void Dispose()
     {
         if (_isDisposed) return;
+        _isDisposed = true;
+
         if (IsPrimary)
         {
-            try
-            {
-                _semaphore.Release();
-            }
-            catch (SemaphoreFullException)
-            {
-                // The semaphore is no longer acquired by this guard.
-            }
+            _mutex.ReleaseMutex();
         }
 
-        _semaphore.Dispose();
-        _isDisposed = true;
+        _mutex.Dispose();
     }
 }

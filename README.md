@@ -19,7 +19,7 @@ StageKit is a lightweight .NET application infrastructure library for JSON setti
 - Collection-backed settings files using `ObservableList<T>` with `ItemsView` for synchronized binding
 - Save hooks through `BeforeSave()` and `AfterSave()`
 - Pending debounce tracking with timeout-aware wait support
-- Single-instance process guard based on a named semaphore
+- Single-instance process guard based on a named mutex
 - Atomic file writes, profile backup/restore, support bundle export, and retention helpers
 - First-run and onboarding state persistence
 - Serializable crash reports with exception chains, stack traces, runtime information, and process stats
@@ -293,7 +293,7 @@ if (guard.IsSecondary)
 RunApplication();
 ```
 
-The guard uses a named semaphore, so it can be disposed safely after async thread switches. It does not forward activation arguments yet, but the API is shaped so named-pipe activation forwarding can be added later.
+The guard uses a named mutex. Because .NET mutex ownership is thread-affine, dispose the guard on the same thread that acquired it. It does not forward activation arguments yet, but the API is shaped so named-pipe activation forwarding can be added later.
 
 If your app also launches a crash-report viewer with `ApplicationKit.CrashReportFlag`, check the crash-report mode before blocking secondary instances, or use a different instance name for the viewer process.
 

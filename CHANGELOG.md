@@ -2,11 +2,11 @@
 - Add serialized `SettingsVersion`, `CurrentSettingsVersion`, and `MigrateSettings(...)` for settings schema migrations.
 - Add `ValidateSettings(...)` and `SettingsValidationContext` for load-time validation and repair.
 - Add `SuspendAutoSave(...)` and `BatchUpdate(...)` to batch changes without scheduling repeated saves.
-- Add `ApplicationInstanceGuard` for named-semaphore single-instance detection.
+- Add `ApplicationInstanceGuard` for named-mutex single-instance detection.
 - Add `SafeFile`, `ApplicationBackup`, `SupportBundleExporter`, `ApplicationRetention`, and `OnboardingStateFile` utilities.
 - Use `SafeFile` for `RootSettingsFile<T>` persistence writes.
 - Add in-memory `RootSettingsFile<T>.SaveCount`, ignored in JSON.
-- Fix `ApplicationInstanceGuard` to use a named semaphore so dispose works after async thread switches.
+- Keep `ApplicationInstanceGuard` as a direct named-mutex wrapper; dispose must run on the same thread that acquired the guard.
 - Fix duplicate `RootCollectionFile<T,TO>` item instances so item change tracking remains subscribed until the last reference is removed.
 - Fix stale `ApplicationKit.CrashReportIndex` after replacing application args with missing or invalid crash-report values.
 - Fix crash report retention to suppress repeated autosaves and persist once after removals.
