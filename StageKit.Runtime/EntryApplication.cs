@@ -762,6 +762,17 @@ public static class EntryApplication
     /// </summary>
     /// <param name="runArguments">Arguments to pass to the application.</param>
     /// <returns>True if able to launch a new instance, otherwise false.</returns>
+    public static bool LaunchNewInstance(params string[] runArguments)
+    {
+        ArgumentNullException.ThrowIfNull(runArguments);
+        return LaunchNewInstance((IEnumerable<string>)runArguments);
+    }
+
+    /// <summary>
+    /// Launches a new instance of the application with the given arguments.
+    /// </summary>
+    /// <param name="runArguments">Arguments to pass to the application.</param>
+    /// <returns>True if able to launch a new instance, otherwise false.</returns>
     public static bool LaunchNewInstance(IEnumerable<string> runArguments)
     {
         ArgumentNullException.ThrowIfNull(runArguments);

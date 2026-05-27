@@ -11,6 +11,7 @@
 - Add `StageKit.Runtime` library:
     - Add `EntryApplication` class with information about the entry assembly and application instance
     - Add `RuntimeDiagnostics` class for combined runtime, process, and entry-application diagnostics
+    - Add `EntryApplication.LaunchNewInstance(params string[])` for safer multi-argument relaunch calls
 
 # v0.1.4 (07/05/2026)
 - Add serialized `SettingsVersion`, `CurrentSettingsVersion`, and `MigrateSettings(...)` for settings schema migrations.

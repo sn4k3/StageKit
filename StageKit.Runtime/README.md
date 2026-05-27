@@ -79,7 +79,10 @@ if (!EntryApplication.LaunchNewInstance("--safe-mode"))
 Prefer the enumerable overload when passing user-provided or separately computed arguments:
 
 ```csharp
-EntryApplication.LaunchNewInstance(["--profile", profileName]);
+EntryApplication.LaunchNewInstance("--profile", profileName);
+
+var arguments = new List<string> { "--profile", profileName };
+EntryApplication.LaunchNewInstance(arguments);
 ```
 
 ## Bundle Detection

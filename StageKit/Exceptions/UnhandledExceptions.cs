@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using StageKit.Interfaces;
+using StageKit.Runtime;
 
 namespace StageKit;
 
@@ -238,18 +239,9 @@ public static class UnhandledExceptions
                     spawnProcess = !HandleCrashReport.Invoke(report);
                 }
 
-                if (spawnProcess && !string.IsNullOrWhiteSpace(ApplicationKit.CrashReportFlag))
+                if (spawnProcess && !string.IsNullOrWhiteSpace(ApplicationKit.CrashReportFlag) && EntryApplication.IsExecutablePathKnown)
                 {
-                    if (!string.IsNullOrWhiteSpace(Environment.ProcessPath))
-                    {
-                        var psi = new ProcessStartInfo(Environment.ProcessPath)
-                        {
-                            UseShellExecute = true
-                        };
-                        psi.ArgumentList.Add(ApplicationKit.CrashReportFlag);
-                        psi.ArgumentList.Add(report.Id.ToString());
-                        using var process = Process.Start(psi);
-                    }
+                    EntryApplication.LaunchNewInstance(ApplicationKit.CrashReportFlag, report.Id.ToString());
                 }
             }
         }
