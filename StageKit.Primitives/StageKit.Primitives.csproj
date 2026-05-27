@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <ProductName>StageKit.Primitives</ProductName>
+        <Description>Dependency-light primitives for StageKit libraries, including disposable base types, GC handle helpers, and atomic file write utilities.</Description>
+        <PackageTags>stagekit;primitives;disposable;safehandle;atomic-file;utilities</PackageTags>
+        <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.203" PrivateAssets="All" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="" Visible="true"/>
+    </ItemGroup>
+
+</Project>

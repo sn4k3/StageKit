@@ -292,6 +292,29 @@ public sealed class RootSettingsFileAutoSaveTests
     }
 
     [Fact]
+    public void Save_WhenTrimRunsWithAutoSaveEnabled_DoesNotScheduleSecondSave()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        var settings = new TrimTrackingSettings
+        {
+            DirectoryPath = directoryPath
+        };
+        settings.EnableSaving();
+
+        settings.Add(new TrackingItem());
+        settings.Add(new TrackingItem());
+        settings.Add(new TrackingItem());
+        settings.AutoSave = true;
+
+        settings.Save();
+
+        Assert.Equal(1, settings.SaveCount);
+        Assert.False(settings.IsDebounceSavePending);
+        Assert.False(settings.HasUnsavedChanges);
+        settings.DeleteFile();
+    }
+
+    [Fact]
     public void Remove_WhenDuplicateTrackedItemStillExists_KeepsItemChangeTracking()
     {
         var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));

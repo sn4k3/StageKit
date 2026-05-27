@@ -1,3 +1,17 @@
+# v0.2.0 (27/05/2026)
+- Add `PrimaryProcess` property to `ApplicationInstanceGuard`
+- Add `StageKit.Primitives` library:
+    - Move `SafeFile` to `StageKit.Primitives`
+    - Add `DisposableObject` base class for disposable patterns
+    - Add `LeaveOpenDisposableObject` base class for disposable patterns with optional leave-open semantics
+    - Add `GCSafeHandle` for safe handle management with garbage collection support
+    - Add `SafeFileStream` for safe file stream management with atomic write support
+    - Add `PathUtilities` for common path operations and utilities
+    - Add `TemporaryDirectory` and `TemporaryFile` for temporary file and directory management
+- Add `StageKit.Runtime` library:
+    - Add `EntryApplication` class with information about the entry assembly and application instance
+    - Add `RuntimeDiagnostics` class for combined runtime, process, and entry-application diagnostics
+
 # v0.1.4 (07/05/2026)
 - Add serialized `SettingsVersion`, `CurrentSettingsVersion`, and `MigrateSettings(...)` for settings schema migrations.
 - Add `ValidateSettings(...)` and `SettingsValidationContext` for load-time validation and repair.

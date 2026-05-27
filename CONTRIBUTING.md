@@ -13,13 +13,15 @@ Thank you for your interest in contributing! Everyone is welcome to contribute t
 
 ## Building & Testing
 
-```bash
+```powershell
 dotnet restore
-dotnet build StageKit/StageKit.csproj
-dotnet test StageKit.Tests/StageKit.Tests.csproj
+dotnet build .\StageKit.slnx -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true
+dotnet test .\StageKit.Tests\StageKit.Tests.csproj -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true
 ```
 
 The library multi-targets `net8.0` and `net10.0`; the test project targets `net10.0` only.
+
+Main packages are `StageKit`, `StageKit.Primitives`, and `StageKit.Runtime`. Keep package-specific README files updated when changing user-facing APIs in those packages.
 
 ## Code Guidelines
 
@@ -34,6 +36,8 @@ The library multi-targets `net8.0` and `net10.0`; the test project targets `net1
 - Keep code clean — avoid leaving large blocks of commented-out code unless essential
 - Factory methods are prefixed with `Create`; measurement/query methods are prefixed with `Get`
 - Extensions use C# 14's explicit extension block syntax where appropriate.
+- Prefer `ArgumentNullException.ThrowIfNull(...)` for null guard clauses.
+- Do not add new runtime dependencies unless the benefit is clear for a small infrastructure library.
 
 ## Commit Messages
 

@@ -4,7 +4,13 @@ The StageKit maintainers take security seriously. This document describes how to
 
 ## Supported Versions
 
-Only the latest released version on [NuGet](https://www.nuget.org/packages/StageKit) receives security fixes. Older versions will not be patched — upgrade to the latest release to receive fixes.
+Only the latest released versions on NuGet receive security fixes. Older versions will not be patched — upgrade to the latest release to receive fixes.
+
+Package links:
+
+- [StageKit](https://www.nuget.org/packages/StageKit)
+- [StageKit.Primitives](https://www.nuget.org/packages/StageKit.Primitives)
+- [StageKit.Runtime](https://www.nuget.org/packages/StageKit.Runtime)
 
 | Version | Supported          |
 | ------- | ------------------ |
@@ -62,7 +68,7 @@ We will:
 
 In scope:
 
-- Vulnerabilities in the `StageKit` library source code (this repository), including settings persistence, crash report handling, exception logging, file path handling, and process relaunch behavior.
+- Vulnerabilities in the `StageKit`, `StageKit.Primitives`, or `StageKit.Runtime` library source code (this repository), including settings persistence, crash report handling, exception logging, atomic file writes, file path handling, runtime diagnostics, and process relaunch behavior.
 - Security issues in the NuGet package metadata, signing, or build pipeline (GitHub Actions workflows in this repository).
 
 Out of scope:
@@ -77,9 +83,11 @@ If you are unsure whether something is in scope, report it anyway and we will ro
 
 A few notes for applications using StageKit:
 
-- **Settings files.** `RootSettingsFile<T>` writes JSON files under `ApplicationKit.ConfigPath`. Applications should set this path to a trusted per-user location and avoid sharing it with untrusted users. `AutoSave` is opt-in and debounced by default.
+- **Settings files.** `RootSettingsFile<T>` writes JSON files under `ApplicationKit.ProfilePath` by default. Applications should set this path to a trusted per-user location and avoid sharing it with untrusted users. `AutoSave` is opt-in and debounced by default.
 - **Crash reports.** Crash reports can include exception messages, stack traces, process information, and custom text appended by `CrashReport.FormatMessageFunc`. Treat generated crash report files as potentially sensitive.
+- **Runtime diagnostics.** `RuntimeDiagnostics` and `EntryApplication.ApplicationInfo` can include process paths, application metadata, bundle information, and loaded assembly names. Review diagnostics before sending them to third parties.
 - **Process relaunch.** `UnhandledExceptions` can launch a new process instance for crash report handling. Applications should validate custom `ApplicationKit.CrashReportFlag` values and avoid passing untrusted command-line content.
+- **Atomic writes.** `SafeFile` and `SafeFileStream` write through temporary files next to the destination. Use trusted destination directories and avoid exposing temporary output paths to untrusted users.
 - **Panic save.** `UnhandledExceptions.SettingsFilesToSaveBeforeCrash` calls registered `ISavable.Save()` implementations before forced exit. Only register trusted settings objects whose save behavior is safe during exception handling.
 - **Thread-safety guarantees.** StageKit settings and crash report types follow standard .NET instance-member-not-thread-safe conventions unless explicitly documented otherwise.
 - **NativeAOT / trimming.** This library is not currently validated for NativeAOT or aggressive trimming. Do not assume trim safety.

@@ -16,7 +16,6 @@ Log.Logger = new LoggerConfiguration()
 
 var loggerFactory = new SerilogLoggerFactory(Log.Logger, dispose: false);
 
-
 ApplicationKit.ApplicationArgs = args;
 ApplicationKit.Logger = loggerFactory.CreateLogger("StageKitDemo");
 ApplicationKit.UiFrameworkInfo = "Console";
@@ -57,7 +56,7 @@ if (ApplicationKit.HasCrashReportFlag && ApplicationKit.CrashReportIndex > 0)
 using var appGuard = ApplicationInstanceGuard.AcquireGlobal();
 if (appGuard.IsSecondary)
 {
-    Console.WriteLine("The app is already running on another window.");
+    Console.WriteLine($"The app {appGuard.PrimaryProcess?.ProcessName} is already running on another window. PID: {appGuard.PrimaryProcess?.Id}");
     Console.WriteLine("Exiting now.");
     return;
 }

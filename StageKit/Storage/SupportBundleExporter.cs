@@ -1,3 +1,5 @@
+using StageKit.Primitives;
+using StageKit.Runtime;
 using System.IO.Compression;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -186,7 +188,7 @@ public static class SupportBundleExporter
         return new SupportBundleManifest
         {
             ApplicationName = ApplicationKit.ApplicationName,
-            Version = Helpers.AssemblyVersionString,
+            Version = EntryApplication.AssemblyVersionString,
             CreatedUtc = DateTimeOffset.UtcNow,
             MachineName = Environment.MachineName,
             UserName = Environment.UserName,
@@ -256,7 +258,7 @@ public static class SupportBundleExporter
                 return false;
             }
 
-            return !fullFilePath.StartsWith(destinationFilePath + ".tmp-", StringComparison.OrdinalIgnoreCase);
+            return !SafeFile.IsTemporaryPathFor(fullFilePath, destinationFilePath);
         };
     }
 

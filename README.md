@@ -10,6 +10,8 @@
 
 StageKit is a lightweight .NET application infrastructure library for JSON settings files, observable settings objects, crash report capture, application runtime metadata, and unhandled exception handling.
 
+The repository also includes smaller packages for reusable building blocks: `StageKit.Primitives` for low-level primitives and `StageKit.Runtime` for entry-application/runtime inspection helpers.
+
 ## Features
 
 - Singleton JSON settings files with lazy load, manual save, AutoSave, and debounced save support
@@ -21,6 +23,7 @@ StageKit is a lightweight .NET application infrastructure library for JSON setti
 - Pending debounce tracking with timeout-aware wait support
 - Single-instance process guard based on a named mutex
 - Atomic file writes, profile backup/restore, support bundle export, and retention helpers
+- Dependency-light primitives package for atomic file writes and disposable/resource helpers
 - First-run and onboarding state persistence
 - Serializable crash reports with exception chains, stack traces, runtime information, and process stats
 - AppDomain and task scheduler unhandled exception helpers
@@ -34,10 +37,28 @@ StageKit is a lightweight .NET application infrastructure library for JSON setti
 dotnet add package StageKit
 ```
 
+For only the low-level primitives:
+
+```bash
+dotnet add package StageKit.Primitives
+```
+
+For only runtime and entry-application helpers:
+
+```bash
+dotnet add package StageKit.Runtime
+```
+
 ## Requirements
 
 - .NET 8 or newer
 - C# latest language version
+
+## Packages
+
+- `StageKit` - application infrastructure: settings, crash reports, retention, backups, support bundles, single-instance guards, and app metadata.
+- `StageKit.Primitives` - dependency-light primitives: `SafeFile`, `SafeFileStream`, `PathUtilities`, `TemporaryDirectory`, `TemporaryFile`, `DisposableObject`, `LeaveOpenDisposableObject`, and `GCSafeHandle`.
+- `StageKit.Runtime` - entry-application and runtime helpers: assembly metadata, process paths, bundle detection, relaunch utilities, and combined diagnostics through `RuntimeDiagnostics`.
 
 ## Quick Start
 
@@ -299,11 +320,41 @@ If your app also launches a crash-report viewer with `ApplicationKit.CrashReport
 
 ## Storage Utilities
 
-Use `SafeFile` when application code needs an atomic write outside `RootSettingsFile<T>`:
+Use `SafeFile` from `StageKit.Primitives` when application code needs an atomic write outside `RootSettingsFile<T>`:
 
 ```csharp
+using StageKit.Primitives;
+
 SafeFile.WriteAllText(path, json);
 SafeFile.Write(path, stream => JsonSerializer.Serialize(stream, model));
+```
+
+Use `SafeFileStream` when stream-style code should still write atomically:
+
+```csharp
+using var stream = new SafeFileStream(path);
+JsonSerializer.Serialize(stream, model);
+// Dispose commits by default.
+```
+
+Set `commitOnDispose: false` when the caller should explicitly choose whether to replace the destination:
+
+```csharp
+await using var stream = new SafeFileStream(path, commitOnDispose: false);
+await JsonSerializer.SerializeAsync(stream, model, cancellationToken: cancellationToken);
+await stream.CommitAsync(cancellationToken);
+```
+
+Use the IO helpers for path checks and temporary workspace cleanup:
+
+```csharp
+if (!PathUtilities.IsSubPathOf(candidatePath, rootPath))
+{
+    throw new InvalidOperationException("Path escapes the root directory.");
+}
+
+using var directory = new TemporaryDirectory(prefix: "stagekit");
+using var file = new TemporaryFile(extension: "json");
 ```
 
 Create and restore profile backups:
@@ -386,6 +437,24 @@ Runtime duration since library initialization is available through:
 Console.WriteLine(ApplicationKit.RuntimeElapsed);
 ```
 
+## Runtime Helpers
+
+Use `StageKit.Runtime` when an app or library needs entry-application metadata, deployment shape detection, or a support-friendly diagnostics report without referencing the full `StageKit` package:
+
+```csharp
+using StageKit.Runtime;
+
+Console.WriteLine(EntryApplication.AssemblyTitle);
+Console.WriteLine(EntryApplication.BundleType);
+Console.WriteLine(RuntimeDiagnostics.GetReport());
+```
+
+Append the loaded assembly list only when needed because it can be long:
+
+```csharp
+var report = RuntimeDiagnostics.GetReport(includeLoadedAssemblies: true);
+```
+
 ## Demo
 
 See [StageKit.Demo/Program.cs](StageKit.Demo/Program.cs) for a runnable console demo covering startup configuration, Serilog integration, AutoSave settings, collection settings, panic-save registration, crash report launch handling, and debounced save waiting.
@@ -400,10 +469,10 @@ dotnet run --project StageKit.Demo/StageKit.Demo.csproj
 
 Restore, build, and test:
 
-```bash
+```powershell
 dotnet restore
-dotnet build
-dotnet test
+dotnet build .\StageKit.slnx -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true
+dotnet test .\StageKit.Tests\StageKit.Tests.csproj -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true
 ```
 
 ## Security

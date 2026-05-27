@@ -6,23 +6,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Multi-targets `net8.0` and `net10.0`. Tests are xUnit v3.
 
-```bash
+```powershell
 dotnet restore
-dotnet build StageKit/StageKit.csproj
-dotnet test StageKit.Tests/StageKit.Tests.csproj
+dotnet build .\StageKit.slnx -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true
+dotnet test .\StageKit.Tests\StageKit.Tests.csproj -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true
 ```
 
 Run a single test:
 
-```bash
-dotnet test StageKit.Tests/StageKit.Tests.csproj --filter "FullyQualifiedName~ApplicationKitBirthdayTests.AgeShortStr_WhenBornToday_ReturnsZeroYears"
+```powershell
+dotnet test .\StageKit.Tests\StageKit.Tests.csproj -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true --filter "FullyQualifiedName~ApplicationKitBirthdayTests.AgeShortStr_WhenBornToday_ReturnsZeroYears"
 ```
 
 `Directory.Build.props` sets `TreatWarningsAsErrors=true`, signs assemblies with `StageKit.snk`, and routes build output to `artifacts/`. Debug configuration disables `IsPackable`. NuGet packing only runs in Release.
 
 ## Architecture
 
-StageKit is a small standalone .NET infrastructure library. Most public APIs live in `StageKit`; small supporting APIs live in `StageKit.Extensions` and `StageKit.Interfaces`. The pieces interlock through `ApplicationKit` static configuration:
+StageKit is a small standalone .NET infrastructure library. Core application infrastructure APIs live in `StageKit`; dependency-light reusable helpers live in `StageKit.Primitives`; runtime and entry-application helpers live in `StageKit.Runtime`. Small supporting core APIs live in `StageKit.Extensions` and `StageKit.Interfaces`. The core pieces interlock through `ApplicationKit` static configuration:
 
 - **`ApplicationKit`** (partial class, split with `ApplicationKit.Birthday.cs`) — process-wide config: `ApplicationName`, `ApplicationArgs`, `Logger`, `ProfilePath`/`ConfigsPath`/`LogsPath`, shared `JsonSerializerOptions`, startup timestamp/runtime duration, birthday helpers, and crash-report-flag parsing. `ApplicationArgs` setter auto-detects `--crash-report <id>` and populates `HasCrashReportFlag` + `CrashReportIndex`; `CrashReport` resolves the active report when possible. Default `ProfilePath` is OS-aware (Windows/Linux: `ApplicationData`; macOS: `~/Library/Application Support`).
 
@@ -30,15 +30,17 @@ StageKit is a small standalone .NET infrastructure library. Most public APIs liv
 
 - **Crash reporting**: `ExceptionInfo` captures one exception (type, message, stack, data, source), `CrashReport` walks `InnerException`/`AggregateException` chains and adds runtime/process info, `CrashReportsFile` is a `RootCollectionFile` of crash reports (opt-in via `CrashReportsFile.IsEnabled`).
 
-- **Storage utilities**: `SafeFile` provides temp-file atomic writes. `ApplicationBackup` creates/restores profile zip backups. `SupportBundleExporter` writes manifest/config/log support bundles. `ApplicationRetention` applies log file and crash report retention. `OnboardingStateFile` persists first-run/onboarding completion state as a `RootSettingsFile<T>`.
+- **Storage utilities**: `ApplicationBackup` creates/restores profile zip backups. `SupportBundleExporter` writes manifest/config/log support bundles. `ApplicationRetention` applies log file and crash report retention. `OnboardingStateFile` persists first-run/onboarding completion state as a `RootSettingsFile<T>`. Atomic writes and low-level IO helpers live in `StageKit.Primitives` as `SafeFile`, `SafeFileStream`, `PathUtilities`, `TemporaryDirectory`, and `TemporaryFile`.
 
 - **`UnhandledExceptions`**: registers `AppDomain.UnhandledException` and `TaskScheduler.UnobservedTaskException` handlers (idempotent, lock-guarded). Filters via `IgnoredExceptionList` (types) and `IgnoredExceptionMessages` (case-insensitive substrings). `HandleCrashReport` callback returning `false` lets StageKit relaunch the app with `CrashReportFlag`. `SettingsFilesToSaveBeforeCrash` stores `StageKit.Interfaces.ISavable` and calls `Save()` before `Environment.Exit`. **Configure ignore/save lists during startup only** — they are not thread-safe under concurrent exception handling.
 
 - **CommunityToolkit.Mvvm** is a runtime package reference. StageKit-derived classes can use `[ObservableProperty]`, but consuming apps that use generator attributes should reference `CommunityToolkit.Mvvm` directly so analyzers/source generators run in that project.
 
-Runtime package dependencies are `CommunityToolkit.Mvvm`, `ObservableCollections`, and `Microsoft.Extensions.Logging.Abstractions`. SourceLink is enabled for Release packages.
+The main `StageKit` package dependencies are `CommunityToolkit.Mvvm`, `ObservableCollections`, and `Microsoft.Extensions.Logging.Abstractions`. `StageKit.Primitives` and `StageKit.Runtime` should stay zero-runtime-dependency packages unless there is a strong reason. SourceLink is enabled for Release packages.
 
 - **`ApplicationInstanceGuard`**: direct named-mutex single-instance helper with `Acquire(instanceName)`, `IsPrimary`, and `IsSecondary`. Mutex ownership is thread-affine, so dispose must run on the same thread that acquired the guard. It intentionally has no IPC or activation forwarding yet.
+
+- **`StageKit.Runtime`**: `EntryApplication` exposes entry assembly metadata, process/executable paths, runtime identifier, bundle detection for .NET single-file, AppImage, Flatpak, and macOS `.app`, loaded assembly formatting, and best-effort relaunch. `RuntimeDiagnostics` combines BCL runtime/process information with `EntryApplication` data for logs, support bundles, and crash reports.
 
 ## Code Conventions
 

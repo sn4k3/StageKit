@@ -168,11 +168,11 @@ public static class UnhandledExceptions
 
         if (CanIgnoreException(ex))
         {
-            ApplicationKit.Logger?.LogWarning(ex, "CurrentDomainUnhandledException");
+            ApplicationKit.Logger?.LogWarning(ex, "[CurrentDomainUnhandledException:Ignored]");
             return;
         }
 
-        HandleUnhandledException(ex, "CurrentDomainUnhandledException", false);
+        HandleUnhandledException(ex, "[CurrentDomainUnhandledException]", false);
     }
 
     /// <summary>
@@ -184,12 +184,12 @@ public static class UnhandledExceptions
     {
         if (CanIgnoreException(e.Exception))
         {
-            ApplicationKit.Logger?.LogWarning(e.Exception, "UnobservedTaskException");
+            ApplicationKit.Logger?.LogWarning(e.Exception, "[UnobservedTaskException:Ignored]");
             e.SetObserved();
             return;
         }
 
-        HandleUnhandledException(e.Exception, "UnobservedTaskException", false);
+        HandleUnhandledException(e.Exception, "[UnobservedTaskException]", false);
     }
 
     /// <summary>
@@ -325,16 +325,16 @@ public static class UnhandledExceptions
             {
                 yield return innerException;
             }
-
-            yield break;
         }
-
-        var currentException = exception;
-        do
+        else
         {
-            yield return currentException;
-            currentException = currentException.InnerException;
-        } while (currentException is not null);
+            var currentException = exception;
+            do
+            {
+                yield return currentException;
+                currentException = currentException.InnerException;
+            } while (currentException is not null);
+        }
     }
     #endregion
 }

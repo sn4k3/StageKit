@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using StageKit.Interfaces;
+using StageKit.Primitives;
 
 namespace StageKit;
 
@@ -570,7 +571,7 @@ public abstract class RootSettingsFile<T> : SubSettings, ISavable, IDisposable w
         }
     }
 
-    private sealed class AutoSaveSuspensionScope : IDisposable
+    private sealed class AutoSaveSuspensionScope : DisposableObject
     {
         private RootSettingsFile<T>? _owner;
 
@@ -579,7 +580,7 @@ public abstract class RootSettingsFile<T> : SubSettings, ISavable, IDisposable w
             _owner = owner;
         }
 
-        public void Dispose()
+        protected override void DisposeManaged()
         {
             Interlocked.Exchange(ref _owner, null)?.ResumeAutoSaveSuspension();
         }

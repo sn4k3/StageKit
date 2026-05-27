@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using StageKit.Primitives;
 
 namespace StageKit.Tests;
 
@@ -14,7 +15,7 @@ public sealed class ApplicationStorageUtilitiesTests
         SafeFile.WriteAllText(filePath, "new");
 
         Assert.Equal("new", File.ReadAllText(filePath));
-        Assert.Empty(Directory.GetFiles(directoryPath, "*.tmp-*"));
+        Assert.Empty(Directory.GetFiles(directoryPath, "*.tmp.*"));
     }
 
     [Fact]
@@ -27,7 +28,7 @@ public sealed class ApplicationStorageUtilitiesTests
         await SafeFile.WriteAllTextAsync(filePath, "new", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal("new", await File.ReadAllTextAsync(filePath, TestContext.Current.CancellationToken));
-        Assert.Empty(Directory.GetFiles(directoryPath, "*.tmp-*"));
+        Assert.Empty(Directory.GetFiles(directoryPath, "*.tmp.*"));
     }
 
     [Fact]
@@ -51,7 +52,7 @@ public sealed class ApplicationStorageUtilitiesTests
 
         Assert.Equal(cancellationTokenSource.Token, exception.CancellationToken);
         Assert.Equal("old", await File.ReadAllTextAsync(filePath, TestContext.Current.CancellationToken));
-        Assert.Empty(Directory.GetFiles(directoryPath, "*.tmp-*"));
+        Assert.Empty(Directory.GetFiles(directoryPath, "*.tmp.*"));
     }
 
     [Fact]
@@ -220,7 +221,7 @@ public sealed class ApplicationStorageUtilitiesTests
 
             Assert.NotNull(archive.GetEntry("logs/app.log"));
             Assert.DoesNotContain(archive.Entries, entry => entry.FullName.Contains("support.zip", StringComparison.OrdinalIgnoreCase));
-            Assert.DoesNotContain(archive.Entries, entry => entry.FullName.Contains(".tmp-", StringComparison.OrdinalIgnoreCase));
+            Assert.DoesNotContain(archive.Entries, entry => entry.FullName.Contains(".tmp.", StringComparison.OrdinalIgnoreCase));
         }
         finally
         {
@@ -257,7 +258,7 @@ public sealed class ApplicationStorageUtilitiesTests
 
             Assert.NotNull(archive.GetEntry("logs/app.log"));
             Assert.DoesNotContain(archive.Entries, entry => entry.FullName.Contains("support.zip", StringComparison.OrdinalIgnoreCase));
-            Assert.DoesNotContain(archive.Entries, entry => entry.FullName.Contains(".tmp-", StringComparison.OrdinalIgnoreCase));
+            Assert.DoesNotContain(archive.Entries, entry => entry.FullName.Contains(".tmp.", StringComparison.OrdinalIgnoreCase));
         }
         finally
         {

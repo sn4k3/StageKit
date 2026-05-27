@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using StageKit.Primitives;
 
 namespace StageKit;
 
@@ -40,13 +41,13 @@ public static class ApplicationBackup
                         return false;
                     }
 
-                    if (fullFilePath.StartsWith(destinationFilePath + ".tmp-", StringComparison.OrdinalIgnoreCase))
+                    if (SafeFile.IsTemporaryPathFor(fullFilePath, destinationFilePath))
                     {
                         return false;
                     }
 
                     return options.IncludeBackupsDirectory
-                           || !IsSubPathOf(fullFilePath, backupsDirectoryPath);
+                           || !PathUtilities.IsSubPathOf(fullFilePath, backupsDirectoryPath);
                 });
         });
 
@@ -95,13 +96,13 @@ public static class ApplicationBackup
                             return false;
                         }
 
-                        if (fullFilePath.StartsWith(destinationFilePath + ".tmp-", StringComparison.OrdinalIgnoreCase))
+                        if (SafeFile.IsTemporaryPathFor(fullFilePath, destinationFilePath))
                         {
                             return false;
                         }
 
                         return options.IncludeBackupsDirectory
-                               || !IsSubPathOf(fullFilePath, backupsDirectoryPath);
+                               || !PathUtilities.IsSubPathOf(fullFilePath, backupsDirectoryPath);
                     },
                     cancellationToken: token).ConfigureAwait(false);
             },
@@ -129,7 +130,7 @@ public static class ApplicationBackup
             if (string.IsNullOrEmpty(entry.Name)) continue;
 
             var destinationPath = Path.GetFullPath(Path.Combine(destinationRoot, entry.FullName));
-            if (!IsSubPathOf(destinationPath, destinationRoot))
+            if (!PathUtilities.IsSubPathOf(destinationPath, destinationRoot))
             {
                 throw new InvalidOperationException($"Backup entry escapes the destination directory: {entry.FullName}");
             }
@@ -180,7 +181,7 @@ public static class ApplicationBackup
             if (string.IsNullOrEmpty(entry.Name)) continue;
 
             var destinationPath = Path.GetFullPath(Path.Combine(destinationRoot, entry.FullName));
-            if (!IsSubPathOf(destinationPath, destinationRoot))
+            if (!PathUtilities.IsSubPathOf(destinationPath, destinationRoot))
             {
                 throw new InvalidOperationException($"Backup entry escapes the destination directory: {entry.FullName}");
             }
@@ -236,7 +237,7 @@ public static class ApplicationBackup
             var entryName = string.IsNullOrWhiteSpace(entryPrefix)
                 ? relativePath
                 : Path.Combine(entryPrefix, relativePath);
-            archive.CreateEntryFromFile(filePath, NormalizeEntryName(entryName), CompressionLevel.Optimal);
+            archive.CreateEntryFromFile(filePath, PathUtilities.NormalizeArchiveEntryName(entryName), CompressionLevel.Optimal);
         }
     }
 
@@ -265,7 +266,7 @@ public static class ApplicationBackup
             await AddFileToArchiveAsync(
                 archive,
                 filePath,
-                NormalizeEntryName(entryName),
+                PathUtilities.NormalizeArchiveEntryName(entryName),
                 cancellationToken).ConfigureAwait(false);
         }
     }
@@ -308,12 +309,7 @@ public static class ApplicationBackup
     /// <returns>True if the path is a subpath of the root path; otherwise, false.</returns>
     internal static bool IsSubPathOf(string path, string rootPath)
     {
-        var fullPath = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var fullRoot = Path.GetFullPath(rootPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-
-        return string.Equals(fullPath, fullRoot, StringComparison.OrdinalIgnoreCase)
-               || fullPath.StartsWith(fullRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-               || fullPath.StartsWith(fullRoot + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+        return PathUtilities.IsSubPathOf(path, rootPath);
     }
 
     /// <summary>
@@ -323,7 +319,7 @@ public static class ApplicationBackup
     /// <returns>The normalized entry name.</returns>
     internal static string NormalizeEntryName(string entryName)
     {
-        return entryName.Replace(Path.DirectorySeparatorChar, '/').Replace(Path.AltDirectorySeparatorChar, '/');
+        return PathUtilities.NormalizeArchiveEntryName(entryName);
     }
 
     /// <summary>

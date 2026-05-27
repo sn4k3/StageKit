@@ -148,7 +148,6 @@ public static partial class ApplicationKit
         }
 
         return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ApplicationName);
-
     }
 
     /// <summary>

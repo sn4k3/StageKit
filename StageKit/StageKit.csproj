@@ -11,4 +11,9 @@
         <PackageReference Include="ObservableCollections" Version="3.3.4" />
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\StageKit.Primitives\StageKit.Primitives.csproj" />
+      <ProjectReference Include="..\StageKit.Runtime\StageKit.Runtime.csproj" />
+    </ItemGroup>
+
 </Project>

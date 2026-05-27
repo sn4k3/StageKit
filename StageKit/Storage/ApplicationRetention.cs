@@ -53,11 +53,20 @@ public static class ApplicationRetention
         if (policy.MaxAge is { } maxAge)
         {
             var deleteBeforeUtc = DateTime.UtcNow - maxAge;
-            foreach (var file in files.Where(file => file.LastWriteTimeUtc < deleteBeforeUtc).ToArray())
+            var retainedFiles = new List<FileInfo>(files.Count);
+            foreach (var file in files)
             {
-                TryDelete(file.FullName, result);
-                files.Remove(file);
+                if (file.LastWriteTimeUtc < deleteBeforeUtc)
+                {
+                    TryDelete(file.FullName, result);
+                }
+                else
+                {
+                    retainedFiles.Add(file);
+                }
             }
+
+            files = retainedFiles;
         }
 
         if (policy.MaxFiles > 0)

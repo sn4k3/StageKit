@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json.Serialization;
+using StageKit.Runtime;
 
 namespace StageKit;
 
@@ -24,7 +25,7 @@ public record CrashReport
     /// <summary>
     /// Gets the application version captured when the report was created.
     /// </summary>
-    public string Version { get; init; } = Helpers.AssemblyVersionString ?? string.Empty;
+    public string Version { get; init; } = EntryApplication.AssemblyVersionString ?? string.Empty;
 
     /// <summary>
     /// Gets the captured exception information.

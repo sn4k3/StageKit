@@ -16,6 +16,8 @@ public abstract class RootCollectionFile<T, TO> : RootSettingsFile<T>, IList<TO>
 {
     #region Members
     private readonly Dictionary<INotifyPropertyChanged, int> _trackedItemReferenceCounts = new(ReferenceEqualityComparer.Instance);
+
+    private bool _isTrimmingBeforeSave;
     #endregion
 
     #region Properties
@@ -92,6 +94,7 @@ public abstract class RootCollectionFile<T, TO> : RootSettingsFile<T>, IList<TO>
             }
         }
 
+        if (_isTrimmingBeforeSave) return;
         if (!IsLoaded) return;
         HasUnsavedChanges = true;
         ScheduleAutoSaveAfterChange(DefaultDebounceSaveMilliseconds);
@@ -110,7 +113,16 @@ public abstract class RootCollectionFile<T, TO> : RootSettingsFile<T>, IList<TO>
         base.BeforeSave();
         var maxItemCount = TrimCollectionWhenExceeding;
         if (maxItemCount <= 0 || Items.Count <= maxItemCount) return;
-        Items.RemoveExceedingAt(maxItemCount, TrimCollectionSide);
+
+        _isTrimmingBeforeSave = true;
+        try
+        {
+            Items.RemoveExceedingAt(maxItemCount, TrimCollectionSide);
+        }
+        finally
+        {
+            _isTrimmingBeforeSave = false;
+        }
     }
     #endregion
 

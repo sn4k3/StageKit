@@ -6,6 +6,8 @@
     <File Path="README.md" />
   </Folder>
   <Project Path="StageKit.Demo/StageKit.Demo.csproj" Id="8a2537af-e246-4e2c-aa96-e62580f80130" />
+  <Project Path="StageKit.Primitives/StageKit.Primitives.csproj" Id="fb48c447-c9c4-4496-8ca9-132c4661fed2" />
+  <Project Path="StageKit.Runtime/StageKit.Runtime.csproj" />
   <Project Path="StageKit.Tests/StageKit.Tests.csproj" />
   <Project Path="StageKit/StageKit.csproj" />
 </Solution>
