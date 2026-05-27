@@ -9,7 +9,8 @@
         <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
 
         <!-- Metadata -->
-        <ProductName>StageKit</ProductName>
+        <MainProductName>StageKit</MainProductName>
+        <ProductName>$(MainProductName)</ProductName>
         <Company>PTRTECH</Company>
         <CompanyRDNS>pt.ptrtech</CompanyRDNS>
         <Authors>Tiago Conceição</Authors>
@@ -18,8 +19,8 @@
         <Version>0.2.0</Version>
 
         <!-- Package -->
-        <ApplicationIcon>$(MSBuildThisFileDirectory)media\$(ProductName).ico</ApplicationIcon>
-        <PackageIcon>$(ProductName)_128.png</PackageIcon>
+        <ApplicationIcon>$(MSBuildThisFileDirectory)media\$(MainProductName).ico</ApplicationIcon>
+        <PackageIcon>$(MainProductName)_128.png</PackageIcon>
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
@@ -44,7 +45,7 @@
 
         <!-- Sign -->
         <SignAssembly>True</SignAssembly>
-        <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)$(ProductName).snk</AssemblyOriginatorKeyFile>
+        <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)$(MainProductName).snk</AssemblyOriginatorKeyFile>
 
         <!-- No pack under Debug -->
         <IsPackable Condition="'$(Configuration)' == 'Debug'">false</IsPackable>
@@ -55,7 +56,19 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <None Include="$(MSBuildThisFileDirectory)media\$(ProductName)_128.png" Pack="true" PackagePath="" Visible="false"/>
-        <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="" Visible="true"/>
+        <None Include="$(MSBuildThisFileDirectory)media\$(MainProductName)_128.png" Pack="true" PackagePath="" Visible="false"/>
     </ItemGroup>
+
+    <Choose>
+        <When Condition="Exists('$(MSBuildProjectDirectory)\README.md')">
+            <ItemGroup>
+                <None Include="$(MSBuildProjectDirectory)\README.md" Pack="true" PackagePath="" Visible="true" />
+            </ItemGroup>
+        </When>
+        <When Condition="Exists('$(MSBuildThisFileDirectory)README.md')">
+            <ItemGroup>
+                <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="" Visible="true" />
+            </ItemGroup>
+        </When>
+    </Choose>
 </Project>

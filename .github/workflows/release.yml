@@ -35,7 +35,7 @@ jobs:
 
       # 📦 Pack the project
       - name: 📦 Pack
-        run: dotnet pack StageKit --configuration Release --output .
+        run: dotnet pack --configuration Release --output .
 
       # 🏷️ Create a Git tag
       - name: 🏷️ Create Git tag
