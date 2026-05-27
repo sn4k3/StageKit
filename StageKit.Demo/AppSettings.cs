@@ -32,6 +32,7 @@ public partial class AppSettings : RootSettingsFile<AppSettings>
     public AppSettings()
     {
         AutoSave = true;
+        DirectoryPath = ApplicationKit.ConfigsPath;
     }
 
     public override string ToString()
