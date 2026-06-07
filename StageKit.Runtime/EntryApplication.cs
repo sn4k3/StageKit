@@ -24,8 +24,8 @@ public static class EntryApplication
     /// accesses.</remarks>
     private static readonly Lazy<string> GenericRuntimeIdentifierLazy = new(() =>
         OperatingSystem.IsWindows() ? $"win-{RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant()}" :
-        OperatingSystem.IsMacOS()   ? $"osx-{RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant()}" :
-        OperatingSystem.IsLinux()   ? $"linux-{RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant()}" :
+        OperatingSystem.IsMacOS() ? $"osx-{RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant()}" :
+        OperatingSystem.IsLinux() ? $"linux-{RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant()}" :
         RuntimeInformation.RuntimeIdentifier);
 
     /// <summary>
@@ -228,7 +228,8 @@ public static class EntryApplication
         if (!OperatingSystem.IsMacOS()) return null;
 
         const string appSuffix = ".app";
-        var pathRequirement = $"{appSuffix}{Path.DirectorySeparatorChar}Contents{Path.DirectorySeparatorChar}MacOS{Path.DirectorySeparatorChar}";
+        var pathRequirement =
+            $"{appSuffix}{Path.DirectorySeparatorChar}Contents{Path.DirectorySeparatorChar}MacOS{Path.DirectorySeparatorChar}";
         var index = AppContext.BaseDirectory.IndexOf(pathRequirement, StringComparison.OrdinalIgnoreCase);
 
         if (index >= 1)
@@ -258,10 +259,13 @@ public static class EntryApplication
             using var currentProcess = Process.GetCurrentProcess();
             processName = currentProcess.ProcessName;
         }
-        if (!string.IsNullOrWhiteSpace(processName) && OperatingSystem.IsWindows() && !processName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+
+        if (!string.IsNullOrWhiteSpace(processName) && OperatingSystem.IsWindows() &&
+            !processName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
         {
             processName += ".exe";
         }
+
         return processName;
     });
 
@@ -308,23 +312,25 @@ public static class EntryApplication
     /// strategies. If the executable path cannot be determined, the tuple fields for path and name are null, the base
     /// directory is set to the application's base directory, and the flag is set to <see langword="false"/>. Accessing
     /// this value is thread-safe and the computation is performed only once.</remarks>
-    private static readonly Lazy<(string? ExecutablePath, string? ExecutableName, string? BaseDirectory, bool IsExecutablePathKnown)> ExecutableInfoLazy = new(() =>
-    {
-        var executablePath = LinuxAppImagePath
-                            ?? LinuxFlatpakPath
-                            ?? MacOSAppBundlePath
-                            ?? DotNetSingleFileAppPath
-                            ?? (IsRunningFromDotNetProcess && !string.IsNullOrWhiteSpace(AssemblyLocation)
-                                ? AssemblyLocation
-                                : Environment.ProcessPath);
-
-        if (string.IsNullOrWhiteSpace(executablePath))
+    private static readonly
+        Lazy<(string? ExecutablePath, string? ExecutableName, string? BaseDirectory, bool IsExecutablePathKnown)>
+        ExecutableInfoLazy = new(() =>
         {
-            return (null, null, AppContext.BaseDirectory, false);
-        }
+            var executablePath = LinuxAppImagePath
+                                 ?? LinuxFlatpakPath
+                                 ?? MacOSAppBundlePath
+                                 ?? DotNetSingleFileAppPath
+                                 ?? (IsRunningFromDotNetProcess && !string.IsNullOrWhiteSpace(AssemblyLocation)
+                                     ? AssemblyLocation
+                                     : Environment.ProcessPath);
 
-        return (executablePath, Path.GetFileName(executablePath), Path.GetDirectoryName(executablePath), true);
-    });
+            if (string.IsNullOrWhiteSpace(executablePath))
+            {
+                return (null, null, AppContext.BaseDirectory, false);
+            }
+
+            return (executablePath, Path.GetFileName(executablePath), Path.GetDirectoryName(executablePath), true);
+        });
 
     /// <summary>
     /// Provides lazy initialization for the detected application bundle type based on the current runtime environment.
@@ -446,7 +452,8 @@ public static class EntryApplication
     public static Version? AssemblyVersion => AssemblyVersionLazy.Value;
 
     /// <summary>
-    /// Gets the entry assembly version, as specified by the <see cref="AssemblyVersionAttribute"/>, if null, fallbacks to the <see cref="AssemblyInformationalVersion"/>, but without the commit hash if present.
+    /// Gets the entry assembly informational version without build metadata, falling back to the
+    /// <see cref="AssemblyVersionAttribute"/> version when the informational version is unavailable.
     /// </summary>
     /// <example>1.0.0-dev</example>
     public static string? AssemblyVersionString => AssemblyVersionStringLazy.Value;
@@ -500,7 +507,8 @@ public static class EntryApplication
     /// <summary>
     /// Checks if the application is running under a dotnet process.
     /// </summary>
-    [MemberNotNullWhen(true, nameof(ProcessName), nameof(ExecutablePath), nameof(ExecutableName), nameof(BaseDirectory))]
+    [MemberNotNullWhen(true, nameof(ProcessName), nameof(ExecutablePath), nameof(ExecutableName),
+        nameof(BaseDirectory))]
     public static bool IsRunningFromDotNetProcess => IsRunningFromDotNetProcessLazy.Value;
 
     /// <summary>
@@ -511,7 +519,8 @@ public static class EntryApplication
     /// <summary>
     /// Checks if the application is running under a single-file app (PublishSingleFile) bundled by dotnet.
     /// </summary>
-    [MemberNotNullWhen(true, nameof(DotNetSingleFileAppPath), nameof(ExecutablePath), nameof(ExecutableName), nameof(BaseDirectory))]
+    [MemberNotNullWhen(true, nameof(DotNetSingleFileAppPath), nameof(ExecutablePath), nameof(ExecutableName),
+        nameof(BaseDirectory))]
     public static bool IsDotNetSingleFileApp => !string.IsNullOrWhiteSpace(DotNetSingleFileAppPath);
 
     /// <summary>
@@ -522,7 +531,8 @@ public static class EntryApplication
     /// <summary>
     /// Checks if the application is running under linux application image (AppImage).
     /// </summary>
-    [MemberNotNullWhen(true, nameof(LinuxAppImagePath), nameof(ExecutablePath), nameof(ExecutableName), nameof(BaseDirectory))]
+    [MemberNotNullWhen(true, nameof(LinuxAppImagePath), nameof(ExecutablePath), nameof(ExecutableName),
+        nameof(BaseDirectory))]
     public static bool IsLinuxAppImage => !string.IsNullOrWhiteSpace(LinuxAppImagePath);
 
     /// <summary>
@@ -538,7 +548,8 @@ public static class EntryApplication
     /// <summary>
     /// Checks if the application is running under linux flatpak.
     /// </summary>
-    [MemberNotNullWhen(true, nameof(LinuxFlatpakPath), nameof(ExecutablePath), nameof(ExecutableName), nameof(BaseDirectory))]
+    [MemberNotNullWhen(true, nameof(LinuxFlatpakPath), nameof(ExecutablePath), nameof(ExecutableName),
+        nameof(BaseDirectory))]
     public static bool IsLinuxFlatpak => !string.IsNullOrWhiteSpace(LinuxFlatpakId);
 
     /// <summary>
@@ -549,7 +560,8 @@ public static class EntryApplication
     /// <summary>
     /// Checks if the application is running under a macOS app bundle.
     /// </summary>
-    [MemberNotNullWhen(true, nameof(MacOSAppBundlePath), nameof(ExecutablePath), nameof(ExecutableName), nameof(BaseDirectory))]
+    [MemberNotNullWhen(true, nameof(MacOSAppBundlePath), nameof(ExecutablePath), nameof(ExecutableName),
+        nameof(BaseDirectory))]
     public static bool IsMacOSAppBundle => !string.IsNullOrWhiteSpace(MacOSAppBundlePath);
 
     /// <summary>
@@ -579,7 +591,8 @@ public static class EntryApplication
     /// <remarks>When this property is <see langword="true"/>, the <see cref="ExecutablePath"/>, <see
     /// cref="ExecutableName"/>, and <see cref="BaseDirectory"/> properties are guaranteed to be non-null. If <see
     /// langword="false"/>, these properties may not be available.</remarks>
-    [MemberNotNullWhen(true, nameof(ExecutablePath), nameof(ExecutableName), nameof(BaseDirectory), nameof(ProcessPath))]
+    [MemberNotNullWhen(true, nameof(ExecutablePath), nameof(ExecutableName), nameof(BaseDirectory),
+        nameof(ProcessPath))]
     public static bool IsExecutablePathKnown => ExecutableInfoLazy.Value.IsExecutablePathKnown;
 
     /// <summary>
@@ -614,6 +627,7 @@ public static class EntryApplication
                 sb.AppendFormat(format, i + 1, assembly.Name, assembly.Version);
                 sb.AppendLine();
             }
+
             return sb.ToString().TrimEnd();
         }
     }
@@ -640,10 +654,10 @@ public static class EntryApplication
         }
     }
 
-
     #endregion
 
     #region Methods
+
     /// <summary>
     /// Returns a dictionary of the entry application information.
     /// </summary>
@@ -732,7 +746,8 @@ public static class EntryApplication
                 if (Directory.Exists(ExecutablePath))
                 {
                     return Utilities.StartProcess("open",
-                        $"\"{ExecutablePath}\"{(runArguments is null ? string.Empty : $" --args {runArguments}")}") == 0;
+                               $"\"{ExecutablePath}\"{(runArguments is null ? string.Empty : $" --args {runArguments}")}") ==
+                           0;
                 }
             }
 

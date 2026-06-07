@@ -2,6 +2,7 @@
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
+        <Description>Console demo for StageKit startup configuration, settings persistence, crash reporting, support utilities, and logging integration.</Description>
         <TargetFrameworks></TargetFrameworks>
         <TargetFramework>net10.0</TargetFramework>
         <IsPackable>false</IsPackable>

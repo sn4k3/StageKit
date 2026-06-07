@@ -15,8 +15,8 @@
         <CompanyRDNS>pt.ptrtech</CompanyRDNS>
         <Authors>Tiago Conceição</Authors>
         <Copyright>Copyright 2026-$([System.DateTime]::Now.ToString(`yyyy`)) © PTRTECH</Copyright>
-        <Description>StageKit is a lightweight .NET application infrastructure library for JSON settings, schema migrations, atomic storage, backups, support bundles, retention, onboarding state, single-instance guards, crash reports, and unhandled exception handling.</Description>
-        <Version>0.2.0</Version>
+        <Description>StageKit repository project.</Description>
+        <Version>0.2.1</Version>
 
         <!-- Package -->
         <ApplicationIcon>$(MSBuildThisFileDirectory)media\$(MainProductName).ico</ApplicationIcon>

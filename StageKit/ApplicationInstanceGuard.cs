@@ -163,19 +163,12 @@ public sealed class ApplicationInstanceGuard : DisposableObject
     /// <inheritdoc />
     protected override void DisposeManaged()
     {
-        try
-        {
-            if (IsPrimary)
-            {
-                _mutex.ReleaseMutex();
-            }
-        }
-        finally
-        {
-            _primaryProcess?.Dispose();
-            _primaryProcess = null;
-            _mutex.Dispose();
-        }
+        // Do not call ReleaseMutex: it is thread-affine and throws if disposal runs on a different thread than Acquire.
+        // Disposing the handle releases ownership from any thread. If still owned, the OS marks the mutex abandoned, which
+        // Acquire already treats as primary via AbandonedMutexException.
+        _primaryProcess?.Dispose();
+        _primaryProcess = null;
+        _mutex.Dispose();
     }
 
     #endregion

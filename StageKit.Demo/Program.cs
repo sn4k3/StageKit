@@ -14,7 +14,7 @@ Log.Logger = new LoggerConfiguration()
     .WriteTo.Debug()
     .CreateLogger();
 
-var loggerFactory = new SerilogLoggerFactory(Log.Logger, dispose: false);
+var loggerFactory = new SerilogLoggerFactory(Log.Logger);
 
 ApplicationKit.ApplicationArgs = args;
 ApplicationKit.Logger = loggerFactory.CreateLogger("StageKitDemo");
@@ -28,6 +28,14 @@ UnhandledExceptions.RegisterTaskSchedulerUnobservedTaskException();
 // Dispatcher.UIThread.UnhandledException += (sender, e) => UnhandledExceptions.HandleUnhandledException(e.Exception, "Dispatcher");
 UnhandledExceptions.SettingsFilesToSaveBeforeCrash.Add(AppSettings.Instance);
 UnhandledExceptions.SettingsFilesToSaveBeforeCrash.Add(RecentDocuments.Instance);
+UnhandledExceptions.ExceptionThrown += (_, e) =>
+{
+    e.CustomData = new Dictionary<string, object?>
+    {
+        ["OnboardingState"] = OnboardingStateFile.Instance,
+        ["OnboardingStateString"] = OnboardingStateFile.Instance.ToString()
+    };
+};
 
 CrashReportsFile.IsEnabled = AppSettings.Instance.EnableCrashReporting;
 
@@ -56,7 +64,8 @@ if (ApplicationKit.HasCrashReportFlag && ApplicationKit.CrashReportIndex > 0)
 using var appGuard = ApplicationInstanceGuard.AcquireGlobal();
 if (appGuard.IsSecondary)
 {
-    Console.WriteLine($"The app {appGuard.PrimaryProcess?.ProcessName} is already running on another window. PID: {appGuard.PrimaryProcess?.Id}");
+    Console.WriteLine(
+        $"The app {appGuard.PrimaryProcess?.ProcessName} is already running on another window. PID: {appGuard.PrimaryProcess?.Id}");
     Console.WriteLine("Exiting now.");
     return;
 }
@@ -79,6 +88,7 @@ while (!AppSettings.Instance.FileExists)
     Console.WriteLine($"{AppSettings.Instance.FileName} does not exists, waiting 300ms...");
     await Task.Delay(300);
 }
+
 Console.WriteLine(AppSettings.Instance.ToString());
 
 RecentDocuments.Instance.Clear();
@@ -93,7 +103,8 @@ RecentDocuments.Instance.Add("document7.docx");
 Console.WriteLine("Choose an option:");
 Console.WriteLine("1. Throw divide by zero exception");
 Console.WriteLine("2. Throw overflow exception");
-Console.WriteLine("3. Test SubSetting change with save");
+Console.WriteLine("3. Throw divide by zero and overflow exception in parallel");
+Console.WriteLine("4. Test SubSetting change with save");
 Console.WriteLine("b. Backup configs");
 Console.WriteLine("e. Export logs");
 Console.WriteLine("q/quit/exit = Quit application");
@@ -107,29 +118,62 @@ while (true)
 
     if (line.Equals("1", StringComparison.OrdinalIgnoreCase))
     {
-        int zero = 0;
-        int overflow = int.MaxValue;
+        var zero = 0;
+        var overflow = int.MaxValue;
         overflow *= 2;
+        // ReSharper disable once UnusedVariable
         var cantDivideByZero = overflow / zero;
     }
     else if (line.Equals("2", StringComparison.OrdinalIgnoreCase))
     {
-        int overflow = int.MaxValue;
+        // ReSharper disable once NotAccessedVariable
+        var overflow = int.MaxValue;
         checked
         {
+            // ReSharper disable once RedundantAssignment
             overflow *= 2;
         }
     }
     else if (line.Equals("3", StringComparison.OrdinalIgnoreCase))
     {
-        Console.WriteLine($"{nameof(AppSettings.Instance.HasUnsavedChanges)}: {AppSettings.Instance.HasUnsavedChanges}");
+        Parallel.For(0, 20, i =>
+        {
+            if (i % 2 == 0)
+            {
+                var zero = 0;
+                var overflow = int.MaxValue;
+                // ReSharper disable once IntVariableOverflowInUncheckedContext
+                overflow *= 2;
+                // ReSharper disable once UnusedVariable
+                // ReSharper disable once IntDivisionByZero
+                var cantDivideByZero = overflow / zero;
+            }
+            else
+            {
+                // ReSharper disable once NotAccessedVariable
+                var overflow = int.MaxValue;
+                checked
+                {
+                    // ReSharper disable once IntVariableOverflowInCheckedContext
+                    // ReSharper disable once RedundantAssignment
+                    overflow *= 2;
+                }
+            }
+        });
+    }
+    else if (line.Equals("4", StringComparison.OrdinalIgnoreCase))
+    {
+        Console.WriteLine(
+            $"{nameof(AppSettings.Instance.HasUnsavedChanges)}: {AppSettings.Instance.HasUnsavedChanges}");
         AppSettings.Instance.General.MaxThreads = Random.Shared.Next(1, 101);
-        Console.WriteLine($"{nameof(AppSettings.Instance.HasUnsavedChanges)}: {AppSettings.Instance.HasUnsavedChanges}");
+        Console.WriteLine(
+            $"{nameof(AppSettings.Instance.HasUnsavedChanges)}: {AppSettings.Instance.HasUnsavedChanges}");
         if (AppSettings.Instance.HasUnsavedChanges)
         {
             Console.WriteLine($"Waiting for save: {AppSettings.Instance.CanSave}");
             await AppSettings.Instance.WaitForDebouncedSaveAsync(TimeSpan.FromSeconds(5));
-            Console.WriteLine($"Saved, {nameof(AppSettings.Instance.HasUnsavedChanges)}: {AppSettings.Instance.HasUnsavedChanges}");
+            Console.WriteLine(
+                $"Saved, {nameof(AppSettings.Instance.HasUnsavedChanges)}: {AppSettings.Instance.HasUnsavedChanges}");
         }
     }
     else if (line.Equals("b", StringComparison.OrdinalIgnoreCase))

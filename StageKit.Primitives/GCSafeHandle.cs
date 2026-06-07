@@ -33,6 +33,9 @@ namespace StageKit.Primitives;
 // ReSharper disable once InconsistentNaming
 public class GCSafeHandle : SafeHandle
 {
+    /// <summary>
+    /// The GCHandle that this SafeHandle manages. It can be of any type (Pinned, Normal, Weak, etc.) depending on the use case.
+    /// </summary>
     private GCHandle _gcHandle;
 
     /// <summary>
@@ -68,6 +71,7 @@ public class GCSafeHandle : SafeHandle
         {
             _gcHandle.Free();
         }
+
         return true;
     }
 }

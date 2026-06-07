@@ -1,3 +1,19 @@
+# v0.2.1 (07/06/2026)
+- Add `CrashReport.GcTotalMemory`, `GcTotalAllocatedBytes`, and `GcCollectionCounts` to capture managed heap, lifetime allocations, and per-generation GC counts at crash time.
+- Add `CrashReport.CustomData` (`IReadOnlyDictionary<string, object?>`) for application-specific key-value data, appended to the formatted report.
+- Add `StageKitExceptionEventArgs` carrying `Category`, `IsIgnored`, and `CustomData`, with a `ToCrashReport()` helper and conversion constructors from `UnhandledExceptionEventArgs`/`UnobservedTaskExceptionEventArgs`.
+- Add `UnhandledExceptions.ExceptionThrown` event, raised for every caught unhandled exception (fatal or ignored).
+- Add `UnhandledExceptions.HandleSafeException(...)` to log a non-fatal exception at a configurable `LogLevel`.
+- Add `UnhandledExceptions.HandleUnhandledException(StageKitExceptionEventArgs, ...)` overload; non-terminating unhandled exceptions are now logged via `HandleSafeException` instead of terminating the process.
+- Add `CrashReport` constructors taking optional `customData` and a `StageKitExceptionEventArgs`.
+- Fix `ExceptionInfo` to preserve aggregate exception metadata, capture complete nested exception trees, omit null optional JSON properties, and avoid recursive construction for deep exception chains.
+- Rename `CrashReport.ElapsedRuntime` to `ProgramElapsedRuntime`.
+- `CrashReport.DateTimeUtc` is no longer `required`.
+- Move `CrashReport` capture to property initializers and chain the exception constructor through the default constructor.
+- `UnhandledExceptions` now invokes `HandleCrashReport` before persisting to `CrashReportsFile`, so the handler can manipulate the report before it is displayed or persisted.
+- Fix `ApplicationInstanceGuard.Dispose` to be thread-safe: it disposes the mutex handle instead of calling the thread-affine `ReleaseMutex`, so dispose can run on any thread (OS marks the mutex abandoned, which `Acquire` already treats as primary).
+- Improve package descriptions for `StageKit`, `StageKit.Primitives`, and `StageKit.Runtime`.
+
 # v0.2.0 (27/05/2026)
 - Add `PrimaryProcess` property to `ApplicationInstanceGuard`
 - Add `StageKit.Primitives` library:

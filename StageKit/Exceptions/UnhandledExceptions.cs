@@ -34,6 +34,7 @@ public static class UnhandledExceptions
     #endregion
 
     #region Configurations
+
     /// <summary>
     /// Gets exception types that should be ignored when evaluating unhandled exceptions.
     /// </summary>
@@ -61,11 +62,21 @@ public static class UnhandledExceptions
     /// Gets or sets the process exit code used after a fatal unhandled exception.
     /// </summary>
     public static int FatalExitCode { get; set; } = 9;
+
     #endregion
 
     #region Events
+
     /// <summary>
-    /// Gets or sets an optional crash report handler.
+    /// Occurs when an unhandled exception is caught by StageKit's handlers, regardless of whether the exception is considered fatal or ignored.
+    /// Provides the exception and category for logging and crash reporting, as well as a flag to indicate whether the exception should be ignored for crash reporting purposes.
+    /// </summary>
+    public static event EventHandler<StageKitExceptionEventArgs>? ExceptionThrown;
+
+
+    /// <summary>
+    /// Gets or sets an optional crash report handler.<br/>
+    /// Can be used to manipulate the crash report before it is displayed or persisted.
     /// </summary>
     /// <remarks>
     /// Return <see langword="true"/> to indicate the crash report was handled. Return
@@ -77,9 +88,11 @@ public static class UnhandledExceptions
     /// Occurs immediately before <see cref="Environment.Exit(int)"/> is called.
     /// </summary>
     public static event EventHandler? BeforeForcedExit;
+
     #endregion
 
     #region Methods
+
     /// <summary>
     /// Determines whether an exception should be ignored.
     /// </summary>
@@ -167,13 +180,28 @@ public static class UnhandledExceptions
             return;
         }
 
-        if (CanIgnoreException(ex))
+        var args = new StageKitExceptionEventArgs(e)
         {
-            ApplicationKit.Logger?.LogWarning(ex, "[CurrentDomainUnhandledException:Ignored]");
+            Category = "[CurrentDomainUnhandledException]",
+            IsIgnored = CanIgnoreException(ex)
+        };
+
+        RaiseExceptionThrown(args);
+
+        if (args.IsIgnored)
+        {
+            HandleSafeException(ex, "[CurrentDomainUnhandledException:Ignored]");
             return;
         }
 
-        HandleUnhandledException(ex, "[CurrentDomainUnhandledException]", false);
+        if (args.IsTerminating)
+        {
+            HandleUnhandledExceptionCore(args, false, false);
+        }
+        else
+        {
+            HandleSafeException(ex, "[CurrentDomainUnhandledException]");
+        }
     }
 
     /// <summary>
@@ -183,63 +211,95 @@ public static class UnhandledExceptions
     /// <param name="e">The unobserved task exception event data.</param>
     public static void TaskSchedulerOnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
     {
-        if (CanIgnoreException(e.Exception))
+        var args = new StageKitExceptionEventArgs(e)
         {
-            ApplicationKit.Logger?.LogWarning(e.Exception, "[UnobservedTaskException:Ignored]");
+            Category = "[UnobservedTaskException]",
+            IsIgnored = CanIgnoreException(e.Exception)
+        };
+
+        RaiseExceptionThrown(args);
+
+        if (args.IsIgnored)
+        {
+            HandleSafeException(e.Exception, "[UnobservedTaskException:Ignored]");
             e.SetObserved();
             return;
         }
 
-        HandleUnhandledException(e.Exception, "[UnobservedTaskException]", false);
+        HandleUnhandledExceptionCore(args, false, false);
     }
 
     /// <summary>
-    /// Logs, records, and terminates the process for a fatal unhandled exception.
+    /// Logs, records, and terminates the process for a fatal unhandled exception contained in <see cref="StageKitExceptionEventArgs"/>. Should be called from process-wide unhandled exception handlers when an unhandled exception is considered fatal (i.e. when IsTerminating is <see langword="true"/>).
     /// </summary>
-    /// <param name="ex">The exception to handle.</param>
-    /// <param name="category">The log and crash report category.</param>
+    /// <param name="args">The <see cref="StageKitExceptionEventArgs"/> containing the exception details.</param>
     /// <param name="searchForIgnoredExceptions">Whether ignore rules should be checked before handling.</param>
     public static void HandleUnhandledException(
-        Exception ex,
-        string? category = null,
+        StageKitExceptionEventArgs args,
         bool searchForIgnoredExceptions = true)
     {
-        ArgumentNullException.ThrowIfNull(ex);
+        ArgumentNullException.ThrowIfNull(args);
 
-        if (searchForIgnoredExceptions && CanIgnoreException(ex))
+        HandleUnhandledExceptionCore(args, searchForIgnoredExceptions, true);
+    }
+
+    private static void HandleUnhandledExceptionCore(
+        StageKitExceptionEventArgs args,
+        bool searchForIgnoredExceptions,
+        bool raiseExceptionThrown)
+    {
+        if (args.ExceptionObject is not Exception ex) return;
+        var category = args.Category;
+
+        if (args.IsIgnored || (searchForIgnoredExceptions && CanIgnoreException(ex)))
         {
+            var ignoredArgs = args.IsIgnored
+                ? args
+                : new StageKitExceptionEventArgs(args) { IsIgnored = true };
+
+            if (raiseExceptionThrown)
+            {
+                RaiseExceptionThrown(ignoredArgs);
+            }
+
             try
             {
-                ApplicationKit.Logger?.LogWarning(ex, category);
+                HandleSafeException(ex, category);
             }
             catch (Exception e)
             {
                 Debug.WriteLine(e);
             }
+
             return;
+        }
+
+        if (raiseExceptionThrown)
+        {
+            RaiseExceptionThrown(args);
         }
 
         try
         {
-            ApplicationKit.Logger?.LogCritical(ex, category);
+            HandleSafeException(ex, category, LogLevel.Critical);
 
             if (!ApplicationKit.HasCrashReportFlag)
             {
-                var report = new CrashReport(ex, category ?? string.Empty);
+                var report = args.ToCrashReport();
+
+                var handledExternally = false;
+                if (HandleCrashReport is not null)
+                {
+                    handledExternally = HandleCrashReport.Invoke(report);
+                }
 
                 if (CrashReportsFile.IsEnabled)
                 {
                     CrashReportsFile.Instance.Add(report);
                 }
 
-
-                var spawnProcess = true;
-                if (HandleCrashReport is not null)
-                {
-                    spawnProcess = !HandleCrashReport.Invoke(report);
-                }
-
-                if (spawnProcess && !string.IsNullOrWhiteSpace(ApplicationKit.CrashReportFlag) && EntryApplication.IsExecutablePathKnown)
+                if (!handledExternally && !string.IsNullOrWhiteSpace(ApplicationKit.CrashReportFlag) &&
+                    EntryApplication.IsExecutablePathKnown)
                 {
                     EntryApplication.LaunchNewInstance(ApplicationKit.CrashReportFlag, report.Id.ToString());
                 }
@@ -261,6 +321,20 @@ public static class UnhandledExceptions
         }
 
         Environment.Exit(FatalExitCode);
+    }
+
+    /// <summary>
+    /// Logs, records, and terminates the process for a fatal unhandled exception.
+    /// </summary>
+    /// <param name="ex">The exception to handle.</param>
+    /// <param name="category">The log and crash report category.</param>
+    /// <param name="searchForIgnoredExceptions">Whether ignore rules should be checked before handling.</param>
+    public static void HandleUnhandledException(
+        Exception ex,
+        string? category = null,
+        bool searchForIgnoredExceptions = true)
+    {
+        HandleUnhandledException(new StageKitExceptionEventArgs(ex, category, false), searchForIgnoredExceptions);
     }
 
     /// <summary>
@@ -311,22 +385,65 @@ public static class UnhandledExceptions
     /// <returns>A sequence containing the exception and its inner exceptions.</returns>
     public static IEnumerable<Exception> TraverseExceptions(Exception exception)
     {
-        if (exception is AggregateException aggregateException)
+        ArgumentNullException.ThrowIfNull(exception);
+
+        var exceptions = new Stack<Exception>();
+        exceptions.Push(exception);
+
+        while (exceptions.TryPop(out var currentException))
         {
-            foreach (var innerException in aggregateException.Flatten().InnerExceptions)
+            yield return currentException;
+
+            if (currentException is AggregateException aggregateException)
             {
-                yield return innerException;
+                for (var i = aggregateException.InnerExceptions.Count - 1; i >= 0; i--)
+                {
+                    exceptions.Push(aggregateException.InnerExceptions[i]);
+                }
+            }
+            else if (currentException.InnerException is not null)
+            {
+                exceptions.Push(currentException.InnerException);
             }
         }
-        else
+    }
+
+    /// <summary>
+    /// Enumerates the direct inner exception chain without expanding aggregate exceptions.
+    /// </summary>
+    /// <param name="exception">The exception whose inner exceptions should be enumerated.</param>
+    /// <returns>The direct inner exception chain.</returns>
+    public static IEnumerable<Exception> TraverseInnerExceptions(Exception exception)
+    {
+        var innerException = exception.InnerException;
+        while (innerException is not null)
         {
-            var currentException = exception;
-            do
-            {
-                yield return currentException;
-                currentException = currentException.InnerException;
-            } while (currentException is not null);
+            yield return innerException;
+            innerException = innerException.InnerException;
         }
     }
+
+    private static void RaiseExceptionThrown(StageKitExceptionEventArgs args)
+    {
+        var handlers = ExceptionThrown;
+        if (handlers is null)
+        {
+            return;
+        }
+
+        foreach (var invocation in handlers.GetInvocationList())
+        {
+            var handler = (EventHandler<StageKitExceptionEventArgs>)invocation;
+            try
+            {
+                handler.Invoke(null, args);
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine(e);
+            }
+        }
+    }
+
     #endregion
 }

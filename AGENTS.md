@@ -96,7 +96,7 @@ Storage helpers in `StageKit` include `ApplicationBackup`, `SupportBundleExporte
 
 `StageKit.Runtime` contains `EntryApplication`, `ApplicationBundleType`, and `RuntimeDiagnostics`. Keep this package focused on runtime, process, entry assembly, bundle detection, relaunch, and diagnostics helpers.
 
-`ApplicationInstanceGuard` is a direct named-mutex single-instance helper. Mutex ownership is thread-affine, so dispose must happen on the same thread that acquired the guard.
+`ApplicationInstanceGuard` is a direct named-mutex single-instance helper. Dispose can run on any thread: it closes the mutex handle (instead of calling thread-affine `ReleaseMutex`). If still owned, the OS marks the mutex abandoned and the next `Acquire` treats `AbandonedMutexException` as primary. It intentionally has no IPC or activation forwarding yet.
 
 ## Behavioral Constraints
 

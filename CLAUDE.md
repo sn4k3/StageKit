@@ -38,7 +38,7 @@ StageKit is a small standalone .NET infrastructure library. Core application inf
 
 The main `StageKit` package dependencies are `CommunityToolkit.Mvvm`, `ObservableCollections`, and `Microsoft.Extensions.Logging.Abstractions`. `StageKit.Primitives` and `StageKit.Runtime` should stay zero-runtime-dependency packages unless there is a strong reason. SourceLink is enabled for Release packages.
 
-- **`ApplicationInstanceGuard`**: direct named-mutex single-instance helper with `Acquire(instanceName)`, `IsPrimary`, and `IsSecondary`. Mutex ownership is thread-affine, so dispose must run on the same thread that acquired the guard. It intentionally has no IPC or activation forwarding yet.
+- **`ApplicationInstanceGuard`**: direct named-mutex single-instance helper with `Acquire(instanceName)`, `IsPrimary`, and `IsSecondary`. Dispose can run on any thread: it closes the mutex handle (not thread-affine) instead of calling the thread-affine `ReleaseMutex`; if still owned, the OS marks the mutex abandoned and the next `Acquire` treats `AbandonedMutexException` as primary. It intentionally has no IPC or activation forwarding yet.
 
 - **`StageKit.Runtime`**: `EntryApplication` exposes entry assembly metadata, process/executable paths, runtime identifier, bundle detection for .NET single-file, AppImage, Flatpak, and macOS `.app`, loaded assembly formatting, and best-effort relaunch. `RuntimeDiagnostics` combines BCL runtime/process information with `EntryApplication` data for logs, support bundles, and crash reports.
 

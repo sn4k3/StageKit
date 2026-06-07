@@ -1,8 +1,8 @@
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using StageKit.Runtime;
 
 namespace StageKit;
 
@@ -17,9 +17,9 @@ public static partial class ApplicationKit
     public static ILogger? Logger { get; set; }
 
     /// <summary>
-    /// Gets the timestamp when the application started, used as a reference point for calculating runtime durations.
+    /// Gets the approximate <see cref="Stopwatch"/> timestamp when the current process started.
     /// </summary>
-    public static long StartingTimestamp { get; } = Stopwatch.GetTimestamp();
+    public static long StartingTimestamp { get; } = GetProcessStartingTimestamp();
 
     /// <summary>
     /// Gets the elapsed time since the application started.
@@ -27,6 +27,25 @@ public static partial class ApplicationKit
     /// <remarks>This property provides a high-resolution measurement of the application's runtime duration.
     /// The value is calculated from the moment the application process began.</remarks>
     public static TimeSpan RuntimeElapsed => Stopwatch.GetElapsedTime(StartingTimestamp);
+
+    private static long GetProcessStartingTimestamp()
+    {
+        var currentTimestamp = Stopwatch.GetTimestamp();
+
+        try
+        {
+            using var process = Process.GetCurrentProcess();
+            var elapsedSinceProcessStart = DateTime.UtcNow - process.StartTime.ToUniversalTime();
+            if (elapsedSinceProcessStart <= TimeSpan.Zero) return currentTimestamp;
+
+            var elapsedTimestampTicks = (long)(elapsedSinceProcessStart.TotalSeconds * Stopwatch.Frequency);
+            return currentTimestamp - elapsedTimestampTicks;
+        }
+        catch
+        {
+            return currentTimestamp;
+        }
+    }
 
     /// <summary>
     /// Gets or sets the command-line arguments for the current application instance.
@@ -41,27 +60,36 @@ public static partial class ApplicationKit
         set
         {
             field = value;
-            HasCrashReportFlag = false;
-            CrashReportIndex = 0;
-            if (field is null || string.IsNullOrWhiteSpace(CrashReportFlag)) return;
-            var crashReportIndex = Array.IndexOf(field, CrashReportFlag);
-            if (crashReportIndex >= 0 && field.Length > crashReportIndex + 1)
-            {
-                _ = long.TryParse(field[crashReportIndex + 1], out var crashReportHashCode);
-                if (crashReportHashCode > 0)
-                {
-                    CrashReportIndex = crashReportHashCode;
-                }
-
-                HasCrashReportFlag = true;
-            }
+            ParseCrashReportArgs();
         }
     }
 
     /// <summary>
+    /// Gets a unique session identifier for the current application instance, can be used to correlate logs and crash reports across the application's runtime.
+    /// </summary>
+    public static Guid SessionId { get; } =
+#if NET10_0_OR_GREATER
+        Guid.CreateVersion7();
+#else
+        Guid.NewGuid();
+#endif
+
+    /// <summary>
     /// Gets or sets the application name used to build default data paths.
     /// </summary>
-    public static string ApplicationName { get; set; } = AppDomain.CurrentDomain.FriendlyName;
+    public static string ApplicationName
+    {
+        get;
+        set
+        {
+            var previousDefaultProfilePath = GetDefaultProfilePath();
+            var usesDefaultProfilePath =
+                string.Equals(ProfilePath, previousDefaultProfilePath, StringComparison.Ordinal);
+
+            field = value;
+            if (usesDefaultProfilePath) ProfilePath = GetDefaultProfilePath();
+        }
+    } = EntryApplication.AssemblyName ?? "StageKitUnknownApplication";
 
     /// <summary>
     /// Gets or sets optional UI framework information included in crash reports.
@@ -71,12 +99,19 @@ public static partial class ApplicationKit
     /// <summary>
     /// Gets or sets the command-line argument used to open a crash report instance.
     /// </summary>
-    public static string? CrashReportFlag { get; set; } = "--crash-report";
+    public static string? CrashReportFlag
+    {
+        get;
+        set
+        {
+            field = value;
+            ParseCrashReportArgs();
+        }
+    } = "--crash-report";
 
     /// <summary>
     /// Gets a value indicating whether <see cref="ApplicationArgs"/> contains <see cref="CrashReportFlag"/>.
     /// </summary>
-    [MemberNotNullWhen(true, nameof(CrashReport))]
     public static bool HasCrashReportFlag { get; private set; }
 
     /// <summary>
@@ -88,7 +123,25 @@ public static partial class ApplicationKit
     /// <summary>
     /// Gets the active crash report when <see cref="HasCrashReportFlag"/> is <see langword="true"/> and <see cref="CrashReportIndex"/> is greater than 0; otherwise, <see langword="null"/>.
     /// </summary>
-    public static CrashReport? CrashReport => HasCrashReportFlag && CrashReportIndex > 0 ? CrashReportsFile.Instance.GetActual(CrashReportIndex) : null;
+    public static CrashReport? CrashReport => HasCrashReportFlag && CrashReportIndex > 0
+        ? CrashReportsFile.Instance.GetActual(CrashReportIndex)
+        : null;
+
+    private static void ParseCrashReportArgs()
+    {
+        HasCrashReportFlag = false;
+        CrashReportIndex = 0;
+        if (ApplicationArgs is null || string.IsNullOrWhiteSpace(CrashReportFlag)) return;
+
+        var crashReportIndex = Array.IndexOf(ApplicationArgs, CrashReportFlag);
+        if (crashReportIndex < 0) return;
+
+        HasCrashReportFlag = true;
+        if (ApplicationArgs.Length <= crashReportIndex + 1) return;
+
+        _ = long.TryParse(ApplicationArgs[crashReportIndex + 1], out var crashReportHashCode);
+        if (crashReportHashCode > 0) CrashReportIndex = crashReportHashCode;
+    }
 
     /// <summary>
     /// Gets or sets the root profile directory for application data.
@@ -132,20 +185,16 @@ public static partial class ApplicationKit
     public static string GetDefaultProfilePath()
     {
         if (OperatingSystem.IsWindows() || OperatingSystem.IsLinux())
-        {
             return Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 ApplicationName);
-        }
 
         if (OperatingSystem.IsMacOS())
-        {
             return Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 "Library",
                 "Application Support",
                 ApplicationName);
-        }
 
         return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ApplicationName);
     }
@@ -161,7 +210,7 @@ public static partial class ApplicationKit
         IgnoreReadOnlyProperties = true,
         Converters =
         {
-            new JsonStringEnumConverter(),
+            new JsonStringEnumConverter()
         }
     };
 }
