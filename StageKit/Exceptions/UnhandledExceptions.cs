@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using StageKit.Extensions;
 using StageKit.Interfaces;
 using StageKit.Runtime;
 
@@ -102,7 +103,7 @@ public static class UnhandledExceptions
     {
         ArgumentNullException.ThrowIfNull(ex);
 
-        foreach (var exception in TraverseExceptions(ex))
+        foreach (var exception in ex.Traverse())
         {
             var exceptionType = exception.GetType();
             foreach (var ignoredType in IgnoredExceptionList)
@@ -374,58 +375,6 @@ public static class UnhandledExceptions
             catch (Exception e)
             {
                 Debug.WriteLine(e);
-            }
-        }
-    }
-
-
-    /// <summary>
-    /// Traverses an exception and its inner exceptions using the specified traversal type.
-    /// </summary>
-    /// <param name="exception">The exception to traverse.</param>
-    /// <param name="traversalType">The type of exception traversal to perform.</param>
-    /// <returns>A sequence containing the supplied exception followed by its traversed inner exceptions.</returns>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="traversalType"/> is not supported.</exception>
-    public static IEnumerable<Exception> TraverseExceptions(
-        Exception exception,
-        ExceptionTraversalType traversalType = ExceptionTraversalType.ExceptionTree)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-
-        if (traversalType is not ExceptionTraversalType.ExceptionTree and
-            not ExceptionTraversalType.InnerExceptionChain)
-        {
-            throw new ArgumentOutOfRangeException(nameof(traversalType), traversalType, null);
-        }
-
-        var currentException = exception;
-        Stack<Exception>? pendingExceptions = null;
-
-        while (true)
-        {
-            yield return currentException;
-
-            if (traversalType is ExceptionTraversalType.ExceptionTree &&
-                currentException is AggregateException { InnerExceptions.Count: > 0 } aggregateException)
-            {
-                for (var i = aggregateException.InnerExceptions.Count - 1; i >= 1; i--)
-                {
-                    (pendingExceptions ??= new Stack<Exception>()).Push(aggregateException.InnerExceptions[i]);
-                }
-
-                currentException = aggregateException.InnerExceptions[0];
-                continue;
-            }
-
-            if (currentException.InnerException is not null)
-            {
-                currentException = currentException.InnerException;
-                continue;
-            }
-
-            if (pendingExceptions is null || !pendingExceptions.TryPop(out currentException))
-            {
-                yield break;
             }
         }
     }

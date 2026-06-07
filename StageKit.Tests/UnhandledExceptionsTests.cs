@@ -1,3 +1,5 @@
+using StageKit.Extensions;
+
 namespace StageKit.Tests;
 
 public sealed class UnhandledExceptionsTests
@@ -48,8 +50,8 @@ public sealed class UnhandledExceptionsTests
             new InvalidOperationException("first", new IOException("first child")),
             new AggregateException(new ArgumentException("second")));
 
-        var exceptionTypes = UnhandledExceptions
-            .TraverseExceptions(exception)
+        var exceptionTypes = exception
+            .Traverse()
             .Select(item => item.GetType())
             .ToArray();
 
@@ -71,8 +73,8 @@ public sealed class UnhandledExceptionsTests
             new InvalidOperationException("first", new IOException("first child")),
             new ArgumentException("second"));
 
-        var messages = UnhandledExceptions
-            .TraverseExceptions(exception, ExceptionTraversalType.InnerExceptionChain)
+        var messages = exception
+            .Traverse(ExceptionTraversalType.InnerExceptionChain)
             .Select(item => item.Message)
             .ToArray();
 
@@ -82,9 +84,8 @@ public sealed class UnhandledExceptionsTests
     [Fact]
     public void TraverseExceptions_WhenTraversalTypeIsUnsupported_ThrowsArgumentOutOfRangeException()
     {
-        var exceptions = UnhandledExceptions.TraverseExceptions(
-            new InvalidOperationException(),
-            (ExceptionTraversalType)(-1));
+        var exceptions = new InvalidOperationException()
+            .Traverse((ExceptionTraversalType)(-1));
 
         Assert.Throws<ArgumentOutOfRangeException>(() => exceptions.ToArray());
     }
@@ -162,7 +163,8 @@ public sealed class UnhandledExceptionsTests
     public void CurrentDomainOnUnhandledException_WhenSubscriberThrows_ContinuesInvokingSubscribers()
     {
         var invocationCount = 0;
-        EventHandler<StageKitExceptionEventArgs> throwingHandler = (_, _) => throw new InvalidOperationException("subscriber failed");
+        EventHandler<StageKitExceptionEventArgs> throwingHandler =
+            (_, _) => throw new InvalidOperationException("subscriber failed");
         EventHandler<StageKitExceptionEventArgs> countingHandler = (_, _) => invocationCount++;
 
         try

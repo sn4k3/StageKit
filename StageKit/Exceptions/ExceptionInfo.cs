@@ -2,6 +2,7 @@
 
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
+using StageKit.Extensions;
 
 namespace StageKit;
 
@@ -73,9 +74,7 @@ public record ExceptionInfo
             return;
         }
 
-        var innerExceptions = UnhandledExceptions
-            .TraverseExceptions(exception, traversalType)
-            .Skip(1);
+        var innerExceptions = exception.Traverse(traversalType).Skip(1);
 
         InnerException = CreateLinkedList(innerExceptions, includeStackTrace);
     }
@@ -111,7 +110,7 @@ public record ExceptionInfo
             linkedException = new ExceptionInfo(
                 exception,
                 includeStackTrace,
-                includeInnerException: false)
+                false)
             {
                 InnerException = linkedException
             };
