@@ -78,13 +78,13 @@ public sealed class ExceptionInfoTests
     }
 
     [Fact]
-    public void Constructor_WhenAggregateLinkingDisabled_FollowsDirectInnerExceptionChain()
+    public void Constructor_WhenUsingInnerExceptionChainTraversal_FollowsDirectInnerExceptionChain()
     {
         var first = new InvalidOperationException("first");
         var second = new ArgumentException("second");
         var exception = new AggregateException(first, second);
 
-        var info = new ExceptionInfo(exception, handleAggregateExceptionAsLinkedLink: false);
+        var info = new ExceptionInfo(exception, traversalType: ExceptionTraversalType.InnerExceptionChain);
         var messages = info.TraverseExceptions().Select(item => item.Message).ToArray();
 
         Assert.Equal([exception.Message, "first"], messages);

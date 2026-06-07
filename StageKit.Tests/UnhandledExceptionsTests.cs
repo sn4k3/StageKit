@@ -42,10 +42,10 @@ public sealed class UnhandledExceptionsTests
     }
 
     [Fact]
-    public void TraverseExceptions_WhenAggregateException_ReturnsFlattenedExceptions()
+    public void TraverseExceptions_WhenUsingDefaultTraversal_ReturnsExceptionTreeInDepthFirstPreOrder()
     {
         var exception = new AggregateException(
-            new InvalidOperationException("first"),
+            new InvalidOperationException("first", new IOException("first child")),
             new AggregateException(new ArgumentException("second")));
 
         var exceptionTypes = UnhandledExceptions
@@ -57,10 +57,36 @@ public sealed class UnhandledExceptionsTests
             [
                 typeof(AggregateException),
                 typeof(InvalidOperationException),
+                typeof(IOException),
                 typeof(AggregateException),
                 typeof(ArgumentException)
             ],
             exceptionTypes);
+    }
+
+    [Fact]
+    public void TraverseExceptions_WhenUsingInnerExceptionChain_DoesNotExpandAggregateBranches()
+    {
+        var exception = new AggregateException(
+            new InvalidOperationException("first", new IOException("first child")),
+            new ArgumentException("second"));
+
+        var messages = UnhandledExceptions
+            .TraverseExceptions(exception, ExceptionTraversalType.InnerExceptionChain)
+            .Select(item => item.Message)
+            .ToArray();
+
+        Assert.Equal([exception.Message, "first", "first child"], messages);
+    }
+
+    [Fact]
+    public void TraverseExceptions_WhenTraversalTypeIsUnsupported_ThrowsArgumentOutOfRangeException()
+    {
+        var exceptions = UnhandledExceptions.TraverseExceptions(
+            new InvalidOperationException(),
+            (ExceptionTraversalType)(-1));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => exceptions.ToArray());
     }
 
     [Fact]

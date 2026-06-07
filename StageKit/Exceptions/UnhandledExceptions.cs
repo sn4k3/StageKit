@@ -378,48 +378,55 @@ public static class UnhandledExceptions
         }
     }
 
+
     /// <summary>
-    /// Traverses an exception and its inner exceptions, including all inner exceptions of any encountered <see cref="AggregateException"/> instances.
+    /// Traverses an exception and its inner exceptions using the specified traversal type.
     /// </summary>
     /// <param name="exception">The exception to traverse.</param>
-    /// <returns>A sequence containing the exception and its inner exceptions.</returns>
-    public static IEnumerable<Exception> TraverseExceptions(Exception exception)
+    /// <param name="traversalType">The type of exception traversal to perform.</param>
+    /// <returns>A sequence containing the supplied exception followed by its traversed inner exceptions.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="traversalType"/> is not supported.</exception>
+    public static IEnumerable<Exception> TraverseExceptions(
+        Exception exception,
+        ExceptionTraversalType traversalType = ExceptionTraversalType.ExceptionTree)
     {
         ArgumentNullException.ThrowIfNull(exception);
 
-        var exceptions = new Stack<Exception>();
-        exceptions.Push(exception);
+        if (traversalType is not ExceptionTraversalType.ExceptionTree and
+            not ExceptionTraversalType.InnerExceptionChain)
+        {
+            throw new ArgumentOutOfRangeException(nameof(traversalType), traversalType, null);
+        }
 
-        while (exceptions.TryPop(out var currentException))
+        var currentException = exception;
+        Stack<Exception>? pendingExceptions = null;
+
+        while (true)
         {
             yield return currentException;
 
-            if (currentException is AggregateException aggregateException)
+            if (traversalType is ExceptionTraversalType.ExceptionTree &&
+                currentException is AggregateException { InnerExceptions.Count: > 0 } aggregateException)
             {
-                for (var i = aggregateException.InnerExceptions.Count - 1; i >= 0; i--)
+                for (var i = aggregateException.InnerExceptions.Count - 1; i >= 1; i--)
                 {
-                    exceptions.Push(aggregateException.InnerExceptions[i]);
+                    (pendingExceptions ??= new Stack<Exception>()).Push(aggregateException.InnerExceptions[i]);
                 }
-            }
-            else if (currentException.InnerException is not null)
-            {
-                exceptions.Push(currentException.InnerException);
-            }
-        }
-    }
 
-    /// <summary>
-    /// Enumerates the direct inner exception chain without expanding aggregate exceptions.
-    /// </summary>
-    /// <param name="exception">The exception whose inner exceptions should be enumerated.</param>
-    /// <returns>The direct inner exception chain.</returns>
-    public static IEnumerable<Exception> TraverseInnerExceptions(Exception exception)
-    {
-        var innerException = exception.InnerException;
-        while (innerException is not null)
-        {
-            yield return innerException;
-            innerException = innerException.InnerException;
+                currentException = aggregateException.InnerExceptions[0];
+                continue;
+            }
+
+            if (currentException.InnerException is not null)
+            {
+                currentException = currentException.InnerException;
+                continue;
+            }
+
+            if (pendingExceptions is null || !pendingExceptions.TryPop(out currentException))
+            {
+                yield break;
+            }
         }
     }
 

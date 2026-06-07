@@ -49,17 +49,16 @@ public record ExceptionInfo
     /// Initializes a new exception info instance from an exception.
     /// </summary>
     /// <param name="exception">The exception to capture.</param>
-    /// <param name="includeInnerException">Whether to capture inner exceptions.</param>
     /// <param name="includeStackTrace">Whether to capture stack traces.</param>
-    /// <param name="handleAggregateExceptionAsLinkedLink">
-    /// Whether aggregate exceptions should be flattened into a linked exception chain.
-    /// </param>
+    /// <param name="includeInnerException">Whether to capture inner exceptions.</param>
+    /// <param name="traversalType">The type of inner exception traversal to capture.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="traversalType"/> is not supported.</exception>
     [SetsRequiredMembers]
     public ExceptionInfo(
         Exception exception,
-        bool includeInnerException = true,
         bool includeStackTrace = true,
-        bool handleAggregateExceptionAsLinkedLink = true)
+        bool includeInnerException = true,
+        ExceptionTraversalType traversalType = ExceptionTraversalType.ExceptionTree)
     {
         ArgumentNullException.ThrowIfNull(exception);
 
@@ -74,9 +73,9 @@ public record ExceptionInfo
             return;
         }
 
-        var innerExceptions = handleAggregateExceptionAsLinkedLink
-            ? UnhandledExceptions.TraverseExceptions(exception).Skip(1)
-            : TraverseInnerExceptions(exception);
+        var innerExceptions = UnhandledExceptions
+            .TraverseExceptions(exception, traversalType)
+            .Skip(1);
 
         InnerException = CreateLinkedList(innerExceptions, includeStackTrace);
     }
@@ -109,27 +108,15 @@ public record ExceptionInfo
 
         foreach (var exception in exceptions.Reverse())
         {
-            linkedException = new ExceptionInfo(exception, false, includeStackTrace, false)
+            linkedException = new ExceptionInfo(
+                exception,
+                includeStackTrace,
+                includeInnerException: false)
             {
                 InnerException = linkedException
             };
         }
 
         return linkedException;
-    }
-
-    /// <summary>
-    /// Enumerates the direct inner exception chain without expanding aggregate exceptions.
-    /// </summary>
-    /// <param name="exception">The exception whose inner exceptions should be enumerated.</param>
-    /// <returns>The direct inner exception chain.</returns>
-    private static IEnumerable<Exception> TraverseInnerExceptions(Exception exception)
-    {
-        var innerException = exception.InnerException;
-        while (innerException is not null)
-        {
-            yield return innerException;
-            innerException = innerException.InnerException;
-        }
     }
 }
