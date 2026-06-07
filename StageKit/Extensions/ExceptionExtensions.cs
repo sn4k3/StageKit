@@ -1,19 +1,19 @@
 ﻿namespace StageKit.Extensions;
 
 /// <summary>
-/// Provides extension methods for traversing exceptions and their inner exceptions in different ways.
+/// Provides extension methods for enumerating exceptions and their inner exceptions in different ways.
 /// </summary>
 public static class ExceptionExtensions
 {
     extension(Exception e)
     {
         /// <summary>
-        /// Traverses an exception and its inner exceptions using the specified traversal type.
+        /// Enumerates an exception and its inner exceptions using the specified traversal type.
         /// </summary>
         /// <param name="traversalType">The type of exception traversal to perform.</param>
         /// <returns>A sequence containing the supplied exception followed by its traversed inner exceptions.</returns>
         /// <exception cref="ArgumentOutOfRangeException"><paramref name="traversalType"/> is not supported.</exception>
-        public IEnumerable<Exception> Traverse(
+        public IEnumerable<Exception> EnumerateExceptions(
             ExceptionTraversalType traversalType = ExceptionTraversalType.ExceptionTree)
         {
             if (traversalType is not ExceptionTraversalType.ExceptionTree and

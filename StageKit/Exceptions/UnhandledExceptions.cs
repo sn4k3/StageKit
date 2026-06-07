@@ -103,7 +103,7 @@ public static class UnhandledExceptions
     {
         ArgumentNullException.ThrowIfNull(ex);
 
-        foreach (var exception in ex.Traverse())
+        foreach (var exception in ex.EnumerateExceptions())
         {
             var exceptionType = exception.GetType();
             foreach (var ignoredType in IgnoredExceptionList)

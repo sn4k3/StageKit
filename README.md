@@ -424,10 +424,8 @@ UnhandledExceptions.IgnoreAvaloniaSafeExceptions();
 Traverse a complete aggregate exception tree, or only its direct inner-exception chain:
 
 ```csharp
-var exceptionTree = UnhandledExceptions.TraverseExceptions(exception);
-var innerChain = UnhandledExceptions.TraverseExceptions(
-    exception,
-    ExceptionTraversalType.InnerExceptionChain);
+var exceptionTree = exception.EnumerateExceptions();
+var innerChain = exception.EnumerateExceptions(ExceptionTraversalType.InnerExceptionChain);
 ```
 
 ## Application Birthday Helpers

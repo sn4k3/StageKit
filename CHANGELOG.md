@@ -8,8 +8,9 @@
   and conversion constructors from `UnhandledExceptionEventArgs`/`UnobservedTaskExceptionEventArgs`.
 - Add `UnhandledExceptions.ExceptionThrown` event, raised for every caught unhandled exception (fatal or ignored).
 - Add `UnhandledExceptions.HandleSafeException(...)` to log a non-fatal exception at a configurable `LogLevel`.
-- Add `ExceptionTraversalType` and a traversal-type parameter to `UnhandledExceptions.TraverseExceptions(...)` for
-  selecting complete exception-tree or direct inner-chain traversal.
+- Add `ExceptionTraversalType` and `ExceptionExtensions.EnumerateExceptions(...)` for traversing complete exception
+  trees or direct inner-exception chains,
+  allocating a pending-branch stack only when required by branching aggregate exceptions.
 - Breaking: replace the `ExceptionInfo` constructor's `handleAggregateExceptionAsLinkedLink` boolean with an
   `ExceptionTraversalType` parameter.
 - Breaking: move `includeStackTrace` before `includeInnerException` in the `ExceptionInfo` constructor.

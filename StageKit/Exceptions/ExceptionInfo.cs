@@ -74,7 +74,7 @@ public record ExceptionInfo
             return;
         }
 
-        var innerExceptions = exception.Traverse(traversalType).Skip(1);
+        var innerExceptions = exception.EnumerateExceptions(traversalType).Skip(1);
 
         InnerException = CreateLinkedList(innerExceptions, includeStackTrace);
     }
@@ -83,7 +83,7 @@ public record ExceptionInfo
     /// Enumerates this exception and each linked inner exception.
     /// </summary>
     /// <returns>A sequence containing the linked exception chain.</returns>
-    public IEnumerable<ExceptionInfo> TraverseExceptions()
+    public IEnumerable<ExceptionInfo> EnumerateExceptions()
     {
         var exception = this;
         do

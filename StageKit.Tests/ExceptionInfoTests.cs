@@ -12,7 +12,7 @@ public sealed class ExceptionInfoTests
             new AggregateException(new ArgumentException("second")));
 
         var info = new ExceptionInfo(exception);
-        var messages = info.TraverseExceptions().Select(item => item.Message).ToArray();
+        var messages = info.EnumerateExceptions().Select(item => item.Message).ToArray();
 
         Assert.Equal(
             [
@@ -59,7 +59,7 @@ public sealed class ExceptionInfoTests
 
         var info = new ExceptionInfo(exception, includeStackTrace: false);
 
-        Assert.Equal(innerExceptionCount + 1, info.TraverseExceptions().Count());
+        Assert.Equal(innerExceptionCount + 1, info.EnumerateExceptions().Count());
     }
 
     [Fact]
@@ -74,7 +74,7 @@ public sealed class ExceptionInfoTests
 
         var info = new ExceptionInfo(exception, includeStackTrace: false);
 
-        Assert.Equal(innerExceptionCount + 1, info.TraverseExceptions().Count());
+        Assert.Equal(innerExceptionCount + 1, info.EnumerateExceptions().Count());
     }
 
     [Fact]
@@ -85,7 +85,7 @@ public sealed class ExceptionInfoTests
         var exception = new AggregateException(first, second);
 
         var info = new ExceptionInfo(exception, traversalType: ExceptionTraversalType.InnerExceptionChain);
-        var messages = info.TraverseExceptions().Select(item => item.Message).ToArray();
+        var messages = info.EnumerateExceptions().Select(item => item.Message).ToArray();
 
         Assert.Equal([exception.Message, "first"], messages);
     }

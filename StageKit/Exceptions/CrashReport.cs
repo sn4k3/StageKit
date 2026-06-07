@@ -118,7 +118,7 @@ public record CrashReport
         get
         {
             var sb = new StringBuilder(2048);
-            var exceptions = Exception.TraverseExceptions().ToArray();
+            var exceptions = Exception.EnumerateExceptions().ToArray();
 
             for (var i = 0; i < exceptions.Length; i++)
             {
