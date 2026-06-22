@@ -19,6 +19,12 @@ public record CrashReport
     public static Action<CrashReport, StringBuilder>? FormatMessageFunc { get; set; }
 
     /// <summary>
+    /// Gets or sets an optional text to append before print the <see cref="CustomData"/>.
+    /// </summary>
+    /// <remarks><see cref="CustomData"/> must not be <see langword="null"/>.</remarks>
+    public static string? AppendTextBeforeCustomData { get; set; }
+
+    /// <summary>
     /// Gets the unique crash report identifier.
     /// </summary>
     public long Id { get; init; } = Stopwatch.GetTimestamp();
@@ -91,7 +97,8 @@ public record CrashReport
     /// <summary>
     /// Gets the number of garbage collections per generation (index 0, 1, 2) captured at crash time.
     /// </summary>
-    public int[] GcCollectionCounts { get; init; } = [GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2)];
+    public int[] GcCollectionCounts { get; init; } =
+        [GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2)];
 
     /// <summary>
     /// Gets the elapsed runtime of the system at crash time. This value is calculated from the moment the system began until the crash report was created.
@@ -147,16 +154,24 @@ public record CrashReport
             {
                 sb.AppendLine($"UI: {ApplicationKit.UiFrameworkInfo}");
             }
-            sb.AppendLine($"Processor cores: {Environment.ProcessorCount}   Runtime: {RuntimeInformation.RuntimeIdentifier}");
+
+            sb.AppendLine(
+                $"Processor cores: {Environment.ProcessorCount}   Runtime: {RuntimeInformation.RuntimeIdentifier}");
             sb.AppendLine($"Thread usage: {ThreadPoolCount} / {ThreadCount}");
             sb.AppendLine($"CPU usage: System={CpuPrivilegedTime}   User={CpuUserTime}   Total={CpuTotalTime}");
             sb.AppendLine($"RAM usage: {Helpers.ToFileSizeString(ProcessWorkingSet64)}");
-            sb.AppendLine($"GC heap: {Helpers.ToFileSizeString(GcTotalMemory)}   Allocated: {Helpers.ToFileSizeString(GcTotalAllocatedBytes)}   Collections: {string.Join('/', GcCollectionCounts.Select(i => Helpers.ToFileSizeString(i)))}");
+            sb.AppendLine(
+                $"GC heap: {Helpers.ToFileSizeString(GcTotalMemory)}   Allocated: {Helpers.ToFileSizeString(GcTotalAllocatedBytes)}   Collections: {string.Join('/', GcCollectionCounts.Select(i => Helpers.ToFileSizeString(i)))}");
             sb.AppendLine($"System elapsed: {SystemElapsedRuntime}");
             sb.AppendLine($"Program elapsed: {ProgramElapsedRuntime}");
 
             if (CustomData is not null)
             {
+                if (AppendTextBeforeCustomData is not null)
+                {
+                    sb.AppendLine(AppendTextBeforeCustomData);
+                }
+
                 foreach (var data in CustomData)
                 {
                     sb.AppendLine($"{data.Key}: {data.Value}");
@@ -195,7 +210,8 @@ public record CrashReport
     /// <param name="dateTimeUtc">The UTC timestamp to store in the report.</param>
     /// <param name="customData">Optional custom data to include in the crash report.</param>
     [SetsRequiredMembers]
-    public CrashReport(Exception exception, string category, DateTime dateTimeUtc, IReadOnlyDictionary<string, object?>? customData = null) : this()
+    public CrashReport(Exception exception, string category, DateTime dateTimeUtc,
+        IReadOnlyDictionary<string, object?>? customData = null) : this()
     {
         ArgumentNullException.ThrowIfNull(exception);
 
@@ -212,7 +228,8 @@ public record CrashReport
     /// <param name="category">The application-defined crash category.</param>
     /// <param name="customData">Optional custom data to include in the crash report.</param>
     [SetsRequiredMembers]
-    public CrashReport(Exception exception, string category, IReadOnlyDictionary<string, object?>? customData = null) : this(exception, category, DateTime.UtcNow, customData)
+    public CrashReport(Exception exception, string category, IReadOnlyDictionary<string, object?>? customData = null) :
+        this(exception, category, DateTime.UtcNow, customData)
     {
     }
 
@@ -221,7 +238,8 @@ public record CrashReport
     /// </summary>
     /// <param name="args">The exception event arguments to extract data from.</param>
     [SetsRequiredMembers]
-    public CrashReport(StageKitExceptionEventArgs args) : this((Exception)args.ExceptionObject, args.Category, DateTime.UtcNow, args.CustomData)
+    public CrashReport(StageKitExceptionEventArgs args) : this((Exception)args.ExceptionObject, args.Category,
+        DateTime.UtcNow, args.CustomData)
     {
     }
 

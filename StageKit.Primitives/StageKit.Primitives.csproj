@@ -5,10 +5,11 @@
         <Description>Dependency-light .NET primitives for reusable library code, including disposable base types, GC handle helpers, atomic file writes, safe file streams, path helpers, and temporary file or directory utilities.</Description>
         <PackageTags>stagekit;primitives;disposable;safehandle;atomic-file;utilities</PackageTags>
         <GenerateDocumentationFile>True</GenerateDocumentationFile>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.300" PrivateAssets="All" />
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.300" PrivateAssets="All"/>
     </ItemGroup>
 
 </Project>

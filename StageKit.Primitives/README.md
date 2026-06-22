@@ -20,6 +20,7 @@ All public helpers are exposed from the `StageKit.Primitives` namespace. IO-rela
 - Disposable base type with thread-safe idempotent disposal through `DisposableObject`
 - Leave-open lifecycle base type through `LeaveOpenDisposableObject`
 - `SafeHandle` wrapper for pinned `GCHandle` scenarios through `GCSafeHandle`
+- `MemoryManager<T>` wrapper for externally owned unmanaged buffers through `UnmanagedMemoryManager<T>`
 
 ## Install
 
@@ -198,6 +199,19 @@ IntPtr address = handle.DangerousGetHandle();
 ```
 
 Use this only when pinning is necessary, such as interop paths that require a stable address. Keep pinning lifetimes short.
+
+## UnmanagedMemoryManager
+
+Use `UnmanagedMemoryManager<T>` when an externally owned unmanaged buffer needs to be exposed as `Memory<T>`.
+
+```csharp
+using StageKit.Primitives;
+
+using var manager = new UnmanagedMemoryManager<byte>(bufferAddress, bufferLength);
+Memory<byte> memory = manager.Memory;
+```
+
+The manager does not allocate, pin, or free the underlying memory. The caller must keep the buffer alive and fixed for every `Memory<T>` or `MemoryHandle` produced by the manager.
 
 ## License
 

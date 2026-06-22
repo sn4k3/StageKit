@@ -1,3 +1,9 @@
+# v0.2.2 (22/06/2026)
+
+- Add `CrashReport.AppendTextBeforeCustomData` for appending text before the custom data section in the formatted
+  report.
+- Add `UnmanagedMemoryManager<T>` for exposing externally owned unmanaged buffers as `Memory<T>`.
+
 # v0.2.1 (07/06/2026)
 
 - Add `CrashReport.GcTotalMemory`, `GcTotalAllocatedBytes`, and `GcCollectionCounts` to capture managed heap, lifetime

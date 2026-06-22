@@ -1,4 +1,5 @@
 using StageKit.Primitives;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace StageKit.Tests;
@@ -120,6 +121,69 @@ public sealed class PrimitivesTests
 
         Assert.True(PathUtilities.IsSubPathOf(childPath, rootPath));
         Assert.False(PathUtilities.IsSubPathOf(siblingWithPrefixPath, rootPath));
+    }
+
+    [Fact]
+    public void UnmanagedMemoryManager_GetSpan_ReflectsUnderlyingMemory()
+    {
+        var pointer = Marshal.AllocHGlobal(sizeof(int) * 3);
+
+        try
+        {
+            Marshal.WriteInt32(pointer, 0, 10);
+            Marshal.WriteInt32(pointer, sizeof(int), 20);
+            Marshal.WriteInt32(pointer, sizeof(int) * 2, 30);
+
+            using var manager = new UnmanagedMemoryManager<int>(pointer, 3);
+            var span = manager.GetSpan();
+
+            Assert.Equal([10, 20, 30], span.ToArray());
+
+            span[1] = 42;
+
+            Assert.Equal(42, Marshal.ReadInt32(pointer, sizeof(int)));
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(pointer);
+        }
+    }
+
+    [Fact]
+    public void UnmanagedMemoryManager_AllowsNullPointerForEmptyBlock()
+    {
+        using var manager = new UnmanagedMemoryManager<byte>(nint.Zero, 0);
+
+        Assert.True(manager.GetSpan().IsEmpty);
+
+        using var handle = manager.Pin();
+    }
+
+    [Fact]
+    public void UnmanagedMemoryManager_Constructor_RejectsInvalidArguments()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new UnmanagedMemoryManager<byte>(nint.Zero, 1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new UnmanagedMemoryManager<byte>(1, -1));
+    }
+
+    [Fact]
+    public void UnmanagedMemoryManager_Pin_ValidatesElementIndex()
+    {
+        var pointer = Marshal.AllocHGlobal(1);
+
+        try
+        {
+            using var manager = new UnmanagedMemoryManager<byte>(pointer, 1);
+
+            using var endHandle = manager.Pin(1);
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => manager.Pin(-1));
+            Assert.Throws<ArgumentOutOfRangeException>(() => manager.Pin(2));
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(pointer);
+        }
     }
 
     private static string CreateTempDirectory()
