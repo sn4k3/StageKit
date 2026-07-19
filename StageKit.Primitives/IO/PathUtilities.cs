@@ -51,4 +51,82 @@ public static class PathUtilities
     {
         return path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
     }
+
+    /// <summary>
+    /// Tries to get a valid full directory path from the specified directory path.
+    /// </summary>
+    /// <param name="directoryPath">The directory path to validate.</param>
+    /// <param name="fullDirectoryPath">The full directory path if valid.</param>
+    /// <returns>True if the directory path is valid; otherwise, false.</returns>
+    public static bool TryGetValidFullDirectoryPath(string directoryPath, out string fullDirectoryPath)
+    {
+        fullDirectoryPath = string.Empty;
+
+        try
+        {
+            fullDirectoryPath = Path.GetFullPath(directoryPath);
+            var rootPath = Path.GetPathRoot(fullDirectoryPath);
+            var pathWithoutRoot = rootPath is null
+                ? fullDirectoryPath
+                : fullDirectoryPath[rootPath.Length..];
+            var invalidFileNameChars = Path.GetInvalidFileNameChars();
+            var segments = pathWithoutRoot.Split(
+                [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                StringSplitOptions.RemoveEmptyEntries);
+
+            return segments.All(segment => segment.IndexOfAny(invalidFileNameChars) < 0);
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or NotSupportedException
+                                       or PathTooLongException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Determines whether the specified directory path is writable or can be created and returns the full directory path if valid.
+    /// </summary>
+    /// <param name="directoryPath">The directory path to check.</param>
+    /// <param name="fullDirectoryPath">The full directory path if valid.</param>
+    /// <returns>True if the directory path is writable or can be created; otherwise, false.</returns>
+    public static bool IsWritableOrCreatableDirectory(string directoryPath, out string fullDirectoryPath)
+    {
+        fullDirectoryPath = string.Empty;
+        if (!TryGetValidFullDirectoryPath(directoryPath, out fullDirectoryPath)) return false;
+        if (File.Exists(fullDirectoryPath)) return false;
+        if (Directory.Exists(fullDirectoryPath)) return IsWritableDirectory(fullDirectoryPath);
+
+        var parent = Directory.GetParent(fullDirectoryPath);
+        while (parent is not null && !Directory.Exists(parent.FullName)) parent = parent.Parent;
+
+        return parent is not null && IsWritableDirectory(parent.FullName);
+    }
+
+    /// <summary>
+    /// Determines whether the specified directory path is writable by attempting to create and delete a temporary file in it.
+    /// </summary>
+    /// <param name="directoryPath">The directory path to check.</param>
+    /// <returns>True if the directory is writable; otherwise, false.</returns>
+    public static bool IsWritableDirectory(string directoryPath)
+    {
+        try
+        {
+            var probePath = Path.Combine(directoryPath, $".stagekit-write-test-{Guid.NewGuid():N}.tmp");
+            using var probe = new FileStream(
+                probePath,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None,
+                1,
+                FileOptions.DeleteOnClose);
+
+            probe.WriteByte(0);
+            return true;
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or NotSupportedException
+                                       or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
 }

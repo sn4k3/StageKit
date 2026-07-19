@@ -16,7 +16,7 @@
         <Authors>Tiago Conceição</Authors>
         <Copyright>Copyright 2026-$([System.DateTime]::Now.ToString(`yyyy`)) © PTRTECH</Copyright>
         <Description>StageKit repository project.</Description>
-        <Version>0.2.2</Version>
+        <Version>0.2.3</Version>
 
         <!-- Package -->
         <ApplicationIcon>$(MSBuildThisFileDirectory)media\$(MainProductName).ico</ApplicationIcon>
@@ -62,12 +62,12 @@
     <Choose>
         <When Condition="Exists('$(MSBuildProjectDirectory)\README.md')">
             <ItemGroup>
-                <None Include="$(MSBuildProjectDirectory)\README.md" Pack="true" PackagePath="" Visible="true" />
+                <None Include="$(MSBuildProjectDirectory)\README.md" Pack="true" PackagePath="" Visible="true"/>
             </ItemGroup>
         </When>
         <When Condition="Exists('$(MSBuildThisFileDirectory)README.md')">
             <ItemGroup>
-                <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="" Visible="true" />
+                <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="" Visible="true"/>
             </ItemGroup>
         </When>
     </Choose>

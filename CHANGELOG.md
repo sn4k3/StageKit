@@ -1,3 +1,17 @@
+# v0.2.3 (19/07/2026)
+
+- Adds `ApplicationKit.IsPortable` to expose whether the app is in portable mode.
+- Adds `PortableProfileDirectoryName` configuration option.
+- Adds profile path parsing from command-line arguments with `--profile-path` and `--portable` flags (configurable),
+  enabling flexible application data directory configuration.
+- Introduces path validation utilities (`TryGetValidFullDirectoryPath`, `IsWritableOrCreatableDirectory`,
+  `IsWritableDirectory`) to `PathUtilities`.
+- Refactors process naming in `EntryApplication` to separate process name from Windows .exe suffix (new
+  `ProcessFullName`
+  property), `ProcessName` is now just the base name without the suffix as it is in `Environment.ProcessName`.
+- Updates `ApplicationName` fallback chain to:
+  `EntryApplication.AssemblyName ?? EntryApplication.ExecutableName ?? EntryApplication.ProcessName`
+
 # v0.2.2 (22/06/2026)
 
 - Add `CrashReport.AppendTextBeforeCustomData` for appending text before the custom data section in the formatted

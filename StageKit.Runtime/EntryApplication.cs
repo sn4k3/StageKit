@@ -251,6 +251,24 @@ public static class EntryApplication
     /// <remarks>This value is determined based on the process path if available; otherwise, it falls back to
     /// the process name. On Windows, the ".exe" extension is appended if missing to ensure consistency with typical
     /// executable naming conventions.</remarks>
+    private static readonly Lazy<string> ProcessFullNameLazy = new(() =>
+    {
+        var processName = ProcessName;
+
+        if (!string.IsNullOrWhiteSpace(processName) && OperatingSystem.IsWindows() &&
+            !processName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+        {
+            processName += ".exe";
+        }
+
+        return processName;
+    });
+
+    /// <summary>
+    /// Provides a lazily initialized string containing the current process name.
+    /// </summary>
+    /// <remarks>This value is determined based on the process path if available; otherwise, it falls back to
+    /// the process name.</remarks>
     private static readonly Lazy<string> ProcessNameLazy = new(() =>
     {
         var processName = Path.GetFileName(Environment.ProcessPath);
@@ -258,12 +276,6 @@ public static class EntryApplication
         {
             using var currentProcess = Process.GetCurrentProcess();
             processName = currentProcess.ProcessName;
-        }
-
-        if (!string.IsNullOrWhiteSpace(processName) && OperatingSystem.IsWindows() &&
-            !processName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-        {
-            processName += ".exe";
         }
 
         return processName;
@@ -476,6 +488,11 @@ public static class EntryApplication
     public static int ProcessId => Environment.ProcessId;
 
     /// <summary>
+    /// Gets the full name of the current process, including .exe for Windows.
+    /// </summary>
+    public static string ProcessFullName => ProcessFullNameLazy.Value;
+
+    /// <summary>
     /// Gets the name of the current process.
     /// </summary>
     public static string ProcessName => ProcessNameLazy.Value;
@@ -507,7 +524,8 @@ public static class EntryApplication
     /// <summary>
     /// Checks if the application is running under a dotnet process.
     /// </summary>
-    [MemberNotNullWhen(true, nameof(ProcessName), nameof(ExecutablePath), nameof(ExecutableName),
+    [MemberNotNullWhen(true, nameof(ProcessFullName), nameof(ProcessName), nameof(ExecutablePath),
+        nameof(ExecutableName),
         nameof(BaseDirectory))]
     public static bool IsRunningFromDotNetProcess => IsRunningFromDotNetProcessLazy.Value;
 
@@ -688,6 +706,7 @@ public static class EntryApplication
 
         // Process information
         info[nameof(ProcessId)] = ProcessId.ToString();
+        info[nameof(ProcessFullName)] = ProcessFullName;
         info[nameof(ProcessName)] = ProcessName;
 
         // Bundle type
@@ -757,7 +776,7 @@ public static class EntryApplication
             if (IsRunningFromDotNetProcess)
             {
                 var args = runArguments is null ? $"\"{ExecutablePath}\"" : $"\"{ExecutablePath}\" {runArguments}";
-                exitCode = Utilities.StartProcess(Environment.ProcessPath ?? ProcessName, args);
+                exitCode = Utilities.StartProcess(Environment.ProcessPath ?? ProcessFullName, args);
             }
             else
             {
@@ -825,7 +844,7 @@ public static class EntryApplication
                 };
                 dotnetArguments.AddRange(arguments);
 
-                return Utilities.StartProcess(Environment.ProcessPath ?? ProcessName, dotnetArguments) == 0;
+                return Utilities.StartProcess(Environment.ProcessPath ?? ProcessFullName, dotnetArguments) == 0;
             }
 
             return Utilities.StartProcess(ExecutablePath, arguments) == 0;

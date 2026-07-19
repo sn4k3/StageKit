@@ -212,4 +212,167 @@ public sealed class ApplicationKitTests
             ApplicationKit.ProfilePath = originalProfilePath;
         }
     }
+
+    [Fact]
+    public void ParseProfilePathFromArgs_WhenProfilePathDoesNotExistAndParentIsWritable_SetsProfilePath()
+    {
+        var originalProfilePath = ApplicationKit.ProfilePath;
+        var existingProfilePath = CreateTempDirectory();
+        var missingProfilePath = Path.Combine(existingProfilePath, "missing");
+
+        try
+        {
+            ApplicationKit.ProfilePath = existingProfilePath;
+
+            ApplicationKit.ParseProfilePathFromArgs(["--profile-path", missingProfilePath]);
+
+            Assert.Equal(missingProfilePath, ApplicationKit.ProfilePath);
+        }
+        finally
+        {
+            ApplicationKit.ProfilePath = originalProfilePath;
+            Directory.Delete(existingProfilePath, true);
+        }
+    }
+
+    [Fact]
+    public void ParseProfilePathFromArgs_WhenProfilePathIsFile_PreservesProfilePath()
+    {
+        var originalProfilePath = ApplicationKit.ProfilePath;
+        var existingProfilePath = CreateTempDirectory();
+        var filePath = Path.Combine(existingProfilePath, "profile-path.txt");
+
+        try
+        {
+            File.WriteAllText(filePath, "not a directory");
+            ApplicationKit.ProfilePath = existingProfilePath;
+
+            ApplicationKit.ParseProfilePathFromArgs(["--profile-path", filePath]);
+
+            Assert.Equal(existingProfilePath, ApplicationKit.ProfilePath);
+        }
+        finally
+        {
+            ApplicationKit.ProfilePath = originalProfilePath;
+            Directory.Delete(existingProfilePath, true);
+        }
+    }
+
+    [Fact]
+    public void ParseProfilePathFromArgs_WhenProfilePathIsCurrentDirectory_SetsFullProfilePath()
+    {
+        var originalProfilePath = ApplicationKit.ProfilePath;
+
+        try
+        {
+            ApplicationKit.ParseProfilePathFromArgs(["--profile-path", "."]);
+
+            Assert.Equal(Path.GetFullPath("."), ApplicationKit.ProfilePath);
+        }
+        finally
+        {
+            ApplicationKit.ProfilePath = originalProfilePath;
+        }
+    }
+
+    [Fact]
+    public void ParseProfilePathFromArgs_WhenProfilePathHasInvalidCharacters_PreservesProfilePath()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        var originalProfilePath = ApplicationKit.ProfilePath;
+        var existingProfilePath = CreateTempDirectory();
+        var invalidProfilePath = Path.Combine(existingProfilePath, "bad<name");
+
+        try
+        {
+            ApplicationKit.ProfilePath = existingProfilePath;
+
+            ApplicationKit.ParseProfilePathFromArgs(["--profile-path", invalidProfilePath]);
+
+            Assert.Equal(existingProfilePath, ApplicationKit.ProfilePath);
+        }
+        finally
+        {
+            ApplicationKit.ProfilePath = originalProfilePath;
+            Directory.Delete(existingProfilePath, true);
+        }
+    }
+
+    [Fact]
+    public void ParseProfilePathFromArgs_WhenPortableArgHasNegativeLevel_PreservesProfilePath()
+    {
+        var originalProfilePath = ApplicationKit.ProfilePath;
+        var originalIsPortable = ApplicationKit.IsPortable;
+        var existingProfilePath = CreateTempDirectory();
+
+        try
+        {
+            ApplicationKit.IsPortable = false;
+            ApplicationKit.ProfilePath = existingProfilePath;
+
+            ApplicationKit.ParseProfilePathFromArgs(["--portable", "-1"]);
+
+            Assert.Equal(existingProfilePath, ApplicationKit.ProfilePath);
+            Assert.False(ApplicationKit.IsPortable);
+        }
+        finally
+        {
+            ApplicationKit.ProfilePath = originalProfilePath;
+            ApplicationKit.IsPortable = originalIsPortable;
+            Directory.Delete(existingProfilePath, true);
+        }
+    }
+
+    [Fact]
+    public void ParseProfilePathFromArgs_WhenProfilePathOverridesPortableArg_ClearsIsPortable()
+    {
+        var originalProfilePath = ApplicationKit.ProfilePath;
+        var originalIsPortable = ApplicationKit.IsPortable;
+        var profilePath = CreateTempDirectory();
+        var portableProfilePath = GetPortableProfilePath(0);
+        var portablePathExistedBefore = Directory.Exists(portableProfilePath);
+
+        try
+        {
+            ApplicationKit.IsPortable = false;
+
+            ApplicationKit.ParseProfilePathFromArgs(["--portable", "--profile-path", profilePath]);
+
+            Assert.Equal(profilePath, ApplicationKit.ProfilePath);
+            Assert.False(ApplicationKit.IsPortable);
+        }
+        finally
+        {
+            ApplicationKit.ProfilePath = originalProfilePath;
+            ApplicationKit.IsPortable = originalIsPortable;
+            Directory.Delete(profilePath, true);
+            DeleteDirectoryIfCreated(portableProfilePath, portablePathExistedBefore);
+        }
+    }
+
+    private static string CreateTempDirectory()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), $"StageKit-Test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directoryPath);
+        return directoryPath;
+    }
+
+    private static string GetPortableProfilePath(int portableLevel)
+    {
+        var portableRootPath =
+            Runtime.EntryApplication.BaseDirectory ?? Runtime.EntryApplication.AppContextBaseDirectory;
+        for (var i = 0; i < portableLevel; i++) portableRootPath = Directory.GetParent(portableRootPath)!.FullName;
+
+        var portableDirectoryName = portableRootPath == Runtime.EntryApplication.ProcessPath
+            ? ApplicationKit.PortableProfileDirectoryName
+            : $"{ApplicationKit.ApplicationName}_{ApplicationKit.PortableProfileDirectoryName}";
+
+        return Path.GetFullPath(Path.Combine(portableRootPath, portableDirectoryName));
+    }
+
+    private static void DeleteDirectoryIfCreated(string directoryPath, bool existedBefore)
+    {
+        if (!existedBefore && Directory.Exists(directoryPath)) Directory.Delete(directoryPath, true);
+    }
 }

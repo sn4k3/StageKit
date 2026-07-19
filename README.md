@@ -29,6 +29,7 @@ The repository also includes smaller packages for reusable building blocks: `Sta
 - AppDomain and task scheduler unhandled exception helpers
 - Panic-save support for registered `ISavable` settings before forced process exit
 - Configurable profile, config, and log paths
+- Portable profile path parsing with `ApplicationKit.IsPortable` state
 - Small application "birthday" helpers for version/about screens
 
 ## Install
@@ -167,6 +168,18 @@ ApplicationKit.ProfilePath
 ```
 
 Override `DirectoryPath` or set `ApplicationKit.ProfilePath` to customize storage.
+
+Parse startup arguments to support custom and portable profile paths:
+
+```csharp
+ApplicationKit.ApplicationArgs = args;
+ApplicationKit.ParseProfilePathFromArgs();
+
+if (ApplicationKit.IsPortable)
+{
+    // ProfilePath was selected from the portable profile location.
+}
+```
 
 Use schema versioning and validation hooks for app-owned settings evolution:
 

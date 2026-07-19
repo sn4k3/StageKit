@@ -1,8 +1,8 @@
-﻿using Serilog;
+﻿using System.Diagnostics;
+using Serilog;
 using Serilog.Extensions.Logging;
 using StageKit;
 using StageKit.Demo;
-using System.Diagnostics;
 
 Console.WriteLine("Hello from StageKit Demo");
 
@@ -20,6 +20,7 @@ ApplicationKit.ApplicationArgs = args;
 ApplicationKit.Logger = loggerFactory.CreateLogger("StageKitDemo");
 ApplicationKit.UiFrameworkInfo = "Console";
 ApplicationKit.ProfilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "StageKitDemo");
+ApplicationKit.ParseProfilePathFromArgs();
 ApplicationKit.Birth = DateTime.UtcNow;
 
 UnhandledExceptions.RegisterAppDomainUnhandledException();
