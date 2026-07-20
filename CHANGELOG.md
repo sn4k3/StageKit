@@ -1,4 +1,4 @@
-# v0.2.4 (/07/2026)
+# v0.2.4 (20/07/2026)
 
 - Add `Environment.GetCommandLineArgs()[0]` fallback for `EntryApplication.ExecutablePath` when the entry assembly is
   unavailable.
