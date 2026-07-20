@@ -40,7 +40,7 @@ The main `StageKit` package dependencies are `CommunityToolkit.Mvvm`, `Observabl
 
 - **`ApplicationInstanceGuard`**: direct named-mutex single-instance helper with `Acquire(instanceName)`, `IsPrimary`, and `IsSecondary`. Dispose can run on any thread: it closes the mutex handle (not thread-affine) instead of calling the thread-affine `ReleaseMutex`; if still owned, the OS marks the mutex abandoned and the next `Acquire` treats `AbandonedMutexException` as primary. It intentionally has no IPC or activation forwarding yet.
 
-- **`StageKit.Runtime`**: `EntryApplication` exposes entry assembly metadata, process/executable paths, runtime identifier, bundle detection for .NET single-file, AppImage, Flatpak, and macOS `.app`, loaded assembly formatting, and best-effort relaunch. `RuntimeDiagnostics` combines BCL runtime/process information with `EntryApplication` data for logs, support bundles, and crash reports.
+- **`StageKit.Runtime`**: `EntryApplication` exposes entry assembly metadata, process/executable paths, runtime identifier, bundle detection for .NET single-file, AppImage, Flatpak, and macOS `.app`, loaded assembly formatting, and best-effort relaunch. `ExecutablePath` is bundle-aware and falls back to `Environment.GetCommandLineArgs()[0]` if normal runtime path discovery is unavailable. Prefer structured `LaunchNewInstance(params string[])` or `LaunchNewInstance(IEnumerable<string>)` calls for separately computed arguments; the raw string overload is for preformatted command-line text. `RuntimeDiagnostics` combines BCL runtime/process information with `EntryApplication` data for logs, support bundles, and crash reports.
 
 ## Code Conventions
 

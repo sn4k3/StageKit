@@ -323,7 +323,7 @@ public static class EntryApplication
     /// <remarks>This value attempts to determine the executable path using several platform-specific
     /// strategies. If the executable path cannot be determined, the tuple fields for path and name are null, the base
     /// directory is set to the application's base directory, and the flag is set to <see langword="false"/>. Accessing
-    /// this value is thread-safe and the computation is performed only once.</remarks>
+    /// this value is thread-safe, and the computation is performed only once.</remarks>
     private static readonly
         Lazy<(string? ExecutablePath, string? ExecutableName, string? BaseDirectory, bool IsExecutablePathKnown)>
         ExecutableInfoLazy = new(() =>
@@ -338,8 +338,17 @@ public static class EntryApplication
 
             if (string.IsNullOrWhiteSpace(executablePath))
             {
-                return (null, null, AppContext.BaseDirectory, false);
+                var args = Environment.GetCommandLineArgs();
+                if (args.Length > 0)
+                {
+                    executablePath = args[0];
+                }
+                else
+                {
+                    return (null, null, AppContext.BaseDirectory, false);
+                }
             }
+
 
             return (executablePath, Path.GetFileName(executablePath), Path.GetDirectoryName(executablePath), true);
         });
@@ -592,10 +601,10 @@ public static class EntryApplication
     /// <summary>
     /// Gets the full path to the entry executable of the running application.
     /// </summary>
-    /// <remarks>Note the executable is from entry point and not the app executable itself.<br/>
+    /// <remarks>Note the executable is from the entry point and not the app executable itself.<br/>
     /// It's expected to be different from <see cref="Environment.ProcessPath"/> and <see cref="ProcessPath"/> in some cases.<br/>
     /// Example: The MyApp.AppImage, MyApp.app will be returned instead of the app executable.<br/>
-    /// If running from dotnet, it will return the AssemblyLocation, eg: myapp.dll.</remarks>
+    /// If running from dotnet, it will return the AssemblyLocation, e.g.: myapp.dll.</remarks>
     public static string? ExecutablePath => ExecutableInfoLazy.Value.ExecutablePath;
 
     /// <summary>
@@ -798,36 +807,23 @@ public static class EntryApplication
     /// <returns>True if able to launch a new instance, otherwise false.</returns>
     public static bool LaunchNewInstance(params string[] runArguments)
     {
-        ArgumentNullException.ThrowIfNull(runArguments);
-        return LaunchNewInstance((IEnumerable<string>)runArguments);
-    }
-
-    /// <summary>
-    /// Launches a new instance of the application with the given arguments.
-    /// </summary>
-    /// <param name="runArguments">Arguments to pass to the application.</param>
-    /// <returns>True if able to launch a new instance, otherwise false.</returns>
-    public static bool LaunchNewInstance(IEnumerable<string> runArguments)
-    {
-        ArgumentNullException.ThrowIfNull(runArguments);
         if (!IsExecutablePathKnown) return false;
 
-        var arguments = runArguments as string[] ?? runArguments.ToArray();
         try
         {
             if (OperatingSystem.IsMacOS() && IsMacOSAppBundle)
             {
                 if (Directory.Exists(ExecutablePath))
                 {
-                    var openArguments = new List<string>(arguments.Length + 2)
+                    var openArguments = new List<string>(runArguments.Length + 2)
                     {
                         ExecutablePath
                     };
 
-                    if (arguments.Length > 0)
+                    if (runArguments.Length > 0)
                     {
                         openArguments.Add("--args");
-                        openArguments.AddRange(arguments);
+                        openArguments.AddRange(runArguments);
                     }
 
                     return Utilities.StartProcess("open", openArguments) == 0;
@@ -838,21 +834,32 @@ public static class EntryApplication
 
             if (IsRunningFromDotNetProcess)
             {
-                var dotnetArguments = new List<string>(arguments.Length + 1)
+                var dotnetArguments = new List<string>(runArguments.Length + 1)
                 {
                     ExecutablePath
                 };
-                dotnetArguments.AddRange(arguments);
+                dotnetArguments.AddRange(runArguments);
 
                 return Utilities.StartProcess(Environment.ProcessPath ?? ProcessFullName, dotnetArguments) == 0;
             }
 
-            return Utilities.StartProcess(ExecutablePath, arguments) == 0;
+            return Utilities.StartProcess(ExecutablePath, runArguments) == 0;
         }
         catch
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// Launches a new instance of the application with the given arguments.
+    /// </summary>
+    /// <param name="runArguments">Arguments to pass to the application.</param>
+    /// <returns>True if able to launch a new instance, otherwise false.</returns>
+    public static bool LaunchNewInstance(IEnumerable<string> runArguments)
+    {
+        var arguments = runArguments as string[] ?? runArguments.ToArray();
+        return LaunchNewInstance(arguments);
     }
 
     #endregion

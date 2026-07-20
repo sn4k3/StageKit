@@ -9,7 +9,34 @@ namespace StageKit;
 /// </summary>
 public sealed class ApplicationInstanceGuard : DisposableObject
 {
+    #region Constructor
+
+    private ApplicationInstanceGuard(string instanceName, Mutex mutex, bool isPrimary)
+    {
+        InstanceName = instanceName;
+        _mutex = mutex;
+        IsPrimary = isPrimary;
+    }
+
+    #endregion
+
+    #region Dispose
+
+    /// <inheritdoc />
+    protected override void DisposeManaged()
+    {
+        // Do not call ReleaseMutex: it is thread-affine and throws if disposal runs on a different thread than Acquire.
+        // Disposing the handle releases ownership from any thread. If still owned, the OS marks the mutex abandoned, which
+        // Acquire already treats as primary via AbandonedMutexException.
+        _primaryProcess?.Dispose();
+        _primaryProcess = null;
+        _mutex.Dispose();
+    }
+
+    #endregion
+
     #region Members
+
     /// <summary>
     /// Gets a suggested global instance name based on the application domain friendly name.
     /// </summary>
@@ -18,7 +45,8 @@ public sealed class ApplicationInstanceGuard : DisposableObject
     /// <summary>
     /// Gets a suggested instance name based on the application domain friendly name and current user identity.
     /// </summary>
-    public static string SuggestedInstanceNamePerUser => $"{SuggestedInstanceNameGlobal}_{Environment.UserDomainName}_{Environment.UserName}";
+    public static string SuggestedInstanceNamePerUser =>
+        $"{SuggestedInstanceNameGlobal}_{Environment.UserDomainName}_{Environment.UserName}";
 
     /// <summary>
     /// Holds the primary process associated with the current application instance.
@@ -29,9 +57,11 @@ public sealed class ApplicationInstanceGuard : DisposableObject
     /// Holds the mutex used to enforce single-instance behavior. The mutex is named based on the instance name provided
     /// </summary>
     private readonly Mutex _mutex;
+
     #endregion
 
     #region Properties
+
     /// <summary>
     /// Gets the instance name used by the guard.
     /// </summary>
@@ -88,15 +118,7 @@ public sealed class ApplicationInstanceGuard : DisposableObject
             return _primaryProcess;
         }
     }
-    #endregion
 
-    #region Constructor
-    private ApplicationInstanceGuard(string instanceName, Mutex mutex, bool isPrimary)
-    {
-        InstanceName = instanceName;
-        _mutex = mutex;
-        IsPrimary = isPrimary;
-    }
     #endregion
 
     #region Static Methods
@@ -141,7 +163,7 @@ public sealed class ApplicationInstanceGuard : DisposableObject
     /// across the entire system. If a global instance is already active, acquiring the guard may fail depending on the
     /// implementation of <see cref="Acquire"/>.</remarks>
     /// <returns>An <see cref="ApplicationInstanceGuard"/> representing the acquired global instance guard. The caller is
-    /// responsible for disposing the guard when it is no longer needed.</returns>
+    /// responsible for disposing of the guard when it is no longer necessary.</returns>
     public static ApplicationInstanceGuard AcquireGlobal()
     {
         return Acquire(SuggestedInstanceNameGlobal);
@@ -152,23 +174,10 @@ public sealed class ApplicationInstanceGuard : DisposableObject
     /// </summary>
     /// <remarks>Use this method to ensure that only one instance of the application runs per user. This is
     /// useful in multi-user environments where each user should have at most one active instance.</remarks>
-    /// <returns>An ApplicationInstanceGuard that enforces single-instance behavior for the current user context.</returns>
+    /// <returns>An <see cref="ApplicationInstanceGuard"/> that enforces single-instance behavior for the current user context.</returns>
     public static ApplicationInstanceGuard AcquirePerUser()
     {
         return Acquire(SuggestedInstanceNamePerUser);
-    }
-    #endregion
-
-    #region Dispose
-    /// <inheritdoc />
-    protected override void DisposeManaged()
-    {
-        // Do not call ReleaseMutex: it is thread-affine and throws if disposal runs on a different thread than Acquire.
-        // Disposing the handle releases ownership from any thread. If still owned, the OS marks the mutex abandoned, which
-        // Acquire already treats as primary via AbandonedMutexException.
-        _primaryProcess?.Dispose();
-        _primaryProcess = null;
-        _mutex.Dispose();
     }
 
     #endregion

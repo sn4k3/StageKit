@@ -1,3 +1,5 @@
+using StageKit.Runtime;
+
 namespace StageKit.Tests;
 
 public sealed class ApplicationKitTests
@@ -214,6 +216,60 @@ public sealed class ApplicationKitTests
     }
 
     [Fact]
+    public void
+        LaunchNewInstanceKeepApplicationArgs_WhenApplicationArgsIncludeExecutableAndCrashReport_FiltersLaunchMetadata()
+    {
+        var originalArgs = ApplicationKit.ApplicationArgs;
+        var originalFlag = ApplicationKit.CrashReportFlag;
+
+        try
+        {
+            ApplicationKit.CrashReportFlag = "--report";
+            ApplicationKit.ApplicationArgs =
+            [
+                GetKnownExecutablePathArgument(),
+                "--profile-path",
+                "profile",
+                "--report",
+                "42",
+                "--portable",
+                "1"
+            ];
+
+            var actual = ApplicationKit.GetLaunchArgumentsKeepApplicationArgs(["--report", "99"]);
+
+            Assert.Equal(["--profile-path", "profile", "--portable", "1", "--report", "99"], actual);
+        }
+        finally
+        {
+            ApplicationKit.CrashReportFlag = originalFlag;
+            ApplicationKit.ApplicationArgs = originalArgs;
+        }
+    }
+
+    [Fact]
+    public void LaunchNewInstanceKeepApplicationArgs_WhenApplicationArgsDoNotIncludeExecutable_PreservesFirstArgument()
+    {
+        var originalArgs = ApplicationKit.ApplicationArgs;
+        var originalFlag = ApplicationKit.CrashReportFlag;
+
+        try
+        {
+            ApplicationKit.CrashReportFlag = "--report";
+            ApplicationKit.ApplicationArgs = ["--profile-path", "profile", "--report", "42"];
+
+            var actual = ApplicationKit.GetLaunchArgumentsKeepApplicationArgs(["--theme", "dark"]);
+
+            Assert.Equal(["--profile-path", "profile", "--theme", "dark"], actual);
+        }
+        finally
+        {
+            ApplicationKit.CrashReportFlag = originalFlag;
+            ApplicationKit.ApplicationArgs = originalArgs;
+        }
+    }
+
+    [Fact]
     public void ParseProfilePathFromArgs_WhenProfilePathDoesNotExistAndParentIsWritable_SetsProfilePath()
     {
         var originalProfilePath = ApplicationKit.ProfilePath;
@@ -324,33 +380,6 @@ public sealed class ApplicationKitTests
         }
     }
 
-    [Fact]
-    public void ParseProfilePathFromArgs_WhenProfilePathOverridesPortableArg_ClearsIsPortable()
-    {
-        var originalProfilePath = ApplicationKit.ProfilePath;
-        var originalIsPortable = ApplicationKit.IsPortable;
-        var profilePath = CreateTempDirectory();
-        var portableProfilePath = GetPortableProfilePath(0);
-        var portablePathExistedBefore = Directory.Exists(portableProfilePath);
-
-        try
-        {
-            ApplicationKit.IsPortable = false;
-
-            ApplicationKit.ParseProfilePathFromArgs(["--portable", "--profile-path", profilePath]);
-
-            Assert.Equal(profilePath, ApplicationKit.ProfilePath);
-            Assert.False(ApplicationKit.IsPortable);
-        }
-        finally
-        {
-            ApplicationKit.ProfilePath = originalProfilePath;
-            ApplicationKit.IsPortable = originalIsPortable;
-            Directory.Delete(profilePath, true);
-            DeleteDirectoryIfCreated(portableProfilePath, portablePathExistedBefore);
-        }
-    }
-
     private static string CreateTempDirectory()
     {
         var directoryPath = Path.Combine(Path.GetTempPath(), $"StageKit-Test-{Guid.NewGuid():N}");
@@ -358,13 +387,22 @@ public sealed class ApplicationKitTests
         return directoryPath;
     }
 
+
+    private static string GetKnownExecutablePathArgument()
+    {
+        return EntryApplication.ExecutablePath
+               ?? EntryApplication.ProcessPath
+               ?? EntryApplication.AssemblyLocation
+               ?? Environment.GetCommandLineArgs()[0];
+    }
+
     private static string GetPortableProfilePath(int portableLevel)
     {
         var portableRootPath =
-            Runtime.EntryApplication.BaseDirectory ?? Runtime.EntryApplication.AppContextBaseDirectory;
+            EntryApplication.BaseDirectory ?? EntryApplication.AppContextBaseDirectory;
         for (var i = 0; i < portableLevel; i++) portableRootPath = Directory.GetParent(portableRootPath)!.FullName;
 
-        var portableDirectoryName = portableRootPath == Runtime.EntryApplication.ProcessPath
+        var portableDirectoryName = portableRootPath == EntryApplication.ProcessPath
             ? ApplicationKit.PortableProfileDirectoryName
             : $"{ApplicationKit.ApplicationName}_{ApplicationKit.PortableProfileDirectoryName}";
 

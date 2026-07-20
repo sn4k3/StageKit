@@ -5,6 +5,9 @@ using StageKit;
 using StageKit.Demo;
 
 Console.WriteLine("Hello from StageKit Demo");
+Console.WriteLine(args.Length > 0
+    ? $"Application started with {args.Length} argument(s): {string.Join(" ", args)}"
+    : "Application started with no arguments.");
 
 ///////////////////
 // Configuration //
@@ -56,6 +59,7 @@ if (ApplicationKit.HasCrashReportFlag && ApplicationKit.CrashReportIndex > 0)
 {
     Console.WriteLine($"Crash report: {ApplicationKit.CrashReportIndex}");
     Console.WriteLine(ApplicationKit.CrashReport);
+    ApplicationKit.LaunchNewInstanceKeepApplicationArgs();
     Console.WriteLine("Press any key to exit...");
     Console.ReadLine();
     return;

@@ -302,7 +302,9 @@ public static class UnhandledExceptions
                 if (!handledExternally && !string.IsNullOrWhiteSpace(ApplicationKit.CrashReportFlag) &&
                     EntryApplication.IsExecutablePathKnown)
                 {
-                    EntryApplication.LaunchNewInstance(ApplicationKit.CrashReportFlag, report.Id.ToString());
+                    ApplicationKit.LaunchNewInstanceKeepApplicationArgs(
+                        ApplicationKit.CrashReportFlag,
+                        report.Id.ToString());
                 }
             }
         }

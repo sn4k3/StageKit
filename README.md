@@ -181,6 +181,14 @@ if (ApplicationKit.IsPortable)
 }
 ```
 
+Launch a new or helper instance while keeping startup arguments such as profile or portable mode:
+
+```csharp
+ApplicationKit.LaunchNewInstanceKeepApplicationArgs("--open-settings");
+```
+
+The preserved arguments skip the executable path and any existing crash-report argument pair.
+
 Use schema versioning and validation hooks for app-owned settings evolution:
 
 ```csharp
@@ -465,8 +473,19 @@ Use `StageKit.Runtime` when an app or library needs entry-application metadata, 
 using StageKit.Runtime;
 
 Console.WriteLine(EntryApplication.AssemblyTitle);
+Console.WriteLine(EntryApplication.ExecutablePath);
 Console.WriteLine(EntryApplication.BundleType);
 Console.WriteLine(RuntimeDiagnostics.GetReport());
+```
+
+`EntryApplication.ExecutablePath` prefers bundle-aware entry paths such as AppImage and macOS `.app` paths, then falls
+back through single-file, hosted `dotnet`, process path, and `Environment.GetCommandLineArgs()[0]` discovery when
+needed.
+
+Relaunch with separately passed arguments when values should not be manually quoted:
+
+```csharp
+EntryApplication.LaunchNewInstance("--profile", profileName);
 ```
 
 Append the loaded assembly list only when needed because it can be long:

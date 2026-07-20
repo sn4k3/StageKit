@@ -45,6 +45,10 @@ Console.WriteLine(EntryApplication.ExecutablePath);
 Console.WriteLine(EntryApplication.BundleType);
 ```
 
+`ExecutablePath` is bundle-aware. It can report an AppImage path, a macOS `.app` path, a .NET single-file host path, a
+hosted `dotnet` assembly path, the process path, or finally `Environment.GetCommandLineArgs()[0]` when the usual runtime
+path APIs are unavailable.
+
 Capture a diagnostics block:
 
 ```csharp
@@ -76,7 +80,7 @@ if (!EntryApplication.LaunchNewInstance("--safe-mode"))
 }
 ```
 
-Prefer the enumerable overload when passing user-provided or separately computed arguments:
+Use the `params string[]` or enumerable overload when passing user-provided or separately computed arguments:
 
 ```csharp
 EntryApplication.LaunchNewInstance("--profile", profileName);
@@ -84,6 +88,9 @@ EntryApplication.LaunchNewInstance("--profile", profileName);
 var arguments = new List<string> { "--profile", profileName };
 EntryApplication.LaunchNewInstance(arguments);
 ```
+
+The string overload accepts one raw command-line argument string. The structured overloads pass each argument separately
+and let the process launcher handle quoting.
 
 ## Bundle Detection
 

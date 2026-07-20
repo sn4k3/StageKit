@@ -1,3 +1,13 @@
+# v0.2.4 (/07/2026)
+
+- Add `Environment.GetCommandLineArgs()[0]` fallback for `EntryApplication.ExecutablePath` when the entry assembly is
+  unavailable.
+- Add `ApplicationKit.LaunchNewInstanceKeepApplicationArgs(...)` to relaunch while preserving startup arguments,
+  excluding the executable path and existing crash-report argument pair.
+- Add `ApplicationKit.GetLaunchArgumentsKeepApplicationArgs` to retrieve the current launch arguments excluding the
+  executable path and existing crash-report argument pair.
+- Preserve configured startup arguments when launching the crash-report viewer.
+
 # v0.2.3 (19/07/2026)
 
 - Adds `ApplicationKit.IsPortable` to expose whether the app is in portable mode.

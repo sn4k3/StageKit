@@ -129,4 +129,27 @@ public static class PathUtilities
             return false;
         }
     }
+
+    /// <summary>
+    /// Determines whether the specified argument path is the same as the specified path, considering platform-specific case sensitivity.
+    /// </summary>
+    /// <param name="path1">The first path to compare.</param>
+    /// <param name="path2">The second path to compare.</param>
+    /// <returns>True if the paths are the same; otherwise, false.</returns>
+    public static bool IsSamePath(string? path1, string? path2)
+    {
+        if (path1 is null || path2 is null) return true;
+
+        try
+        {
+            return string.Equals(Path.GetFullPath(path1), Path.GetFullPath(path2),
+                SystemUtilities.SystemStringComparison);
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or NotSupportedException
+                                       or UnauthorizedAccessException)
+        {
+        }
+
+        return false;
+    }
 }
