@@ -17,23 +17,30 @@ public static class PathUtilities
     /// </summary>
     /// <param name="path">The path to check.</param>
     /// <param name="rootPath">The root path to compare against.</param>
-    /// <returns><see langword="true"/> when the path is equal to or contained under the root path; otherwise, <see langword="false"/>.</returns>
+    /// <returns><see langword="true"/> when the path is equal to or contained under the root path without traversing a
+    /// reparse point; otherwise, <see langword="false"/>.</returns>
     /// <exception cref="ArgumentException">Thrown if <paramref name="path"/> or <paramref name="rootPath"/> is null or whitespace.</exception>
     public static bool IsSubPathOf(string path, string rootPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentException.ThrowIfNullOrWhiteSpace(rootPath);
 
-        var fullPath = TrimDirectorySeparators(Path.GetFullPath(path));
-        var fullRoot = TrimDirectorySeparators(Path.GetFullPath(rootPath));
+        var fullPath = Path.GetFullPath(path);
+        var fullRoot = Path.GetFullPath(rootPath);
+        var rootWithSeparator = fullRoot.EndsWith(Path.DirectorySeparatorChar) ||
+                                fullRoot.EndsWith(Path.AltDirectorySeparatorChar)
+            ? fullRoot
+            : fullRoot + Path.DirectorySeparatorChar;
 
-        return string.Equals(fullPath, fullRoot, PlatformPathComparison)
-               || fullPath.StartsWith(fullRoot + Path.DirectorySeparatorChar, PlatformPathComparison)
-               || fullPath.StartsWith(fullRoot + Path.AltDirectorySeparatorChar, PlatformPathComparison);
+        var isWithinRoot = string.Equals(fullPath, fullRoot, PlatformPathComparison) ||
+                           fullPath.StartsWith(rootWithSeparator, PlatformPathComparison);
+
+        return isWithinRoot && !ContainsReparsePoint(fullPath, fullRoot);
     }
 
     /// <summary>
-    /// Normalizes a path for use as a zip archive entry name.
+    /// Normalizes a path for use as a zip archive entry name by converting both Windows and platform directory
+    /// separators to forward slashes.
     /// </summary>
     /// <param name="entryName">The entry name to normalize.</param>
     /// <returns>The normalized archive entry name.</returns>
@@ -43,13 +50,54 @@ public static class PathUtilities
         ArgumentException.ThrowIfNullOrWhiteSpace(entryName);
 
         return entryName
+            .Replace('\\', '/')
             .Replace(Path.DirectorySeparatorChar, '/')
             .Replace(Path.AltDirectorySeparatorChar, '/');
     }
 
-    private static string TrimDirectorySeparators(string path)
+    private static bool ContainsReparsePoint(string fullPath, string fullRoot)
     {
-        return path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var relativePath = Path.GetRelativePath(fullRoot, fullPath);
+        if (relativePath == ".") return false;
+
+        var currentPath = fullRoot;
+        try
+        {
+            var rootInfo = new DirectoryInfo(currentPath);
+            if (rootInfo.Exists && rootInfo.Attributes.HasFlag(FileAttributes.ReparsePoint)) return true;
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or NotSupportedException)
+        {
+            // Failing closed avoids treating an uninspectable root as safe.
+            return true;
+        }
+
+        foreach (var segment in relativePath.Split(
+                     [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                     StringSplitOptions.RemoveEmptyEntries))
+        {
+            currentPath = Path.Combine(currentPath, segment);
+
+            try
+            {
+                var directoryInfo = new DirectoryInfo(currentPath);
+                if (directoryInfo.Exists)
+                {
+                    if (directoryInfo.Attributes.HasFlag(FileAttributes.ReparsePoint)) return true;
+                    continue;
+                }
+
+                var fileInfo = new FileInfo(currentPath);
+                if (fileInfo.Exists && fileInfo.Attributes.HasFlag(FileAttributes.ReparsePoint)) return true;
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or NotSupportedException)
+            {
+                // Failing closed avoids treating an uninspectable path as safe.
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -138,7 +186,8 @@ public static class PathUtilities
     /// <returns>True if the paths are the same; otherwise, false.</returns>
     public static bool IsSamePath(string? path1, string? path2)
     {
-        if (path1 is null || path2 is null) return true;
+        if (path1 is null && path2 is null) return true;
+        if (path1 is null || path2 is null) return false;
 
         try
         {
@@ -148,6 +197,7 @@ public static class PathUtilities
         catch (Exception ex) when (ex is ArgumentException or IOException or NotSupportedException
                                        or UnauthorizedAccessException)
         {
+            // Ignored
         }
 
         return false;

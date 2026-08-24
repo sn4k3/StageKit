@@ -457,6 +457,9 @@ $RECYCLE.BIN/
 .avalonia-build-tasks
 
 # nuke
-.nuke/temp/
+.nuke/temp
 
 .dotnet-home
+
+# AI
+.serena

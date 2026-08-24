@@ -1,4 +1,5 @@
 using StageKit.Primitives;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -121,6 +122,56 @@ public sealed class PrimitivesTests
 
         Assert.True(PathUtilities.IsSubPathOf(childPath, rootPath));
         Assert.False(PathUtilities.IsSubPathOf(siblingWithPrefixPath, rootPath));
+    }
+
+    [Fact]
+    public void PathUtilities_IsSamePath_ReturnsFalseWhenOnlyOnePathIsNull()
+    {
+        Assert.False(PathUtilities.IsSamePath("path", null));
+        Assert.False(PathUtilities.IsSamePath(null, "path"));
+        Assert.True(PathUtilities.IsSamePath(null, null));
+    }
+
+    [Fact]
+    public void PathUtilities_NormalizeArchiveEntryName_NormalizesWindowsSeparatorsOnUnix()
+    {
+        Assert.Equal("folder/file.txt", PathUtilities.NormalizeArchiveEntryName(@"folder\file.txt"));
+    }
+
+    [Fact]
+    public void PathUtilities_IsSubPathOf_RejectsReparsePointEscape()
+    {
+        var rootPath = CreateTempDirectory();
+        var outsidePath = CreateTempDirectory();
+        var linkPath = Path.Combine(rootPath, "link");
+
+        try
+        {
+            try
+            {
+                Directory.CreateSymbolicLink(linkPath, outsidePath);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or
+                                               PlatformNotSupportedException)
+            {
+                Assert.Skip($"Symbolic links are unavailable in this environment: {exception.Message}");
+            }
+
+            Assert.False(PathUtilities.IsSubPathOf(Path.Combine(linkPath, "file.txt"), rootPath));
+        }
+        finally
+        {
+            if (Directory.Exists(rootPath)) Directory.Delete(rootPath, recursive: true);
+            if (Directory.Exists(outsidePath)) Directory.Delete(outsidePath, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void DisposableObject_DoesNotDeclareFinalizer()
+    {
+        Assert.Null(typeof(DisposableObject).GetMethod(
+            "Finalize",
+            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly));
     }
 
     [Fact]

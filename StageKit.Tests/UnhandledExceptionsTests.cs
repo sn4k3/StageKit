@@ -211,6 +211,68 @@ public sealed class UnhandledExceptionsTests
     }
 
     [Fact]
+    public void StageKitExceptionEventArgs_FromUnobservedTaskException_IsNonTerminating()
+    {
+        var eventArgs = new UnobservedTaskExceptionEventArgs(
+            new AggregateException(new InvalidOperationException("unobserved")));
+
+        var args = new StageKitExceptionEventArgs(eventArgs);
+
+        Assert.False(args.IsTerminating);
+    }
+
+    [Fact]
+    public void TaskSchedulerOnUnobservedTaskException_WhenNotIgnored_ReturnsWithoutTerminating()
+    {
+        var invocationCount = 0;
+        EventHandler<StageKitExceptionEventArgs> handler = (_, _) => invocationCount++;
+        var eventArgs = new UnobservedTaskExceptionEventArgs(
+            new AggregateException(new InvalidOperationException("unobserved")));
+
+        try
+        {
+            UnhandledExceptions.ExceptionThrown += handler;
+
+            UnhandledExceptions.TaskSchedulerOnUnobservedTaskException(null, eventArgs);
+
+            Assert.Equal(1, invocationCount);
+        }
+        finally
+        {
+            UnhandledExceptions.ExceptionThrown -= handler;
+        }
+    }
+
+    [Fact]
+    public void TaskSchedulerOnUnobservedTaskException_WhenConfiguredTerminating_ExposesTerminatingFlag()
+    {
+        var originalConfiguration = UnhandledExceptions.UnobservedTaskExceptionIsTerminating;
+        var exception = new AggregateException(new InvalidOperationException("configured terminating"));
+        StageKitExceptionEventArgs? receivedArgs = null;
+        EventHandler<StageKitExceptionEventArgs> handler = (_, args) => receivedArgs = args;
+
+        try
+        {
+            UnhandledExceptions.UnobservedTaskExceptionIsTerminating = true;
+            UnhandledExceptions.IgnoredExceptionMessages.Add(exception.Message);
+            UnhandledExceptions.ExceptionThrown += handler;
+
+            UnhandledExceptions.TaskSchedulerOnUnobservedTaskException(
+                null,
+                new UnobservedTaskExceptionEventArgs(exception));
+
+            Assert.NotNull(receivedArgs);
+            Assert.True(receivedArgs.IsTerminating);
+        }
+        finally
+        {
+            UnhandledExceptions.ExceptionThrown -= handler;
+            UnhandledExceptions.IgnoredExceptionMessages.Remove(exception.Message);
+            UnhandledExceptions.UnobservedTaskExceptionIsTerminating = originalConfiguration;
+        }
+    }
+
+    [Fact]
     public void HandleUnhandledException_WhenIgnored_RaisesExceptionThrownWithIgnoredFlag()
     {
         var exception = new InvalidOperationException("direct ignored");

@@ -236,6 +236,24 @@ public sealed class RootSettingsFileAutoSaveTests
     }
 
     [Fact]
+    public void Instance_WhenFileContainsJsonNull_RenamesToBackupAndCreatesFreshInstance()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directoryPath);
+
+        NullLoadSettings.DirectoryPathOverride = directoryPath;
+        var filePath = Path.Combine(directoryPath, NullLoadSettings.SettingsFileName);
+        File.WriteAllText(filePath, "null");
+
+        var settings = NullLoadSettings.Instance;
+
+        Assert.NotNull(settings);
+        Assert.Equal(string.Empty, settings.Name);
+        Assert.False(File.Exists(filePath));
+        Assert.Single(Directory.GetFiles(directoryPath, $"{NullLoadSettings.SettingsFileName}.corrupt-*"));
+    }
+
+    [Fact]
     public async Task WaitForDebouncedSaveAsync_WhenCancelDebouncedSave_ReturnsTrue()
     {
         var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
@@ -370,6 +388,29 @@ public sealed class RootSettingsFileAutoSaveTests
         Assert.True(settings.MigrationRan);
         Assert.True(settings.HasUnsavedChanges);
         settings.DeleteFile();
+    }
+
+    [Fact]
+    public void Instance_WhenMigrationThrows_RenamesFileAndCreatesFreshInstance()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directoryPath);
+
+        ThrowingMigrationSettings.DirectoryPathOverride = directoryPath;
+        var filePath = Path.Combine(directoryPath, ThrowingMigrationSettings.SettingsFileName);
+        File.WriteAllText(filePath, """
+            {
+              "SettingsVersion": 1,
+              "Name": "old"
+            }
+            """);
+
+        var settings = ThrowingMigrationSettings.Instance;
+
+        Assert.Equal(2, settings.SettingsVersion);
+        Assert.Equal(string.Empty, settings.Name);
+        Assert.False(File.Exists(filePath));
+        Assert.Single(Directory.GetFiles(directoryPath, $"{ThrowingMigrationSettings.SettingsFileName}.corrupt-*"));
     }
 
     [Fact]
@@ -779,6 +820,29 @@ public sealed class RootSettingsFileAutoSaveTests
         }
     }
 
+    private sealed class ThrowingMigrationSettings : RootSettingsFile<ThrowingMigrationSettings>
+    {
+        public const string SettingsFileName = "throwing-migration-settings.json";
+
+        public static string DirectoryPathOverride { get; set; } = string.Empty;
+
+        public ThrowingMigrationSettings()
+        {
+            DirectoryPath = DirectoryPathOverride;
+            FileName = SettingsFileName;
+            DefaultDebounceSaveMilliseconds = 0;
+        }
+
+        public string Name { get; set; } = string.Empty;
+
+        protected override int CurrentSettingsVersion => 2;
+
+        protected override void MigrateSettings(SettingsMigrationContext context)
+        {
+            throw new InvalidOperationException("Migration failed.");
+        }
+    }
+
     private sealed class CurrentVersionSettings : RootSettingsFile<CurrentVersionSettings>
     {
         public const string SettingsFileName = "current-version-settings.json";
@@ -811,6 +875,22 @@ public sealed class RootSettingsFileAutoSaveTests
         public static string DirectoryPathOverride { get; set; } = string.Empty;
 
         public FutureVersionSettings()
+        {
+            DirectoryPath = DirectoryPathOverride;
+            FileName = SettingsFileName;
+            DefaultDebounceSaveMilliseconds = 0;
+        }
+
+        public string Name { get; set; } = string.Empty;
+    }
+
+    private sealed class NullLoadSettings : RootSettingsFile<NullLoadSettings>
+    {
+        public const string SettingsFileName = "null-settings.json";
+
+        public static string DirectoryPathOverride { get; set; } = string.Empty;
+
+        public NullLoadSettings()
         {
             DirectoryPath = DirectoryPathOverride;
             FileName = SettingsFileName;

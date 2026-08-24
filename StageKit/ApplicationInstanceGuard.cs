@@ -38,12 +38,14 @@ public sealed class ApplicationInstanceGuard : DisposableObject
     #region Members
 
     /// <summary>
-    /// Gets a suggested global instance name based on the application domain friendly name.
+    /// Gets a suggested global instance name based on the application domain-friendly name.
     /// </summary>
-    public static string SuggestedInstanceNameGlobal => $"StageKit_{AppDomain.CurrentDomain.FriendlyName}";
+    public static string SuggestedInstanceNameGlobal => OperatingSystem.IsWindows()
+        ? $"Global\\StageKit_{AppDomain.CurrentDomain.FriendlyName}"
+        : $"StageKit_{AppDomain.CurrentDomain.FriendlyName}";
 
     /// <summary>
-    /// Gets a suggested instance name based on the application domain friendly name and current user identity.
+    /// Gets a suggested instance name based on the application domain-friendly name and current user identity.
     /// </summary>
     public static string SuggestedInstanceNamePerUser =>
         $"{SuggestedInstanceNameGlobal}_{Environment.UserDomainName}_{Environment.UserName}";

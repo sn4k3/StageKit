@@ -33,6 +33,14 @@ public sealed class ApplicationInstanceGuardTests
         Assert.Throws<ArgumentException>(() => ApplicationInstanceGuard.Acquire(" "));
     }
 
+    [Fact]
+    public void SuggestedInstanceNameGlobal_OnWindowsUsesGlobalNamespace()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        Assert.StartsWith("Global\\", ApplicationInstanceGuard.SuggestedInstanceNameGlobal);
+    }
+
     private static string CreateInstanceName()
     {
         return $"StageKit.Tests.{Guid.NewGuid():N}";

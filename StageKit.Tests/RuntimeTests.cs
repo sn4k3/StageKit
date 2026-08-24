@@ -27,4 +27,42 @@ public sealed class RuntimeTests
         Assert.DoesNotContain("Loaded Assemblies:", report);
         Assert.Contains("Loaded Assemblies:", reportWithAssemblies);
     }
+
+    [Fact]
+    public void DotNetSingleFileDetection_UsesProcessPathInsteadOfDotNetHostPath()
+    {
+        var processPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", "TestApp");
+
+        var detectedPath = EntryApplication.DetectDotNetSingleFileAppPath(
+            assemblyLocation: null,
+            isRunningFromDotNetProcess: false,
+            processPath);
+
+        Assert.Equal(processPath, detectedPath);
+    }
+
+    [Fact]
+    public void ExecutablePathSelection_DoesNotUseFlatpakMarkerAsExecutablePath()
+    {
+        var processPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", "TestApp");
+
+        var selectedPath = EntryApplication.SelectExecutablePath(
+            linuxAppImagePath: null,
+            linuxFlatpakPath: "flatpak",
+            macOsAppBundlePath: null,
+            dotNetSingleFileAppPath: null,
+            isRunningFromDotNetProcess: false,
+            assemblyLocation: null,
+            processPath);
+
+        Assert.Equal(processPath, selectedPath);
+    }
+
+    [Fact]
+    public void IsSingleFileBundle_ReturnsFalseForFlatpak()
+    {
+        Assert.False(EntryApplication.IsSingleFileBundle(ApplicationBundleType.LinuxFlatpak));
+        Assert.True(EntryApplication.IsSingleFileBundle(ApplicationBundleType.DotNetSingleFile));
+        Assert.True(EntryApplication.IsSingleFileBundle(ApplicationBundleType.LinuxAppImage));
+    }
 }

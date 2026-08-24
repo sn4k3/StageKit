@@ -250,32 +250,34 @@ public abstract class RootSettingsFile<T> : SubSettings, ISavable, IDisposable w
                     loaded = JsonSerializer.Deserialize<T>(stream, instance.JsonOptions);
                 }
 
-                if (loaded is not null)
+                if (loaded is null)
                 {
-                    var currentSettingsVersion = loaded.CurrentSettingsVersion;
-                    if (loaded.SettingsVersion > currentSettingsVersion)
-                    {
-                        loaded.Dispose();
-                        loaded = null;
-                        RenameInvalidSettingsFile(filePath, instance.FileName, "unsupported-version");
-                    }
-                    else
-                    {
-                        instance.Dispose();
-                        instance = loaded;
-                        loaded = null;
-                        loadFromFile = true;
+                    throw new JsonException("The settings JSON must contain an object.");
+                }
 
-                        if (instance.SettingsVersion < currentSettingsVersion)
-                        {
-                            var migrationContext = new SettingsMigrationContext(
-                                instance.SettingsVersion,
-                                currentSettingsVersion);
-                            instance.MigrateSettings(migrationContext);
-                            instance.SettingsVersion = currentSettingsVersion;
-                            hasPostLoadChanges = true;
-                        }
+                var currentSettingsVersion = loaded.CurrentSettingsVersion;
+                if (loaded.SettingsVersion > currentSettingsVersion)
+                {
+                    loaded.Dispose();
+                    loaded = null;
+                    RenameInvalidSettingsFile(filePath, instance.FileName, "unsupported-version");
+                }
+                else
+                {
+                    if (loaded.SettingsVersion < currentSettingsVersion)
+                    {
+                        var migrationContext = new SettingsMigrationContext(
+                            loaded.SettingsVersion,
+                            currentSettingsVersion);
+                        loaded.MigrateSettings(migrationContext);
+                        loaded.SettingsVersion = currentSettingsVersion;
+                        hasPostLoadChanges = true;
                     }
+
+                    instance.Dispose();
+                    instance = loaded;
+                    loaded = null;
+                    loadFromFile = true;
                 }
             }
             catch (Exception e)

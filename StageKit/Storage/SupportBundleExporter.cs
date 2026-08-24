@@ -1,8 +1,8 @@
-using StageKit.Primitives;
-using StageKit.Runtime;
 using System.IO.Compression;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using StageKit.Primitives;
+using StageKit.Runtime;
 
 namespace StageKit;
 
@@ -23,7 +23,7 @@ public static class SupportBundleExporter
         var destinationFilePath = Path.GetFullPath(options.DestinationFilePath ?? CreateDefaultBundlePath());
         SafeFile.Write(destinationFilePath, stream =>
         {
-            using var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
+            using var archive = new ZipArchive(stream, ZipArchiveMode.Create, true);
             AddManifest(archive, options);
             var includeFile = CreateBundleFileFilter(destinationFilePath);
 
@@ -34,7 +34,7 @@ public static class SupportBundleExporter
                     ApplicationKit.ConfigsPath,
                     ApplicationKit.ConfigsPath,
                     includeFile,
-                    entryPrefix: "configs");
+                    "configs");
             }
 
             if (options.IncludeLogs)
@@ -44,7 +44,7 @@ public static class SupportBundleExporter
                     ApplicationKit.LogsPath,
                     ApplicationKit.LogsPath,
                     includeFile,
-                    entryPrefix: "logs");
+                    "logs");
             }
             else if (options.IncludeCrashReports)
             {
@@ -81,7 +81,7 @@ public static class SupportBundleExporter
             async (stream, token) =>
             {
 #if NET10_0_OR_GREATER
-                await using var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
+                await using var archive = new ZipArchive(stream, ZipArchiveMode.Create, true);
 #else
                 using var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
 #endif
@@ -95,8 +95,8 @@ public static class SupportBundleExporter
                         ApplicationKit.ConfigsPath,
                         ApplicationKit.ConfigsPath,
                         includeFile,
-                        entryPrefix: "configs",
-                        cancellationToken: token).ConfigureAwait(false);
+                        "configs",
+                        token).ConfigureAwait(false);
                 }
 
                 if (options.IncludeLogs)
@@ -106,8 +106,8 @@ public static class SupportBundleExporter
                         ApplicationKit.LogsPath,
                         ApplicationKit.LogsPath,
                         includeFile,
-                        entryPrefix: "logs",
-                        cancellationToken: token).ConfigureAwait(false);
+                        "logs",
+                        token).ConfigureAwait(false);
                 }
                 else if (options.IncludeCrashReports)
                 {
@@ -202,7 +202,7 @@ public static class SupportBundleExporter
             IncludeConfigs = options.IncludeConfigs,
             IncludeLogs = options.IncludeLogs,
             IncludeCrashReports = options.IncludeCrashReports,
-            Notes = options.Notes,
+            Notes = options.Notes
         };
     }
 
@@ -264,7 +264,8 @@ public static class SupportBundleExporter
 
     private static string CreateDefaultBundlePath()
     {
-        var fileName = $"{ApplicationKit.ApplicationName}-support-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}.zip";
+        var fileName =
+            $"{ApplicationKit.ApplicationName}-support-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}.zip";
         return Path.Combine(ApplicationKit.BackupsPath, fileName);
     }
 

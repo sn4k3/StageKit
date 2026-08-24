@@ -8,9 +8,11 @@
 [![Nuget](https://img.shields.io/nuget/v/StageKit.Primitives?style=for-the-badge)](https://www.nuget.org/packages/StageKit.Primitives)
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/sn4k3?color=red&style=for-the-badge)](https://github.com/sponsors/sn4k3)
 
-StageKit.Primitives is a dependency-light .NET package with reusable low-level helpers used by StageKit libraries and available for other libraries or apps.
+StageKit.Primitives is a dependency-light .NET package with reusable low-level helpers used by StageKit libraries and
+available for other libraries or apps.
 
-All public helpers are exposed from the `StageKit.Primitives` namespace. IO-related source files are grouped under an `IO/` folder for organization only.
+All public helpers are exposed from the `StageKit.Primitives` namespace. IO-related source files are grouped under an
+`IO/` folder for organization only.
 
 ## Features
 
@@ -18,6 +20,7 @@ All public helpers are exposed from the `StageKit.Primitives` namespace. IO-rela
 - Stream-based atomic file writes through `SafeFileStream`
 - Path, temporary file, and temporary directory helpers
 - Disposable base type with thread-safe idempotent disposal through `DisposableObject`
+- Finalizable disposable base type through `UnmanagedDisposableObject`
 - Leave-open lifecycle base type through `LeaveOpenDisposableObject`
 - `SafeHandle` wrapper for pinned `GCHandle` scenarios through `GCSafeHandle`
 - `MemoryManager<T>` wrapper for externally owned unmanaged buffers through `UnmanagedMemoryManager<T>`
@@ -63,7 +66,8 @@ Temporary files use this pattern:
 <destination>.tmp.<guid>
 ```
 
-Use `SafeFile.IsTemporaryPathFor(...)` when filtering a directory that may contain temporary files for an in-progress write:
+Use `SafeFile.IsTemporaryPathFor(...)` when filtering a directory that may contain temporary files for an in-progress
+write:
 
 ```csharp
 if (SafeFile.IsTemporaryPathFor(candidatePath, destinationPath))
@@ -93,7 +97,8 @@ await stream.WriteAsync(buffer, cancellationToken);
 await stream.CommitAsync(cancellationToken);
 ```
 
-If a `SafeFileStream` is disposed without committing and `commitOnDispose` is `false`, the temporary file is deleted and the destination is left unchanged.
+If a `SafeFileStream` is disposed without committing and `commitOnDispose` is `false`, the temporary file is deleted and
+the destination is left unchanged.
 
 ## IO Helpers
 
@@ -154,7 +159,12 @@ public sealed class Worker : DisposableObject
 }
 ```
 
-`DisposeManaged()` runs for normal `Dispose()` calls. `DisposeUnmanaged()` always runs after managed cleanup is attempted, even if managed cleanup throws. The base class does not define a finalizer; types that directly own unmanaged resources should prefer `SafeHandle` or implement their own finalizer.
+`DisposeManaged()` runs for normal `Dispose()` calls. During explicit disposal, `DisposeUnmanaged()` runs after managed
+cleanup is attempted, even if managed cleanup throws. The base class does not define a finalizer; types that directly
+own unmanaged resources should prefer `SafeHandle` or use `UnmanagedDisposableObject`.
+
+`UnmanagedDisposableObject` is available when a type directly owns unmanaged resources and needs finalizer fallback.
+Prefer `SafeHandle` when the resource is a native handle.
 
 ## LeaveOpenDisposableObject
 
@@ -198,7 +208,8 @@ using var handle = new GCSafeHandle(buffer);
 IntPtr address = handle.DangerousGetHandle();
 ```
 
-Use this only when pinning is necessary, such as interop paths that require a stable address. Keep pinning lifetimes short.
+Use this only when pinning is necessary, such as interop paths that require a stable address. Keep pinning lifetimes
+short.
 
 ## UnmanagedMemoryManager
 
@@ -211,7 +222,8 @@ using var manager = new UnmanagedMemoryManager<byte>(bufferAddress, bufferLength
 Memory<byte> memory = manager.Memory;
 ```
 
-The manager does not allocate, pin, or free the underlying memory. The caller must keep the buffer alive and fixed for every `Memory<T>` or `MemoryHandle` produced by the manager.
+The manager does not allocate, pin, or free the underlying memory. The caller must keep the buffer alive and fixed for
+every `Memory<T>` or `MemoryHandle` produced by the manager.
 
 ## License
 

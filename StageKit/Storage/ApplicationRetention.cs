@@ -36,15 +36,37 @@ public static class ApplicationRetention
         ArgumentException.ThrowIfNullOrWhiteSpace(directoryPath);
         ArgumentNullException.ThrowIfNull(policy);
 
+        if (policy.MaxAge is { } configuredMaxAge && configuredMaxAge < TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(policy.MaxAge), policy.MaxAge,
+                "Maximum file age must be non-negative.");
+        }
+
+        if (policy.MaxFiles < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(policy.MaxFiles), policy.MaxFiles,
+                "Maximum file count must be non-negative.");
+        }
+
         var result = new FileRetentionResult();
         if (!Directory.Exists(directoryPath))
         {
             return result;
         }
 
-        var searchOption = policy.Recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+        var directoryInfo = new DirectoryInfo(Path.GetFullPath(directoryPath));
+        if (directoryInfo.Attributes.HasFlag(FileAttributes.ReparsePoint))
+        {
+            return result;
+        }
+
+        var enumerationOptions = new EnumerationOptions
+        {
+            RecurseSubdirectories = policy.Recursive,
+            AttributesToSkip = FileAttributes.Hidden | FileAttributes.System | FileAttributes.ReparsePoint,
+        };
         var files = Directory
-            .EnumerateFiles(directoryPath, policy.SearchPattern, searchOption)
+            .EnumerateFiles(directoryInfo.FullName, policy.SearchPattern, enumerationOptions)
             .Select(path => new FileInfo(path))
             .Where(file => file.Exists)
             .OrderByDescending(file => file.LastWriteTimeUtc)

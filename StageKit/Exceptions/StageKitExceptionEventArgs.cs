@@ -47,10 +47,10 @@ public class StageKitExceptionEventArgs : UnhandledExceptionEventArgs
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="StageKitExceptionEventArgs"/> class based on an existing <see cref="UnobservedTaskExceptionEventArgs"/> instance, copying relevant properties and marking the exception as observed to prevent application termination.
+    /// Initializes a new instance of the <see cref="StageKitExceptionEventArgs"/> class based on an existing <see cref="UnobservedTaskExceptionEventArgs"/> instance, marking it as non-terminating for safe exception handling.
     /// </summary>
     /// <param name="args">The existing <see cref="UnobservedTaskExceptionEventArgs"/> instance to copy properties from.</param>
-    public StageKitExceptionEventArgs(UnobservedTaskExceptionEventArgs args) : base(args.Exception, true)
+    public StageKitExceptionEventArgs(UnobservedTaskExceptionEventArgs args) : base(args.Exception, false)
     {
     }
 

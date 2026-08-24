@@ -208,13 +208,14 @@ public static class EntryApplication
         OperatingSystem.IsLinux() ? Environment.GetEnvironmentVariable("FLATPAK_ID") : null);
 
     /// <summary>
-    /// Provides lazy initialization for the value of the "container" environment variable on Linux systems.
+    /// Provides lazy initialization for the base directory of a Linux Flatpak application.
     /// </summary>
-    /// <remarks>The value is retrieved only if the current operating system is Linux; otherwise, it is null.
-    /// This can be used to detect if the application is running inside a Flatpak or similar containerized environment
-    /// on Linux.</remarks>
+    /// <remarks>The value is available only when the FLATPAK_ID environment variable identifies a Flatpak
+    /// application. The container marker is not an executable path and is never used for process selection.</remarks>
     private static readonly Lazy<string?> LinuxFlatpakPathLazy = new(() =>
-        OperatingSystem.IsLinux() ? Environment.GetEnvironmentVariable("container") : null);
+        OperatingSystem.IsLinux() && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("FLATPAK_ID"))
+            ? AppContext.BaseDirectory
+            : null);
 
     /// <summary>
     /// Provides a lazily initialized path to the root of the current application's macOS .app bundle, if running on
@@ -295,26 +296,10 @@ public static class EntryApplication
     /// Lazily retrieves the path to the current executable when running as a .NET single-file application, or returns
     /// null if not applicable.
     /// </summary>
-    /// <remarks>This value is determined by checking the 'DOTNET_HOST_PATH' environment variable, which is
-    /// set when running as a single-file app. If the environment variable is not set, the process path is used as a
-    /// fallback. Returns null if the application is running from a standard .NET process or if the assembly location is
-    /// available, indicating that the app is not a single-file deployment.</remarks>
+    /// <remarks>Single-file applications expose an empty assembly location. The process path is used as the
+    /// executable path; DOTNET_HOST_PATH identifies the dotnet host and is intentionally ignored.</remarks>
     private static readonly Lazy<string?> DotNetSingleFileAppPathLazy = new(() =>
-    {
-        if (IsRunningFromDotNetProcess || !string.IsNullOrWhiteSpace(AssemblyLocation))
-            return null;
-
-        // If not running from dotnet process, and assembly location is null or empty, is possibly a single-file app
-        var executablePath = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
-
-        // Fallback to process path if DOTNET_HOST_PATH is not set
-        if (string.IsNullOrWhiteSpace(executablePath))
-        {
-            executablePath = Environment.ProcessPath;
-        }
-
-        return executablePath;
-    });
+        DetectDotNetSingleFileAppPath(AssemblyLocation, IsRunningFromDotNetProcess, Environment.ProcessPath));
 
     /// <summary>
     /// Lazily retrieves information about the current process's executable, including its path, name, and base
@@ -328,13 +313,14 @@ public static class EntryApplication
         Lazy<(string? ExecutablePath, string? ExecutableName, string? BaseDirectory, bool IsExecutablePathKnown)>
         ExecutableInfoLazy = new(() =>
         {
-            var executablePath = LinuxAppImagePath
-                                 ?? LinuxFlatpakPath
-                                 ?? MacOSAppBundlePath
-                                 ?? DotNetSingleFileAppPath
-                                 ?? (IsRunningFromDotNetProcess && !string.IsNullOrWhiteSpace(AssemblyLocation)
-                                     ? AssemblyLocation
-                                     : Environment.ProcessPath);
+            var executablePath = SelectExecutablePath(
+                LinuxAppImagePath,
+                LinuxFlatpakPath,
+                MacOSAppBundlePath,
+                DotNetSingleFileAppPath,
+                IsRunningFromDotNetProcess,
+                AssemblyLocation,
+                Environment.ProcessPath);
 
             if (string.IsNullOrWhiteSpace(executablePath))
             {
@@ -350,7 +336,12 @@ public static class EntryApplication
             }
 
 
-            return (executablePath, Path.GetFileName(executablePath), Path.GetDirectoryName(executablePath), true);
+            var fullExecutablePath = Path.GetFullPath(executablePath);
+            return (
+                fullExecutablePath,
+                Path.GetFileName(fullExecutablePath),
+                Path.GetDirectoryName(fullExecutablePath) ?? AppContext.BaseDirectory,
+                true);
         });
 
     /// <summary>
@@ -525,10 +516,7 @@ public static class EntryApplication
     /// Checks if the application is running under a bundled single-file application that extracts itself.<br/>
     /// Example: dotnet single-file, linux AppImage.
     /// </summary>
-    public static bool IsSingleFileApp => BundleType
-        is ApplicationBundleType.DotNetSingleFile
-        or ApplicationBundleType.LinuxAppImage
-        or ApplicationBundleType.LinuxFlatpak;
+    public static bool IsSingleFileApp => IsSingleFileBundle(BundleType);
 
     /// <summary>
     /// Checks if the application is running under a dotnet process.
@@ -568,7 +556,7 @@ public static class EntryApplication
     public static string? LinuxFlatpakId => LinuxFlatpakIdLazy.Value;
 
     /// <summary>
-    /// Gets the path to the running linux flatpak.
+    /// Gets the application base directory inside the running Linux Flatpak.
     /// </summary>
     public static string? LinuxFlatpakPath => LinuxFlatpakPathLazy.Value;
 
@@ -618,8 +606,7 @@ public static class EntryApplication
     /// <remarks>When this property is <see langword="true"/>, the <see cref="ExecutablePath"/>, <see
     /// cref="ExecutableName"/>, and <see cref="BaseDirectory"/> properties are guaranteed to be non-null. If <see
     /// langword="false"/>, these properties may not be available.</remarks>
-    [MemberNotNullWhen(true, nameof(ExecutablePath), nameof(ExecutableName), nameof(BaseDirectory),
-        nameof(ProcessPath))]
+    [MemberNotNullWhen(true, nameof(ExecutablePath), nameof(ExecutableName), nameof(BaseDirectory))]
     public static bool IsExecutablePathKnown => ExecutableInfoLazy.Value.IsExecutablePathKnown;
 
     /// <summary>
@@ -684,6 +671,63 @@ public static class EntryApplication
     #endregion
 
     #region Methods
+
+    /// <summary>
+    /// Detects the path to the .NET single-file application executable if running in a single-file context; otherwise, returns null.
+    /// </summary>
+    /// <param name="assemblyLocation">The location of the assembly.</param>
+    /// <param name="isRunningFromDotNetProcess">Indicates whether the application is running from a .NET process.</param>
+    /// <param name="processPath">The path of the process.</param>
+    /// <returns>The path to the .NET single-file application executable if running in a single-file context; otherwise, null.</returns>
+    internal static string? DetectDotNetSingleFileAppPath(
+        string? assemblyLocation,
+        bool isRunningFromDotNetProcess,
+        string? processPath)
+    {
+        if (isRunningFromDotNetProcess || !string.IsNullOrWhiteSpace(assemblyLocation)) return null;
+        return processPath;
+    }
+
+    /// <summary>
+    /// Selects the appropriate executable path based on the current runtime environment and application bundle type.
+    /// </summary>
+    /// <param name="linuxAppImagePath">The path to the Linux AppImage executable.</param>
+    /// <param name="linuxFlatpakPath">The path to the Linux Flatpak executable.</param>
+    /// <param name="macOsAppBundlePath">The path to the macOS App Bundle executable.</param>
+    /// <param name="dotNetSingleFileAppPath">The path to the .NET single-file application executable.</param>
+    /// <param name="isRunningFromDotNetProcess">Indicates whether the application is running from a .NET process.</param>
+    /// <param name="assemblyLocation">The location of the assembly.</param>
+    /// <param name="processPath">The path of the process.</param>
+    /// <returns></returns>
+    internal static string? SelectExecutablePath(
+        string? linuxAppImagePath,
+        string? linuxFlatpakPath,
+        string? macOsAppBundlePath,
+        string? dotNetSingleFileAppPath,
+        bool isRunningFromDotNetProcess,
+        string? assemblyLocation,
+        string? processPath)
+    {
+        _ = linuxFlatpakPath;
+
+        if (!string.IsNullOrWhiteSpace(linuxAppImagePath)) return linuxAppImagePath;
+        if (!string.IsNullOrWhiteSpace(macOsAppBundlePath)) return macOsAppBundlePath;
+        if (!string.IsNullOrWhiteSpace(dotNetSingleFileAppPath)) return dotNetSingleFileAppPath;
+
+        return isRunningFromDotNetProcess && !string.IsNullOrWhiteSpace(assemblyLocation)
+            ? assemblyLocation
+            : processPath;
+    }
+
+    /// <summary>
+    /// Determines whether the specified application bundle type represents a single-file bundle.
+    /// </summary>
+    /// <param name="bundleType">The application bundle type to check.</param>
+    /// <returns><see langword="true"/> if the bundle type represents a single-file bundle; otherwise, <see langword="false"/>.</returns>
+    internal static bool IsSingleFileBundle(ApplicationBundleType bundleType)
+    {
+        return bundleType is ApplicationBundleType.DotNetSingleFile or ApplicationBundleType.LinuxAppImage;
+    }
 
     /// <summary>
     /// Returns a dictionary of the entry application information.
@@ -811,23 +855,20 @@ public static class EntryApplication
 
         try
         {
-            if (OperatingSystem.IsMacOS() && IsMacOSAppBundle)
+            if (OperatingSystem.IsMacOS() && IsMacOSAppBundle && Directory.Exists(ExecutablePath))
             {
-                if (Directory.Exists(ExecutablePath))
+                var openArguments = new List<string>(runArguments.Length + 2)
                 {
-                    var openArguments = new List<string>(runArguments.Length + 2)
-                    {
-                        ExecutablePath
-                    };
+                    ExecutablePath
+                };
 
-                    if (runArguments.Length > 0)
-                    {
-                        openArguments.Add("--args");
-                        openArguments.AddRange(runArguments);
-                    }
-
-                    return Utilities.StartProcess("open", openArguments) == 0;
+                if (runArguments.Length > 0)
+                {
+                    openArguments.Add("--args");
+                    openArguments.AddRange(runArguments);
                 }
+
+                return Utilities.StartProcess("open", openArguments) == 0;
             }
 
             if (!File.Exists(ExecutablePath)) return false;

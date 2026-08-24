@@ -28,7 +28,7 @@ public static class ApplicationBackup
 
         SafeFile.Write(destinationFilePath, stream =>
         {
-            using var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
+            using var archive = new ZipArchive(stream, ZipArchiveMode.Create, true);
             AddDirectoryToArchive(
                 archive,
                 sourceDirectoryPath,
@@ -80,7 +80,7 @@ public static class ApplicationBackup
             async (stream, token) =>
             {
 #if NET10_0_OR_GREATER
-                await using var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
+                await using var archive = new ZipArchive(stream, ZipArchiveMode.Create, true);
 #else
                 using var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
 #endif
@@ -132,7 +132,8 @@ public static class ApplicationBackup
             var destinationPath = Path.GetFullPath(Path.Combine(destinationRoot, entry.FullName));
             if (!PathUtilities.IsSubPathOf(destinationPath, destinationRoot))
             {
-                throw new InvalidOperationException($"Backup entry escapes the destination directory: {entry.FullName}");
+                throw new InvalidOperationException(
+                    $"Backup entry escapes the destination directory: {entry.FullName}");
             }
 
             if (!overwrite && File.Exists(destinationPath))
@@ -183,7 +184,8 @@ public static class ApplicationBackup
             var destinationPath = Path.GetFullPath(Path.Combine(destinationRoot, entry.FullName));
             if (!PathUtilities.IsSubPathOf(destinationPath, destinationRoot))
             {
-                throw new InvalidOperationException($"Backup entry escapes the destination directory: {entry.FullName}");
+                throw new InvalidOperationException(
+                    $"Backup entry escapes the destination directory: {entry.FullName}");
             }
 
             if (!overwrite && File.Exists(destinationPath))
@@ -237,7 +239,8 @@ public static class ApplicationBackup
             var entryName = string.IsNullOrWhiteSpace(entryPrefix)
                 ? relativePath
                 : Path.Combine(entryPrefix, relativePath);
-            archive.CreateEntryFromFile(filePath, PathUtilities.NormalizeArchiveEntryName(entryName), CompressionLevel.Optimal);
+            archive.CreateEntryFromFile(filePath, PathUtilities.NormalizeArchiveEntryName(entryName),
+                CompressionLevel.Optimal);
         }
     }
 
@@ -328,7 +331,8 @@ public static class ApplicationBackup
     /// <returns>The default backup file path.</returns>
     private static string CreateDefaultBackupPath()
     {
-        var fileName = $"{ApplicationKit.ApplicationName}-backup-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}.zip";
+        var fileName =
+            $"{ApplicationKit.ApplicationName}-backup-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}.zip";
         return Path.Combine(ApplicationKit.BackupsPath, fileName);
     }
 }

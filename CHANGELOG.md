@@ -1,3 +1,17 @@
+# v0.2.5 (24/08/2026)
+
+- Add `WindowsInstaller` to `ApplicationBundleType`
+- Fix single-file and Flatpak executable-path detection.
+- Harden archive path normalization and reparse-point containment checks.
+- Add `UnmanagedDisposableObject` for types requiring finalizer fallback.
+- Fix unobserved task exceptions being treated as process-fatal.
+- Add `UnhandledExceptions.UnobservedTaskExceptionIsTerminating` configuration.
+- Preserve invalid settings files when JSON contains `null` or migration fails.
+- Use the Windows global mutex namespace for `AcquireGlobal()`.
+- Ensure default backup and support-bundle paths are unique.
+- Validate retention limits and skip reparse-point traversal.
+- Bump dependencies
+
 # v0.2.4 (20/07/2026)
 
 - Add `Environment.GetCommandLineArgs()[0]` fallback for `EntryApplication.ExecutablePath` when the entry assembly is
@@ -39,8 +53,8 @@
 - Add `UnhandledExceptions.ExceptionThrown` event, raised for every caught unhandled exception (fatal or ignored).
 - Add `UnhandledExceptions.HandleSafeException(...)` to log a non-fatal exception at a configurable `LogLevel`.
 - Add `ExceptionTraversalType` and `ExceptionExtensions.EnumerateExceptions(...)` for traversing complete exception
-  trees or direct inner-exception chains,
-  allocating a pending-branch stack only when required by branching aggregate exceptions.
+  trees or direct inner-exception chains, allocating a pending-branch stack only when required by branching aggregate
+  exceptions.
 - Breaking: replace the `ExceptionInfo` constructor's `handleAggregateExceptionAsLinkedLink` boolean with an
   `ExceptionTraversalType` parameter.
 - Breaking: move `includeStackTrace` before `includeInnerException` in the `ExceptionInfo` constructor.
@@ -64,17 +78,17 @@
 
 - Add `PrimaryProcess` property to `ApplicationInstanceGuard`
 - Add `StageKit.Primitives` library:
-    - Move `SafeFile` to `StageKit.Primitives`
-    - Add `DisposableObject` base class for disposable patterns
-    - Add `LeaveOpenDisposableObject` base class for disposable patterns with optional leave-open semantics
-    - Add `GCSafeHandle` for safe handle management with garbage collection support
-    - Add `SafeFileStream` for safe file stream management with atomic write support
-    - Add `PathUtilities` for common path operations and utilities
-    - Add `TemporaryDirectory` and `TemporaryFile` for temporary file and directory management
+  - Move `SafeFile` to `StageKit.Primitives`
+  - Add `DisposableObject` base class for disposable patterns
+  - Add `LeaveOpenDisposableObject` base class for disposable patterns with optional leave-open semantics
+  - Add `GCSafeHandle` for safe handle management with garbage collection support
+  - Add `SafeFileStream` for safe file stream management with atomic write support
+  - Add `PathUtilities` for common path operations and utilities
+  - Add `TemporaryDirectory` and `TemporaryFile` for temporary file and directory management
 - Add `StageKit.Runtime` library:
-    - Add `EntryApplication` class with information about the entry assembly and application instance
-    - Add `RuntimeDiagnostics` class for combined runtime, process, and entry-application diagnostics
-    - Add `EntryApplication.LaunchNewInstance(params string[])` for safer multi-argument relaunch calls
+  - Add `EntryApplication` class with information about the entry assembly and application instance
+  - Add `RuntimeDiagnostics` class for combined runtime, process, and entry-application diagnostics
+  - Add `EntryApplication.LaunchNewInstance(params string[])` for safer multi-argument relaunch calls
 
 # v0.1.4 (07/05/2026)
 
@@ -129,9 +143,9 @@
 - Internal: `RootSettingsFile<T>.CanSave` now uses a `volatile` backing field for cross-thread visibility.
 - Docs: `RootCollectionFile<T,TO>.ItemsView` now documents that the synchronization context is captured at construction.
 - Improve `SubSettings`, `RootSettingsFile` and `RootCollectionFile`
-    - Add `HasUnsavedChanges` property to track unsaved changes
-    - Add `SubSettingsCollection` property to update and keep track of sub-settings
-    - Add `TrackItemsWithChangeNotification` property to track item property changes in collections
+  - Add `HasUnsavedChanges` property to track unsaved changes
+  - Add `SubSettingsCollection` property to update and keep track of sub-settings
+  - Add `TrackItemsWithChangeNotification` property to track item property changes in collections
 
 # v0.1.0 (02/05/2026)
 

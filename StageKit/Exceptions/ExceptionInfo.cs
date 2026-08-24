@@ -1,5 +1,3 @@
-// asdasdasd
-
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 using StageKit.Extensions;

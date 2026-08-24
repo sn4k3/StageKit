@@ -21,6 +21,11 @@ public enum ApplicationBundleType
     DotNetSingleFile,
 
     /// <summary>
+    /// The application is bundled as a Windows Installer (MSI) package.
+    /// </summary>
+    WindowsInstaller,
+
+    /// <summary>
     /// The application is bundled as a Linux AppImage.
     /// </summary>
     LinuxAppImage,
@@ -33,5 +38,5 @@ public enum ApplicationBundleType
     /// <summary>
     /// The application is bundled as a macOS app bundle.
     /// </summary>
-    MacOSAppBundle,
+    MacOSAppBundle
 }

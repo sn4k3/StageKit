@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -9,9 +10,27 @@ namespace StageKit;
 public sealed partial class OnboardingStateFile : RootSettingsFile<OnboardingStateFile>
 {
     /// <summary>
-    /// Gets or sets the onboarding state file name.
+    /// Initializes a new instance of the <see cref="OnboardingStateFile"/> class.
     /// </summary>
-    public static string OnboardingStateDirectoryPath { get; set; } = ApplicationKit.ConfigsPath;
+    public OnboardingStateFile()
+    {
+        AutoSave = true;
+        if (!string.IsNullOrWhiteSpace(OnboardingStateDirectoryPath)) DirectoryPath = OnboardingStateDirectoryPath;
+        if (!string.IsNullOrWhiteSpace(OnboardingStateFileName)) FileName = OnboardingStateFileName;
+        DefaultDebounceSaveMilliseconds = 100;
+    }
+
+    /// <summary>
+    /// Gets or sets the directory used for onboarding state. When not explicitly configured, this follows
+    /// <see cref="ApplicationKit.ConfigsPath"/>.
+    /// </summary>
+    [field: MaybeNull]
+    [field: AllowNull]
+    public static string OnboardingStateDirectoryPath
+    {
+        get => field ?? ApplicationKit.ConfigsPath;
+        set;
+    }
 
     /// <summary>
     /// Gets or sets the onboarding state file name.
@@ -53,17 +72,6 @@ public sealed partial class OnboardingStateFile : RootSettingsFile<OnboardingSta
     /// </summary>
     [JsonIgnore]
     public bool IsFirstRun => OnboardingCompletedUtc is null;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="OnboardingStateFile"/> class.
-    /// </summary>
-    public OnboardingStateFile()
-    {
-        AutoSave = true;
-        if (!string.IsNullOrWhiteSpace(OnboardingStateDirectoryPath)) DirectoryPath = OnboardingStateDirectoryPath;
-        if (!string.IsNullOrWhiteSpace(OnboardingStateFileName)) FileName = OnboardingStateFileName;
-        DefaultDebounceSaveMilliseconds = 100;
-    }
 
     /// <summary>
     /// Records an application launch.

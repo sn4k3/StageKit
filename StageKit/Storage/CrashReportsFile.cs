@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace StageKit;
 
 /// <summary>
@@ -5,28 +7,6 @@ namespace StageKit;
 /// </summary>
 public class CrashReportsFile : RootCollectionFile<CrashReportsFile, CrashReport>
 {
-    #region Static Configuration
-    /// <summary>
-    /// Gets or sets a value indicating whether the automatic crash report capture and persistence features are enabled.
-    /// </summary>
-    public static bool IsEnabled { get; set; }
-
-    /// <summary>
-    /// Gets or sets the crash report JSON file name.
-    /// </summary>
-    public static string CrashReportsDirectoryPath { get; set; } = ApplicationKit.LogsPath;
-
-    /// <summary>
-    /// Gets or sets the crash report JSON file name.
-    /// </summary>
-    public static string CrashReportsFileName { get; set; } = "CrashReports.json";
-
-    /// <summary>
-    /// Gets or sets the maximum number of crash reports retained in the file.
-    /// </summary>
-    public static int MaxCrashReports { get; set; } = 50;
-    #endregion
-
     /// <inheritdoc />
     public CrashReportsFile()
     {
@@ -63,7 +43,7 @@ public class CrashReportsFile : RootCollectionFile<CrashReportsFile, CrashReport
         }
 
         var removed = 0;
-        using (SuspendAutoSave(saveOnDispose: false))
+        using (SuspendAutoSave(false))
         {
             if (maxAge is { } age)
             {
@@ -95,4 +75,35 @@ public class CrashReportsFile : RootCollectionFile<CrashReportsFile, CrashReport
 
         return removed;
     }
+
+    #region Static Configuration
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the automatic crash report capture and persistence features are enabled.
+    /// </summary>
+    public static bool IsEnabled { get; set; }
+
+    /// <summary>
+    /// Gets or sets the directory used for crash report storage. When not explicitly configured, this follows
+    /// <see cref="ApplicationKit.LogsPath"/>.
+    /// </summary>
+    [field: MaybeNull]
+    [field: AllowNull]
+    public static string CrashReportsDirectoryPath
+    {
+        get => field ?? ApplicationKit.LogsPath;
+        set;
+    }
+
+    /// <summary>
+    /// Gets or sets the crash report JSON file name.
+    /// </summary>
+    public static string CrashReportsFileName { get; set; } = "CrashReports.json";
+
+    /// <summary>
+    /// Gets or sets the maximum number of crash reports retained in the file.
+    /// </summary>
+    public static int MaxCrashReports { get; set; } = 50;
+
+    #endregion
 }

@@ -8,7 +8,13 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.301" PrivateAssets="All"/>
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.400" PrivateAssets="All"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="StageKit.Tests">
+            <PublicKey>0024000004800000940000000602000000240000525341310004000001000100d15f1e7e8ead128db7121831d28cd2a046d0c460993b46e54d32752e49678d916d823174db6fe17ad9a2a6e79e421de69dad83c3744d7a16c7dcf1565951f41e22278c003f64e433bb202d405999ac90f98c187cc1d2c2f91d152777d0683086f382503e59e2408ac9a23114d156fd100f333ae7a7a092484f43c77413ecfdb8</PublicKey>
+        </InternalsVisibleTo>
     </ItemGroup>
 
 </Project>

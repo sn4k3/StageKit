@@ -54,24 +54,12 @@ namespace StageKit.Primitives;
 public abstract class DisposableObject : IDisposable
 {
     /// <summary>
-    /// Indicates whether the object has already been disposed. Used to prevent multiple disposal attempts.
+    /// Indicates whether the object has already been disposed of. Used to prevent multiple disposal attempts.
     /// </summary>
     private int _disposed;
 
     /// <summary>
-    /// Finalizes the object and releases unmanaged resources before the object is reclaimed by garbage collection.
-    /// </summary>
-    /// <remarks>This destructor is called by the garbage collector when the object is no longer accessible.
-    /// It invokes the Dispose method with a parameter indicating that the object is being finalized, not disposed
-    /// explicitly. Implement a finalizer only if the class directly holds unmanaged resources that require
-    /// cleanup.</remarks>
-    ~DisposableObject()
-    {
-        Dispose(false);
-    }
-
-    /// <summary>
-    /// Checks if the object has been disposed and throws an <see cref="ObjectDisposedException"/> if it has.
+    /// Checks if the object has been disposed of and throws an <see cref="ObjectDisposedException"/> if it has.
     /// This method should be called at the beginning of any public method that accesses resources to ensure that the object is still valid.
     /// </summary>
     protected void ThrowIfDisposed()
@@ -82,8 +70,8 @@ public abstract class DisposableObject : IDisposable
     /// <summary>
     /// Releases all resources used by the object. If disposing is true, both managed and unmanaged resources are released.
     /// </summary>
-    /// <param name="disposing"></param>
-    private void Dispose(bool disposing)
+    /// <param name="disposing">True when called by <see cref="Dispose()"/>; false when called by a finalizer.</param>
+    protected void Dispose(bool disposing)
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
             return;
@@ -98,7 +86,7 @@ public abstract class DisposableObject : IDisposable
         }
         finally
         {
-            // Always dispose unmanaged resources
+            // Always dispose the unmanaged resources
             DisposeUnmanaged();
         }
     }
@@ -123,11 +111,10 @@ public abstract class DisposableObject : IDisposable
     protected abstract void DisposeManaged();
 
     /// <summary>
-    /// Releases unmanaged resources used by the object.
+    /// Releases unmanaged resources used by the object during explicit disposal.
     /// </summary>
-    /// <remarks>This method should be called when the object is no longer needed to free up unmanaged
-    /// resources. It is recommended to override this method in derived classes to ensure proper resource
-    /// cleanup.</remarks>
+    /// <remarks>Use <see cref="UnmanagedDisposableObject"/> when a derived type also requires finalizer-based
+    /// cleanup. Prefer <see cref="System.Runtime.InteropServices.SafeHandle"/> for native handles.</remarks>
     protected virtual void DisposeUnmanaged()
     {
     }

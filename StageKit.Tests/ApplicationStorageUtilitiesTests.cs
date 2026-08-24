@@ -108,6 +108,60 @@ public sealed class ApplicationStorageUtilitiesTests
     }
 
     [Fact]
+    public void ApplicationBackup_CreateWithoutDestination_UsesUniquePaths()
+    {
+        var originalProfilePath = ApplicationKit.ProfilePath;
+        var profilePath = CreateTempDirectory();
+        var sourcePath = CreateTempDirectory();
+
+        try
+        {
+            ApplicationKit.ProfilePath = profilePath;
+            File.WriteAllText(Path.Combine(sourcePath, "settings.json"), "value");
+
+            var firstPath = ApplicationBackup.Create(new ApplicationBackupOptions
+            {
+                SourceDirectoryPath = sourcePath,
+            });
+            var secondPath = ApplicationBackup.Create(new ApplicationBackupOptions
+            {
+                SourceDirectoryPath = sourcePath,
+            });
+
+            Assert.NotEqual(firstPath, secondPath);
+            Assert.True(File.Exists(firstPath));
+            Assert.True(File.Exists(secondPath));
+        }
+        finally
+        {
+            ApplicationKit.ProfilePath = originalProfilePath;
+        }
+    }
+
+    [Fact]
+    public void SupportBundleExporter_ExportWithoutDestination_UsesUniquePaths()
+    {
+        var originalProfilePath = ApplicationKit.ProfilePath;
+        var profilePath = CreateTempDirectory();
+
+        try
+        {
+            ApplicationKit.ProfilePath = profilePath;
+
+            var firstPath = SupportBundleExporter.Export();
+            var secondPath = SupportBundleExporter.Export();
+
+            Assert.NotEqual(firstPath, secondPath);
+            Assert.True(File.Exists(firstPath));
+            Assert.True(File.Exists(secondPath));
+        }
+        finally
+        {
+            ApplicationKit.ProfilePath = originalProfilePath;
+        }
+    }
+
+    [Fact]
     public void SupportBundleExporter_Export_IncludesManifestConfigsAndLogs()
     {
         var originalProfilePath = ApplicationKit.ProfilePath;
@@ -291,6 +345,24 @@ public sealed class ApplicationStorageUtilitiesTests
         Assert.False(File.Exists(oldPath));
         Assert.False(File.Exists(secondNewestPath));
         Assert.True(File.Exists(newestPath));
+    }
+
+    [Fact]
+    public void ApplicationRetention_ApplyFileRetention_RejectsInvalidLimits()
+    {
+        var directoryPath = CreateTempDirectory();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            ApplicationRetention.ApplyFileRetention(directoryPath, new FileRetentionPolicy
+            {
+                MaxAge = TimeSpan.FromSeconds(-1),
+            }));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            ApplicationRetention.ApplyFileRetention(directoryPath, new FileRetentionPolicy
+            {
+                MaxFiles = -1,
+            }));
     }
 
     [Fact]

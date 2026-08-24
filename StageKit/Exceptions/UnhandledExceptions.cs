@@ -1,5 +1,5 @@
-using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using StageKit.Extensions;
 using StageKit.Interfaces;
 using StageKit.Runtime;
@@ -35,6 +35,15 @@ public static class UnhandledExceptions
     #endregion
 
     #region Configurations
+
+    /// <summary>
+    /// Gets or sets a value indicating whether non-ignored unobserved task exceptions should be treated as terminating.
+    /// </summary>
+    /// <remarks>
+    /// The default is <see langword="false"/>, so unobserved task exceptions are marked observed and logged without
+    /// terminating the process. Configure this during application startup before registering the handler.
+    /// </remarks>
+    public static bool UnobservedTaskExceptionIsTerminating { get; set; }
 
     /// <summary>
     /// Gets exception types that should be ignored when evaluating unhandled exceptions.
@@ -106,20 +115,15 @@ public static class UnhandledExceptions
         foreach (var exception in ex.EnumerateExceptions())
         {
             var exceptionType = exception.GetType();
-            foreach (var ignoredType in IgnoredExceptionList)
+            if (IgnoredExceptionList.Any(ignoredType => ignoredType.IsAssignableFrom(exceptionType)))
             {
-                if (ignoredType.IsAssignableFrom(exceptionType))
-                {
-                    return true;
-                }
+                return true;
             }
 
-            foreach (var msg in IgnoredExceptionMessages)
+            if (IgnoredExceptionMessages.Any(msg =>
+                    exception.Message.Contains(msg, StringComparison.OrdinalIgnoreCase)))
             {
-                if (exception.Message.Contains(msg, StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
+                return true;
             }
         }
 
@@ -212,22 +216,28 @@ public static class UnhandledExceptions
     /// <param name="e">The unobserved task exception event data.</param>
     public static void TaskSchedulerOnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
     {
-        var args = new StageKitExceptionEventArgs(e)
+        var args = new StageKitExceptionEventArgs(e.Exception, UnobservedTaskExceptionIsTerminating)
         {
             Category = "[UnobservedTaskException]",
             IsIgnored = CanIgnoreException(e.Exception)
         };
 
+        e.SetObserved();
         RaiseExceptionThrown(args);
 
         if (args.IsIgnored)
         {
             HandleSafeException(e.Exception, "[UnobservedTaskException:Ignored]");
-            e.SetObserved();
             return;
         }
 
-        HandleUnhandledExceptionCore(args, false, false);
+        if (args.IsTerminating)
+        {
+            HandleUnhandledExceptionCore(args, false, false);
+            return;
+        }
+
+        HandleSafeException(e.Exception, "[UnobservedTaskException]");
     }
 
     /// <summary>
@@ -244,6 +254,26 @@ public static class UnhandledExceptions
         HandleUnhandledExceptionCore(args, searchForIgnoredExceptions, true);
     }
 
+    /// <summary>
+    /// Logs, records, and terminates the process for a fatal unhandled exception.
+    /// </summary>
+    /// <param name="ex">The exception to handle.</param>
+    /// <param name="category">The log and crash report category.</param>
+    /// <param name="searchForIgnoredExceptions">Whether ignore rules should be checked before handling.</param>
+    public static void HandleUnhandledException(
+        Exception ex,
+        string? category = null,
+        bool searchForIgnoredExceptions = true)
+    {
+        HandleUnhandledException(new StageKitExceptionEventArgs(ex, category, false), searchForIgnoredExceptions);
+    }
+
+    /// <summary>
+    /// Logs, records, and terminates the process for a fatal unhandled exception contained in <see cref="StageKitExceptionEventArgs"/>. Should be called from process-wide unhandled exception handlers when an unhandled exception is considered fatal (i.e. when IsTerminating is <see langword="true"/>).
+    /// </summary>
+    /// <param name="args">The <see cref="StageKitExceptionEventArgs"/> containing the exception details.</param>
+    /// <param name="searchForIgnoredExceptions">Whether ignore rules should be checked before handling.</param>
+    /// <param name="raiseExceptionThrown">Whether the <see cref="ExceptionThrown"/> event should be raised.</param>
     private static void HandleUnhandledExceptionCore(
         StageKitExceptionEventArgs args,
         bool searchForIgnoredExceptions,
@@ -324,20 +354,6 @@ public static class UnhandledExceptions
         }
 
         Environment.Exit(FatalExitCode);
-    }
-
-    /// <summary>
-    /// Logs, records, and terminates the process for a fatal unhandled exception.
-    /// </summary>
-    /// <param name="ex">The exception to handle.</param>
-    /// <param name="category">The log and crash report category.</param>
-    /// <param name="searchForIgnoredExceptions">Whether ignore rules should be checked before handling.</param>
-    public static void HandleUnhandledException(
-        Exception ex,
-        string? category = null,
-        bool searchForIgnoredExceptions = true)
-    {
-        HandleUnhandledException(new StageKitExceptionEventArgs(ex, category, false), searchForIgnoredExceptions);
     }
 
     /// <summary>

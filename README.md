@@ -74,6 +74,7 @@ ApplicationKit.Logger = logger;
 ApplicationKit.UiFrameworkInfo = $"Avalonia {typeof(AvaloniaObject).Assembly.GetName().Version!.ToString(3)}";
 ApplicationKit.Birth = DateTime.SpecifyKind(new DateTime(2026, 1, 1), DateTimeKind.Utc);
 
+UnhandledExceptions.UnobservedTaskExceptionIsTerminating = false;
 UnhandledExceptions.RegisterAppDomainUnhandledException();
 UnhandledExceptions.RegisterTaskSchedulerUnobservedTaskException();
 
@@ -311,6 +312,10 @@ UnhandledExceptions.HandleCrashReport = report =>
 ```
 
 If `CrashReportsFile.IsEnabled` is `true`, fatal unhandled exceptions are added to `CrashReportsFile.Instance`.
+
+Unobserved task exceptions are marked observed and logged without terminating by default. Set
+`UnhandledExceptions.UnobservedTaskExceptionIsTerminating` to `true` during startup when they should use the fatal
+handling path.
 
 Register settings that should be saved before StageKit forces process exit after a fatal exception:
 
