@@ -1,84 +1,139 @@
-name: 📦 Nuget package publish
+name: 📦 NuGet package publish
 
 on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Perform a dry run (pack only, no push or release)'
+        description: Perform a dry run (pack only, no push or release)
         required: false
         default: true
         type: boolean
 
-jobs:
-  extract_information:
-    name: '🔍 Extract release information'
-    uses: sn4k3/Actions/.github/workflows/extract-csproj-information.yml@main
+permissions:
+  contents: read
 
-  nuget:
-    name: 📦 Nuget - Publish package
-    needs: extract_information
+concurrency:
+  group: release-${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish packages
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     permissions:
       contents: write
       packages: write
-    steps:
-      # 🛒 Checkout the repository
-      - name: 🛒 Checkout
-        uses: actions/checkout@v4
 
-      # 🟣 Setup .NET
-      - name: 🟣 Setup .NET 10.0
-        uses: actions/setup-dotnet@v4
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
 
-      # 📦 Pack the project
-      - name: 📦 Pack
-        run: dotnet pack --configuration Release --output .
+      - name: Restore dependencies
+        run: dotnet restore StageKit.slnx -p:NuGetAudit=false
 
-      # 🏷️ Create a Git tag
-      - name: 🏷️ Create Git tag
-        if: ${{ github.event.inputs.dry_run != 'true' }}
+      - name: Build
+        run: dotnet build StageKit.slnx --configuration Release --no-restore
+
+      - name: Test net8.0
+        run: >-
+          dotnet run --project StageKit.Tests/StageKit.Tests.csproj
+          --framework net8.0 --configuration Release --no-build --no-restore --
+          -noLogo -noColor -parallel none -automated sync
+
+      - name: Test net10.0
+        run: >-
+          dotnet run --project StageKit.Tests/StageKit.Tests.csproj
+          --framework net10.0 --configuration Release --no-build --no-restore --
+          -noLogo -noColor -parallel none -automated sync
+
+      - name: Read package metadata
+        id: metadata
+        shell: bash
         run: |
-          version="${{ needs.extract_information.outputs.version }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          if git rev-parse "$version" >/dev/null 2>&1; then
-            echo "Tag $version already exists, skipping."
-          else
-            git tag -a "$version" -m "Release v$version"
-            git push origin "$version"
+          version="$(dotnet msbuild StageKit/StageKit.csproj -getProperty:Version | tail -n 1 | tr -d '')"
+          if [[ -z "$version" || "$version" == "null" ]]; then
+            echo "Unable to determine package version." >&2
+            exit 1
           fi
 
-      # 🚀 Push to nuget.org
-      - name: 🚀 Push nuget.org
-        if: ${{ github.event.inputs.dry_run != 'true' }}
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+          awk 'NR == 1 { next } /^# / { exit } { print }' CHANGELOG.md > release-notes.md
+
+      - name: Pack StageKit.Primitives
+        run: >-
+          dotnet pack StageKit.Primitives/StageKit.Primitives.csproj
+          --configuration Release --no-build --no-restore
+          --output artifacts/packages
+
+      - name: Pack StageKit.Runtime
+        run: >-
+          dotnet pack StageKit.Runtime/StageKit.Runtime.csproj
+          --configuration Release --no-build --no-restore
+          --output artifacts/packages
+
+      - name: Pack StageKit
+        run: >-
+          dotnet pack StageKit/StageKit.csproj
+          --configuration Release --no-build --no-restore
+          --output artifacts/packages
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: artifacts/packages/*.nupkg
+          if-no-files-found: error
+
+      - name: Create release tag
+        if: ${{ !inputs.dry_run }}
+        env:
+          TAG: ${{ steps.metadata.outputs.tag }}
+        run: |
+          if git rev-parse --verify --quiet "refs/tags/$TAG"; then
+            echo "Tag $TAG already exists." >&2
+            exit 1
+          fi
+
+          git tag --annotate "$TAG" --message "Release $TAG"
+          git push origin "$TAG"
+
+      - name: Publish to NuGet.org
+        if: ${{ !inputs.dry_run }}
         env:
           NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
-        run: dotnet nuget push *.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN} --skip-duplicate
+        run: >-
+          dotnet nuget push artifacts/packages/*.nupkg
+          --source https://api.nuget.org/v3/index.json
+          --api-key "$NUGET_TOKEN" --skip-duplicate
 
-      # 🚀 Push to GitHub Packages
-      - name: 🚀 Push Github
-        if: ${{ github.event.inputs.dry_run != 'true' }}
-        run: dotnet nuget push *.nupkg --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json --api-key ${{ github.token }} --skip-duplicate
-
-      # 📝 Create GitHub release
-      - name: 📝 Create GitHub release
-        if: ${{ github.event.inputs.dry_run != 'true' }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "${{ env.Version }}"
-          name: "v${{ env.Version }}"
-          body: ${{ env.Changelog }}
-          draft: false
-          prerelease: ${{ contains(env.Version, '-alpha') || contains(env.Version, '-beta') || contains(env.Version, '-preview') || contains(env.Version, '-rc') }}
+      - name: Publish to GitHub Packages
+        if: ${{ !inputs.dry_run }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          Version: ${{ needs.extract_information.outputs.version }}
-          Changelog: ${{ needs.extract_information.outputs.changelog }}
+        run: >-
+          dotnet nuget push artifacts/packages/*.nupkg
+          --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+          --api-key "$GITHUB_TOKEN" --skip-duplicate
 
-      # Show dry run message if enabled
-      - name: 🛑 Dry run notice
-        if: ${{ github.event.inputs.dry_run == 'true' }}
-        run: echo "Dry run completed. Package was built but not published."
+      - name: Create GitHub release
+        if: ${{ !inputs.dry_run }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.metadata.outputs.tag }}
+          name: ${{ steps.metadata.outputs.tag }}
+          body_path: release-notes.md
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Report dry run
+        if: ${{ inputs.dry_run }}
+        run: echo "Dry run complete; packages were created and uploaded as an artifact."
