@@ -1,3 +1,8 @@
+# v0.2.6 (24/08/2026)
+
+- Fix single-file detection for publish configurations that extract assemblies to a temporary directory, plus Flatpak
+  executable-path detection.
+
 # v0.2.5 (24/08/2026)
 
 - Add `WindowsInstaller` to `ApplicationBundleType`

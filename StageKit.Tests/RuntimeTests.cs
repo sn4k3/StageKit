@@ -42,6 +42,35 @@ public sealed class RuntimeTests
     }
 
     [Fact]
+    public void DotNetSingleFileDetection_UsesProcessPathWhenAssemblyWasExtractedToAnotherDirectory()
+    {
+        var processPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", "publish", "TestApp.exe");
+        var assemblyLocation = Path.Combine(Path.GetTempPath(), ".net", "TestApp", "assembly", "TestApp.dll");
+
+        var detectedPath = EntryApplication.DetectDotNetSingleFileAppPath(
+            assemblyLocation,
+            isRunningFromDotNetProcess: false,
+            processPath);
+
+        Assert.Equal(processPath, detectedPath);
+    }
+
+    [Fact]
+    public void DotNetSingleFileDetection_ReturnsNullWhenAssemblyAndProcessShareDirectory()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "StageKit.Tests", "publish");
+        var processPath = Path.Combine(directory, "TestApp.exe");
+        var assemblyLocation = Path.Combine(directory, "TestApp.dll");
+
+        var detectedPath = EntryApplication.DetectDotNetSingleFileAppPath(
+            assemblyLocation,
+            isRunningFromDotNetProcess: false,
+            processPath);
+
+        Assert.Null(detectedPath);
+    }
+
+    [Fact]
     public void ExecutablePathSelection_DoesNotUseFlatpakMarkerAsExecutablePath()
     {
         var processPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", "TestApp");

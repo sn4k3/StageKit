@@ -296,8 +296,10 @@ public static class EntryApplication
     /// Lazily retrieves the path to the current executable when running as a .NET single-file application, or returns
     /// null if not applicable.
     /// </summary>
-    /// <remarks>Single-file applications expose an empty assembly location. The process path is used as the
-    /// executable path; DOTNET_HOST_PATH identifies the dotnet host and is intentionally ignored.</remarks>
+    /// <remarks>Single-file applications usually expose an empty assembly location. Some publish configurations
+    /// extract the entry assembly to a temporary directory instead; when that directory differs from the process
+    /// directory, the process path is still the single-file executable. DOTNET_HOST_PATH identifies the dotnet host
+    /// and is intentionally ignored.</remarks>
     private static readonly Lazy<string?> DotNetSingleFileAppPathLazy = new(() =>
         DetectDotNetSingleFileAppPath(AssemblyLocation, IsRunningFromDotNetProcess, Environment.ProcessPath));
 
@@ -684,8 +686,20 @@ public static class EntryApplication
         bool isRunningFromDotNetProcess,
         string? processPath)
     {
-        if (isRunningFromDotNetProcess || !string.IsNullOrWhiteSpace(assemblyLocation)) return null;
-        return processPath;
+        if (isRunningFromDotNetProcess || string.IsNullOrWhiteSpace(processPath)) return null;
+        if (string.IsNullOrWhiteSpace(assemblyLocation)) return processPath;
+
+        var assemblyDirectory = Path.GetDirectoryName(Path.GetFullPath(assemblyLocation));
+        var processDirectory = Path.GetDirectoryName(Path.GetFullPath(processPath));
+        var pathComparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+
+        return !string.IsNullOrWhiteSpace(assemblyDirectory) &&
+               !string.IsNullOrWhiteSpace(processDirectory) &&
+               !string.Equals(assemblyDirectory, processDirectory, pathComparison)
+            ? processPath
+            : null;
     }
 
     /// <summary>
