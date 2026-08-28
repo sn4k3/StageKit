@@ -8,11 +8,18 @@ StageKit is a small standalone .NET infrastructure library for application setti
 
 Main projects:
 
-- `StageKit/StageKit.csproj` - library
-- `StageKit.Primitives/StageKit.Primitives.csproj` - dependency-light primitives and IO helpers
-- `StageKit.Runtime/StageKit.Runtime.csproj` - runtime and entry-application helpers
-- `StageKit.Tests/StageKit.Tests.csproj` - xUnit v3 tests
-- `StageKit.Demo/StageKit.Demo.csproj` - demo app
+- `src/StageKit/StageKit.csproj` - application infrastructure library
+- `src/StageKit.Primitives/StageKit.Primitives.csproj` - dependency-light primitives and IO helpers
+- `src/StageKit.Runtime/StageKit.Runtime.csproj` - runtime and entry-application helpers
+- `src/StageKit.Updatum/StageKit.Updatum.csproj` - GitHub release update library
+- `src/StageKit.Fallout/StageKit.Fallout.csproj` - build-time publishing pipeline library
+- `tests/StageKit.Tests/StageKit.Tests.csproj` - core, primitives, and runtime tests
+- `tests/StageKit.Updatum.Tests/StageKit.Updatum.Tests.csproj` - Updatum tests
+- `tests/StageKit.Fallout.Tests/StageKit.Fallout.Tests.csproj` - Fallout tests
+- `demo/StageKit.Demo/StageKit.Demo.csproj` - core demo app
+- `demo/Updatum.Demo/Updatum.Demo.csproj` - updater demo app
+- `builds/build/build.csproj` - Fallout build entry point
+- `builds/StageKit.Installer/StageKit.Installer.wixproj` - WiX installer project
 
 The solution is `StageKit.slnx`.
 
@@ -23,13 +30,13 @@ Use these commands from the repository root:
 ```powershell
 dotnet restore
 dotnet build .\StageKit.slnx -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true
-dotnet test .\StageKit.Tests\StageKit.Tests.csproj -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true
+dotnet run --project .\tests\StageKit.Tests\StageKit.Tests.csproj --framework net10.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none -automated sync
 ```
 
 Run a single test with:
 
 ```powershell
-dotnet test .\StageKit.Tests\StageKit.Tests.csproj -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true --filter "FullyQualifiedName~TestOrClassName"
+dotnet run --project .\tests\StageKit.Tests\StageKit.Tests.csproj --framework net10.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none -automated sync -filter "/TestOrClassName/"
 ```
 
 The repo multi-targets `net8.0` and `net10.0`. Treat warnings as errors is enabled, documentation files are generated, and assemblies are signed with `StageKit.snk`.

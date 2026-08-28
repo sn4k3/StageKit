@@ -2,9 +2,11 @@
     <Folder Name="/Root/">
         <File Path=".gitignore" />
         <File Path="CHANGELOG.md" />
+        <File Path="CLAUDE.md" />
         <File Path="Directory.Build.props" />
         <File Path="LICENSE" />
         <File Path="README.md" />
+        <File Path="AGENTS.md" />
         <File Path="build.ps1" />
         <File Path="build.sh" />
     </Folder>

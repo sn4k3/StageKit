@@ -188,7 +188,7 @@ public static class MacAppBundle
                  fi
 
                  {{customCode}}exec "{{escapedExecutableName}}" "$@"
-                 """;
+                 """.ReplaceLineEndings("\n");
     }
 
     private static IEnumerable<XElement> ParseExtraInfoPListEntries(

@@ -15,7 +15,7 @@ dotnet test .\tests\StageKit.Tests\StageKit.Tests.csproj -p:NuGetAudit=false -p:
 CI runs the test assemblies directly (matches `.github/workflows/dotnet.yml`):
 
 ```powershell
-dotnet run --project .\tests\StageKit.Tests\StageKit.Tests.csproj --framework net10.0 --configuration Release --no-build -- -noLogo -noColor -parallel none -automated sync
+dotnet run --project .\tests\StageKit.Tests\StageKit.Tests.csproj --framework net10.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none -automated sync
 ```
 
 Test projects: `tests/StageKit.Tests` (core + Primitives + Runtime), `tests/StageKit.Updatum.Tests`, `tests/StageKit.Fallout.Tests`.
@@ -23,7 +23,7 @@ Test projects: `tests/StageKit.Tests` (core + Primitives + Runtime), `tests/Stag
 Run a single test:
 
 ```powershell
-dotnet test .\tests\StageKit.Tests\StageKit.Tests.csproj -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true --filter "FullyQualifiedName~ApplicationKitBirthdayTests.AgeShortStr_WhenBornToday_ReturnsZeroYears"
+dotnet run --project .\tests\StageKit.Tests\StageKit.Tests.csproj --framework net10.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none -automated sync -filter "/ApplicationKitBirthdayTests.AgeShortStr_WhenBornToday_ReturnsZeroYears/"
 ```
 
 Run a demo:
@@ -43,7 +43,7 @@ dotnet run --project .\demo\Updatum.Demo\Updatum.Demo.csproj
 
 The `Build` subclass in `builds/build/Build.cs` shows the customization surface: `SoftwareName`, `ExcludedProjectNameTokens` (tokens that disqualify a project from being auto-detected as `MainProject` — e.g. `test`, `demo`, `build`, `fake`), `BeforePublishRid`/`AfterPublishRid` callbacks, and `Create*AppBundleOptions` overrides.
 
-`.github/workflows/release.yml` (manual `workflow_dispatch`, dry-run by default) is a separate, simpler path: it packs `StageKit`, `StageKit.Primitives`, `StageKit.Runtime` and pushes to NuGet.org + GitHub Packages, tags `v<Version>`, and cuts a GitHub release from the top `CHANGELOG.md` section.
+`.github/workflows/release.yml` (manual `workflow_dispatch`, dry-run by default) is a separate, simpler path: it packs `StageKit`, `StageKit.Primitives`, `StageKit.Runtime`, and `StageKit.Updatum`, then pushes to NuGet.org + GitHub Packages, tags `v<Version>`, and cuts a GitHub release from the top `CHANGELOG.md` section.
 
 ## Repository Layout
 

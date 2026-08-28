@@ -55,19 +55,19 @@ jobs:
         run: >-
           dotnet run --project tests/StageKit.Tests/StageKit.Tests.csproj
           --configuration Release --no-build --no-restore --
-          -noLogo -noColor -parallel none -automated sync
+          -noLogo -noColor -parallelMode none -automated sync
 
       - name: Test StageKit.Updatum
         run: >-
           dotnet run --project tests/StageKit.Updatum.Tests/StageKit.Updatum.Tests.csproj
           --configuration Release --no-build --no-restore --
-          -noLogo -noColor -parallel none -automated sync
+          -noLogo -noColor -parallelMode none -automated sync
 
       - name: Test StageKit.Fallout
         run: >-
           dotnet run --project tests/StageKit.Fallout.Tests/StageKit.Fallout.Tests.csproj
           --framework net10.0 --configuration Release --no-build --no-restore --
-          -noLogo -noColor -parallel none -automated sync
+          -noLogo -noColor -parallelMode none -automated sync
 
       - name: Read package metadata
         id: metadata

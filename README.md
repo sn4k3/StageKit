@@ -34,6 +34,20 @@ The repository also includes smaller packages for reusable building blocks: [`St
 - GitHub release discovery, secure asset downloads, and staged cross-platform application updates
 - Reusable build pipeline that publishes and bundles applications for Windows, Linux, and macOS
 
+## Repository Layout
+
+The repository keeps publishable libraries, tests, demos, and build tooling in separate top-level folders:
+
+| Folder | Purpose |
+|---|---|
+| `src/` | Publishable StageKit libraries and the Fallout build-pipeline library |
+| `tests/` | xUnit v3 test projects for the libraries |
+| `demo/` | Small runnable demonstration applications |
+| `builds/` | Fallout build entry point and WiX installer project |
+| `.github/` | Continuous integration, security scanning, and package release workflows |
+
+`StageKit.slnx` remains at the repository root and references projects from these folders. Generated output belongs in ignored directories such as `artifacts/` and `TestResults/`.
+
 ## Install
 
 ```bash
