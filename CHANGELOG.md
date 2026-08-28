@@ -1,11 +1,25 @@
 # Unreleased
 
-- Integrate `StageKit.Updatum` for GitHub release discovery, verified downloads, and cross-platform application updates.
+- Rename `ApplicationBundleType` to `ApplicationPackagingType` (now a `[Flags]` enum with `Portable`,
+  `DotNetSingleFile`, `WindowsInstaller`, `LinuxAppImage`, `LinuxFlatpak`, `MacOSAppBundle`)
+- Replace `EntryApplication.BundleType` with `PackagingType`
+- Add `FileUtilities` and `StringExtensions` (quoting helpers) to `StageKit.Primitives`
+- Add `StageKit.Updatum`: GitHub release discovery, SHA-256 verification, platform signature verification, and
+  cross-platform staged update installation
+- Add Bash ANSI-C and Windows batch value quoting helpers to `StageKit.Primitives.StringExtensions`; reuse shared
+  leaf-name validation from `FileUtilities` in `StageKit.Updatum`
+- Add `StageKit.Fallout`: NUKE-based build pipeline (`StageKitBuild`) with Windows/macOS/Linux bundle creation, AppImage
+  tooling, WiX installer orchestration, and Flatpak support
+- Add WiX installer project template and `builds/build/` NUKE build entry point
+- Update solution file, README, CHANGELOG, and all documentation for the above changes
 - Serialize updater operations and keep `State`/`IsBusy` active until asynchronous work actually completes.
-- Use isolated temporary workspaces, reject unsafe release-asset names, and support SHA-256 sidecars plus application-provided platform signature verification.
+- Use isolated temporary workspaces, reject unsafe release-asset names, verify GitHub-native SHA-256 digests with
+  sidecars as fallback, and support application-provided platform signature verification.
 - Make portable and single-file update scripts stage replacements and restore backups when commit fails.
-- Honor install cancellation, `forceTerminate`, and no-relaunch behavior consistently, including bounded Flatpak installation that kills timed-out child processes.
-- Dispatch updater property notifications through the configured synchronization context and add a dedicated Updatum regression test suite.
+- Honor install cancellation, `forceTerminate`, and no-relaunch behavior consistently, including bounded Flatpak
+  installation that kills timed-out child processes.
+- Dispatch updater property notifications through the configured synchronization context and add a dedicated Updatum
+  regression test suite.
 
 # v0.2.6 (24/08/2026)
 

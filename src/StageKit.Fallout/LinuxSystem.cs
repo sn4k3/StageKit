@@ -1,6 +1,6 @@
-﻿using System.Diagnostics;
+﻿using Fallout.Common.Tooling;
 
-namespace StageKit.Primitives.System;
+namespace StageKit.Fallout;
 
 /// <summary>
 /// Provides information about the Linux system environment.
@@ -31,24 +31,9 @@ public static class LinuxSystem
                 {
                     try
                     {
-                        using var process = Process.Start(new ProcessStartInfo
-                        {
-                            FileName = "/usr/bin/env",
-                            ArgumentList = { "bash", "-c", "ldconfig -p | grep libfuse.so.2" },
-                            CreateNoWindow = true,
-                            UseShellExecute = false
-                        });
-
-                        if (process is null || !process.WaitForExit(2000))
-                        {
-                            process?.Kill(true);
-                            process?.WaitForExit();
-                            _isFuseAvailable = false;
-                        }
-                        else
-                        {
-                            _isFuseAvailable = process.ExitCode == 0;
-                        }
+                        using var result = ProcessTasks.StartShell("ldconfig -p | grep libfuse.so.2", timeout: 2000);
+                        result.WaitForExit();
+                        _isFuseAvailable = result.ExitCode == 0;
                     }
                     catch
                     {

@@ -1,0 +1,141 @@
+﻿using System.ComponentModel;
+using System.Diagnostics;
+using StageKit.Runtime;
+using StageKit.Updatum;
+
+namespace Updatum.Demo;
+
+internal class Program
+{
+    private const string RepositoryOwner = "sn4k3";
+    private const string RepositoryName = "UVtools";
+
+    // https://github.com/sn4k3/UVtools/releases
+    internal static readonly UpdatumManager AppUpdater = new(RepositoryOwner, RepositoryName)
+    {
+        // All below are optional settings with recommended defaults
+        // Regex filter to get the correct asset from running system
+        // Defaults would work here too: EntryApplication.GenericRuntimeIdentifier
+        AssetRegexPattern = $"^{RepositoryName}_{EntryApplication.GenericRuntimeIdentifier}_v",
+        // Specifies the type of windows .exe being used in the assets.
+        // It is highly recommended to set this when having .exe assets.
+        // - When asset is an installer, set to Installer.
+        // - When asset is a single file executable, set to SingleFileExecutable.
+        // - When having both asset types, set to Auto.
+        InstallUpdateWindowsExeType = UpdatumWindowsExeType.Installer,
+        // Displays a basic user interface for MSI package
+        // This will show the installer UI installing without any interaction
+        InstallUpdateWindowsInstallerArguments = "/qb",
+        // Strategy to determine the single file executable name for installation and update
+        InstallUpdateSingleFileExecutableNameStrategy = UpdatumSingleFileExecutableNameStrategy.EntryApplicationName,
+        // Fallback name if unable to determine the executable name from the entry application
+        // This is safe to omit, but as we are using a fake app, we need to set it
+        InstallUpdateSingleFileExecutableName = RepositoryName,
+        // Enable codesign verification for macOS .app bundles
+        InstallUpdateCodesignMacOSApp = true,
+        // Enable checksum verification for downloaded assets
+        RequireAssetChecksum = true
+    };
+
+    private static async Task Main()
+    {
+        Debug.WriteLine(EntryApplication.ApplicationInfo);
+        Console.WriteLine(EntryApplication.ApplicationInfo);
+
+        AppUpdater.PropertyChanged += AppUpdaterOnPropertyChanged;
+        Console.WriteLine($"Checking for updates for {AppUpdater.Owner}/{AppUpdater.Repository}");
+
+        await Task.Delay(1000);
+
+        try
+        {
+            var updateFound = await AppUpdater.CheckForUpdatesAsync();
+            Console.WriteLine($"Update found: {updateFound}");
+
+            if (!updateFound) return;
+
+            var release = AppUpdater.LatestRelease;
+
+            if (release is null)
+            {
+                Console.WriteLine("No release found!");
+                return;
+            }
+
+            var asset = AppUpdater.GetCompatibleReleaseAsset(release);
+
+            if (asset is null)
+            {
+                Console.WriteLine("No compatible asset found for this system.");
+                return;
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("Changelog:");
+            Console.WriteLine(AppUpdater.GetChangelog(true));
+            await Task.Delay(1000);
+
+            while (true)
+            {
+                Console.WriteLine($"Do you want to download the {release.TagName} update? (y/yes/n/no)");
+                var input = Console.ReadLine()?.ToLower();
+                if (input is "y" or "yes")
+                {
+                    break;
+                }
+
+                if (input is "n" or "no")
+                {
+                    return;
+                }
+            }
+
+            Console.WriteLine($"Downloading {asset.Name}...");
+            var download = await AppUpdater.DownloadUpdateAsync(release);
+            if (download is null)
+            {
+                Console.WriteLine("Download failed");
+                return;
+            }
+
+
+            Console.WriteLine($"Download finished: {download.FilePath}");
+
+            while (true)
+            {
+                Console.WriteLine("Do you want to install the update? (y/yes/n/no)");
+                var input = Console.ReadLine()?.ToLower();
+                if (input is "y" or "yes")
+                {
+                    break;
+                }
+
+                if (input is "n" or "no")
+                {
+                    return;
+                }
+            }
+
+            Console.WriteLine("Installing...");
+            await Task.Delay(1000);
+            await AppUpdater.InstallUpdateAsync(download);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+        }
+    }
+
+    private static void AppUpdaterOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(UpdatumManager.State))
+        {
+            Console.WriteLine($"Updater state changed: {AppUpdater.State}");
+        }
+        else if (e.PropertyName == nameof(UpdatumManager.DownloadedPercentage))
+        {
+            Console.WriteLine(
+                $"Downloaded: {AppUpdater.DownloadedMegabytes} MB / {AppUpdater.DownloadSizeMegabytes} MB  ({AppUpdater.DownloadedPercentage} %)");
+        }
+    }
+}

@@ -10,7 +10,7 @@
 
 StageKit is a lightweight .NET application infrastructure library for JSON settings files, observable settings objects, crash report capture, application runtime metadata, and unhandled exception handling.
 
-The repository also includes smaller packages for reusable building blocks: `StageKit.Primitives` for low-level primitives, `StageKit.Runtime` for entry-application/runtime inspection helpers, and `StageKit.Updatum` for GitHub release updates.
+The repository also includes smaller packages for reusable building blocks: [`StageKit.Primitives`](src/StageKit.Primitives/README.md) for low-level primitives, [`StageKit.Runtime`](src/StageKit.Runtime/README.md) for entry-application/runtime inspection helpers, and [`StageKit.Updatum`](src/StageKit.Updatum/README.md) for GitHub release updates. [`StageKit.Fallout`](src/StageKit.Fallout/README.md) is the build-time pipeline library that publishes and bundles the applications those packages ship in.
 
 ## Features
 
@@ -32,6 +32,7 @@ The repository also includes smaller packages for reusable building blocks: `Sta
 - Portable profile path parsing with `ApplicationKit.IsPortable` state
 - Small application "birthday" helpers for version/about screens
 - GitHub release discovery, secure asset downloads, and staged cross-platform application updates
+- Reusable build pipeline that publishes and bundles applications for Windows, Linux, and macOS
 
 ## Install
 
@@ -64,10 +65,13 @@ dotnet add package StageKit.Updatum
 
 ## Packages
 
-- `StageKit` - application infrastructure: settings, crash reports, retention, backups, support bundles, single-instance guards, and app metadata.
-- `StageKit.Primitives` - dependency-light primitives: `SafeFile`, `SafeFileStream`, `PathUtilities`, `TemporaryDirectory`, `TemporaryFile`, `DisposableObject`, `LeaveOpenDisposableObject`, and `GCSafeHandle`.
-- `StageKit.Runtime` - entry-application and runtime helpers: assembly metadata, process paths, bundle detection, relaunch utilities, and combined diagnostics through `RuntimeDiagnostics`.
-- `StageKit.Updatum` - GitHub release discovery, optional SHA-256 and platform-signature verification, download progress, and staged Windows/Linux/macOS update installation.
+| Package | NuGet | Docs | Description |
+|---|---|---|---|
+| `StageKit` | [![Nuget](https://img.shields.io/nuget/v/StageKit?style=flat-square)](https://www.nuget.org/packages/StageKit) | This file | Application infrastructure: settings, crash reports, retention, backups, support bundles, single-instance guards, and app metadata. |
+| `StageKit.Primitives` | [![Nuget](https://img.shields.io/nuget/v/StageKit.Primitives?style=flat-square)](https://www.nuget.org/packages/StageKit.Primitives) | [README](src/StageKit.Primitives/README.md) | Dependency-light primitives: `SafeFile`, `SafeFileStream`, `PathUtilities`, `TemporaryDirectory`, `TemporaryFile`, `DisposableObject`, `LeaveOpenDisposableObject`, and `GCSafeHandle`. |
+| `StageKit.Runtime` | [![Nuget](https://img.shields.io/nuget/v/StageKit.Runtime?style=flat-square)](https://www.nuget.org/packages/StageKit.Runtime) | [README](src/StageKit.Runtime/README.md) | Entry-application and runtime helpers: assembly metadata, process paths, bundle detection, relaunch utilities, and combined diagnostics through `RuntimeDiagnostics`. |
+| `StageKit.Updatum` | [![Nuget](https://img.shields.io/nuget/v/StageKit.Updatum?style=flat-square)](https://www.nuget.org/packages/StageKit.Updatum) | [README](src/StageKit.Updatum/README.md) | GitHub release discovery, optional SHA-256 and platform-signature verification, download progress, and staged Windows/Linux/macOS update installation. |
+| `StageKit.Fallout` | Not published | [README](src/StageKit.Fallout/README.md) | Build-time only: reusable Fallout build pipeline with restore/compile/run/publish targets and portable, single-file, WiX installer, macOS `.app`, and Linux AppImage bundling. |
 
 ## Application Updates
 
@@ -93,7 +97,7 @@ if (await updater.CheckForUpdatesAsync(cancellationToken))
 }
 ```
 
-For checksum verification, publish a sidecar asset named exactly `<asset-name>.sha256`. Configure `AssetSignatureVerifier` when the application must also enforce a platform-specific trust policy such as Authenticode or macOS code signing. See the `StageKit.Updatum` package README for installation behavior and security details.
+Checksum verification uses GitHub's native `sha256:` release-asset digest when available. For assets without native digest metadata, publish a fallback sidecar named exactly `<asset-name>.sha256`. Configure `AssetSignatureVerifier` when the application must also enforce a platform-specific trust policy such as Authenticode or macOS code signing. See the `StageKit.Updatum` package README for installation behavior and security details.
 
 ## Quick Start
 
@@ -535,12 +539,15 @@ var report = RuntimeDiagnostics.GetReport(includeLoadedAssemblies: true);
 
 ## Demo
 
-See [StageKit.Demo/Program.cs](StageKit.Demo/Program.cs) for a runnable console demo covering startup configuration, Serilog integration, AutoSave settings, collection settings, panic-save registration, crash report launch handling, and debounced save waiting.
+See [demo/StageKit.Demo/Program.cs](demo/StageKit.Demo/Program.cs) for a runnable console demo covering startup configuration, Serilog integration, AutoSave settings, collection settings, panic-save registration, crash report launch handling, and debounced save waiting.
 
-Run it with:
+[demo/Updatum.Demo/Program.cs](demo/Updatum.Demo/Program.cs) is a "fake app" demo for the updater.
+
+Run them with:
 
 ```bash
-dotnet run --project StageKit.Demo/StageKit.Demo.csproj
+dotnet run --project demo/StageKit.Demo/StageKit.Demo.csproj
+dotnet run --project demo/Updatum.Demo/Updatum.Demo.csproj
 ```
 
 ## Development
@@ -550,8 +557,24 @@ Restore, build, and test:
 ```powershell
 dotnet restore
 dotnet build .\StageKit.slnx -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true
-dotnet test .\StageKit.Tests\StageKit.Tests.csproj -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true
+dotnet test .\tests\StageKit.Tests\StageKit.Tests.csproj -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true
 ```
+
+## Build Pipeline
+
+Release publishing is driven by [`StageKit.Fallout`](src/StageKit.Fallout/README.md), a reusable Fallout (NUKE-style) build library. `build.ps1` / `build.sh` bootstrap the .NET SDK when needed, restore the pinned `fallout` global tool, then run the build project in `builds/build`:
+
+```powershell
+./build.ps1 Print
+./build.ps1 Compile
+./build.ps1 Publish
+```
+
+```bash
+./build.sh Publish
+```
+
+`Publish` builds every runtime identifier in `RIds` (`win`/`osx`/`linux` × `x64`/`arm64` by default) as self-contained ReadyToRun output, then creates the selected bundles - portable zip, .NET single-file, WiX installer, macOS `.app`, and Linux AppImage - into `artifacts/publish/`. Bundles whose host requirement is unmet are skipped with a warning. See the [`StageKit.Fallout` README](src/StageKit.Fallout/README.md) for targets, parameters, and customization points.
 
 ## Security
 

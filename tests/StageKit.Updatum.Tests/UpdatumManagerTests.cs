@@ -62,6 +62,148 @@ public sealed class UpdatumManagerTests
     }
 
     [Fact]
+    public async Task DownloadUpdateAsync_PrefersGitHubDigest_WithoutDownloadingSidecar()
+    {
+        var payload = Encoding.UTF8.GetBytes("GitHub-verified update");
+        var checksum = Convert.ToHexString(SHA256.HashData(payload));
+        var sidecarRequested = false;
+        using var httpClient = new HttpClient(new StubHttpMessageHandler(request =>
+        {
+            if (request.RequestUri!.AbsolutePath.EndsWith(".sha256", StringComparison.Ordinal))
+            {
+                sidecarRequested = true;
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(new string('0', 64)) };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(payload) };
+        }));
+        using var manager = CreateManager(httpClient);
+        manager.RequireAssetChecksum = true;
+        manager.GitHubAssetDigest = $"sha256:{checksum.ToLowerInvariant()}";
+        var release = CreateRelease(
+        [
+            CreateAsset("app.zip", "https://example.test/app.zip", payload.Length),
+            CreateAsset("app.zip.sha256", "https://example.test/app.zip.sha256", 64)
+        ]);
+
+        var download = await manager.DownloadUpdateAsync(release, TestContext.Current.CancellationToken);
+
+        try
+        {
+            Assert.NotNull(download);
+            Assert.True(download.IsChecksumVerified);
+            Assert.Equal(checksum, download.Sha256);
+            Assert.Equal(1, manager.GitHubDigestRequestCount);
+            Assert.False(sidecarRequested);
+        }
+        finally
+        {
+            download?.SafeDeleteFile();
+        }
+    }
+
+    [Fact]
+    public async Task DownloadUpdateAsync_RejectsGitHubDigestMismatch_AndRestoresIdleState()
+    {
+        var payload = Encoding.UTF8.GetBytes("tampered GitHub asset");
+        using var httpClient = new HttpClient(new StubHttpMessageHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(payload) }));
+        using var manager = CreateManager(httpClient);
+        manager.RequireAssetChecksum = true;
+        manager.GitHubAssetDigest = $"sha256:{new string('0', 64)}";
+        var release = CreateRelease([CreateAsset("app.zip", "https://example.test/app.zip", payload.Length)]);
+
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            manager.DownloadUpdateAsync(release, TestContext.Current.CancellationToken));
+
+        Assert.Equal(1, manager.GitHubDigestRequestCount);
+        Assert.Equal(UpdatumState.None, manager.State);
+        Assert.False(manager.IsBusy);
+    }
+
+    [Fact]
+    public async Task DownloadUpdateAsync_ReadsGitHubDigestThroughOctokitConnection()
+    {
+        var payload = Encoding.UTF8.GetBytes("Octokit metadata update");
+        var checksum = Convert.ToHexString(SHA256.HashData(payload));
+        var metadataRequestCount = 0;
+        var octokitHttpClient = new StubOctokitHttpClient(request =>
+        {
+            metadataRequestCount++;
+            Assert.Equal(
+                new Uri("https://api.github.com/repos/owner/repository/releases/assets/1"),
+                new Uri(request.BaseAddress, request.Endpoint));
+            return new StubOctokitResponse($$"""{"digest":"sha256:{{checksum}}"}""");
+        });
+        var githubClient = new GitHubClient(new Connection(new ProductHeaderValue("StageKit.Updatum.Tests"), octokitHttpClient));
+        using var assetHttpClient = new HttpClient(new StubHttpMessageHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(payload) }));
+        using var manager = new UpdatumManager("owner", "repository", githubClient)
+        {
+            AssetRegexPattern = string.Empty,
+            AssetHttpClient = assetHttpClient,
+            RequireAssetChecksum = true
+        };
+        var release = CreateRelease(
+        [
+            CreateAsset(
+                "app.zip",
+                "https://api.github.com/repos/owner/repository/releases/assets/1",
+                payload.Length,
+                "https://downloads.example.test/app.zip")
+        ]);
+
+        var download = await manager.DownloadUpdateAsync(release, TestContext.Current.CancellationToken);
+
+        try
+        {
+            Assert.NotNull(download);
+            Assert.True(download.IsChecksumVerified);
+            Assert.Equal(checksum, download.Sha256);
+            Assert.Equal(1, metadataRequestCount);
+        }
+        finally
+        {
+            download?.SafeDeleteFile();
+        }
+    }
+
+    [Fact]
+    public async Task DownloadUpdateAsync_RejectsDigestMetadataOutsideGitHubApiOrigin()
+    {
+        var payload = Encoding.UTF8.GetBytes("untrusted metadata update");
+        var metadataRequestCount = 0;
+        var octokitHttpClient = new StubOctokitHttpClient(_ =>
+        {
+            metadataRequestCount++;
+            return new StubOctokitResponse($$"""{"digest":"sha256:{{new string('0', 64)}}"}""");
+        });
+        var githubClient = new GitHubClient(new Connection(new ProductHeaderValue("StageKit.Updatum.Tests"), octokitHttpClient));
+        using var assetHttpClient = new HttpClient(new StubHttpMessageHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(payload) }));
+        using var manager = new UpdatumManager("owner", "repository", githubClient)
+        {
+            AssetRegexPattern = string.Empty,
+            AssetHttpClient = assetHttpClient,
+            RequireAssetChecksum = true
+        };
+        var release = CreateRelease(
+        [
+            CreateAsset(
+                "app.zip",
+                "https://attacker.example/assets/1",
+                payload.Length,
+                "https://downloads.example.test/app.zip")
+        ]);
+
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            manager.DownloadUpdateAsync(release, TestContext.Current.CancellationToken));
+
+        Assert.Equal(0, metadataRequestCount);
+        Assert.Equal(UpdatumState.None, manager.State);
+    }
+
+    [Fact]
     public async Task DownloadUpdateAsync_RejectsFailedSignatureVerification_AndRestoresIdleState()
     {
         var payload = Encoding.UTF8.GetBytes("unsigned update");
@@ -182,9 +324,9 @@ public sealed class UpdatumManagerTests
         Assert.Contains(nameof(UpdatumManager.AssetExtensionFilter), notifications);
     }
 
-    private static UpdatumManager CreateManager(HttpClient? httpClient = null)
+    private static TestUpdatumManager CreateManager(HttpClient? httpClient = null)
     {
-        return new UpdatumManager("owner", "repository")
+        return new TestUpdatumManager
         {
             AssetRegexPattern = string.Empty,
             AssetHttpClient = httpClient ?? UpdatumManager.HttpClient
@@ -220,7 +362,7 @@ public sealed class UpdatumManagerTests
             assets);
     }
 
-    private static ReleaseAsset CreateAsset(string name, string url, int size)
+    private static ReleaseAsset CreateAsset(string name, string url, int size, string? browserDownloadUrl = null)
     {
         return new ReleaseAsset(
             url,
@@ -234,7 +376,7 @@ public sealed class UpdatumManagerTests
             0,
             DateTimeOffset.UtcNow,
             DateTimeOffset.UtcNow,
-            url,
+            browserDownloadUrl ?? url,
             null!);
     }
 
@@ -259,6 +401,26 @@ public sealed class UpdatumManagerTests
         }
     }
 
+    private sealed class TestUpdatumManager : UpdatumManager
+    {
+        [SetsRequiredMembers]
+        public TestUpdatumManager() : base("owner", "repository")
+        {
+        }
+
+        public string? GitHubAssetDigest { get; set; }
+        public int GitHubDigestRequestCount { get; private set; }
+
+        internal override Task<string?> GetGitHubAssetDigestAsync(
+            ReleaseAsset asset,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            GitHubDigestRequestCount++;
+            return Task.FromResult(GitHubAssetDigest);
+        }
+    }
+
     private sealed class StubHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> responseFactory)
         : HttpMessageHandler
     {
@@ -269,6 +431,42 @@ public sealed class UpdatumManagerTests
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(responseFactory(request));
         }
+    }
+
+    private sealed class StubOctokitHttpClient(Func<Octokit.Internal.IRequest, IResponse> responseFactory)
+        : Octokit.Internal.IHttpClient
+    {
+        public Task<IResponse> Send(
+            Octokit.Internal.IRequest request,
+            CancellationToken cancellationToken,
+            Func<object, object> postProcessing)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(responseFactory(request));
+        }
+
+        public void SetRequestTimeout(TimeSpan timeout)
+        {
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class StubOctokitResponse(string body) : IResponse
+    {
+        public object Body { get; } = body;
+        public IReadOnlyDictionary<string, string> Headers { get; } = new Dictionary<string, string>();
+        public ApiInfo ApiInfo { get; } = new(
+            new Dictionary<string, Uri>(),
+            [],
+            [],
+            string.Empty,
+            new RateLimit(),
+            TimeSpan.Zero);
+        public HttpStatusCode StatusCode => HttpStatusCode.OK;
+        public string ContentType => "application/json";
     }
 
     private sealed class QueuedSynchronizationContext : SynchronizationContext

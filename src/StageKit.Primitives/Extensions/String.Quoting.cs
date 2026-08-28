@@ -5,6 +5,167 @@
 /// </summary>
 public static class StringExtensions
 {
+    extension(string? value)
+    {
+        /// <summary>
+        /// Quotes a value as a Bash ANSI-C string literal, escaping quotes, backslashes, line endings, and control
+        /// characters.
+        /// </summary>
+        /// <returns>The value wrapped in <c>$'...'</c> syntax.</returns>
+        /// <exception cref="ArgumentException">Thrown when the value contains a null character.</exception>
+        public string QuoteBashAnsiCString()
+        {
+            var source = value ?? string.Empty;
+            if (source.Contains('\0'))
+            {
+                throw new ArgumentException("Bash strings cannot contain NUL (\\0).", nameof(value));
+            }
+
+            var resultLength = 3; // $' and closing '
+            checked
+            {
+                foreach (var c in source)
+                {
+                    resultLength += c switch
+                    {
+                        '\\' or '\'' or '\n' or '\r' or '\t' or '\b' or '\f' => 2,
+                        < ' ' or '\u007F' => 4,
+                        _ => 1
+                    };
+                }
+            }
+
+            return string.Create(
+                resultLength,
+                source,
+                static (destination, source) =>
+                {
+                    var index = 0;
+                    destination[index++] = '$';
+                    destination[index++] = '\'';
+
+                    foreach (var c in source)
+                    {
+                        switch (c)
+                        {
+                            case '\\':
+                                destination[index++] = '\\';
+                                destination[index++] = '\\';
+                                break;
+                            case '\'':
+                                destination[index++] = '\\';
+                                destination[index++] = '\'';
+                                break;
+                            case '\n':
+                                destination[index++] = '\\';
+                                destination[index++] = 'n';
+                                break;
+                            case '\r':
+                                destination[index++] = '\\';
+                                destination[index++] = 'r';
+                                break;
+                            case '\t':
+                                destination[index++] = '\\';
+                                destination[index++] = 't';
+                                break;
+                            case '\b':
+                                destination[index++] = '\\';
+                                destination[index++] = 'b';
+                                break;
+                            case '\f':
+                                destination[index++] = '\\';
+                                destination[index++] = 'f';
+                                break;
+                            case < ' ' or '\u007F':
+                                destination[index++] = '\\';
+                                destination[index++] = 'x';
+                                destination[index++] = GetUpperHexDigit(c >> 4);
+                                destination[index++] = GetUpperHexDigit(c & 0xF);
+                                break;
+                            default:
+                                destination[index++] = c;
+                                break;
+                        }
+                    }
+
+                    destination[index] = '\'';
+                });
+        }
+
+        /// <summary>
+        /// Escapes a value for the value portion of a Windows batch <c>set "NAME=value"</c> command with delayed
+        /// expansion enabled.
+        /// </summary>
+        /// <returns>The escaped value. Carriage returns are removed and line feeds are represented as <c>\n</c>.</returns>
+        public string EscapeWindowsBatchValue()
+        {
+            var source = value ?? string.Empty;
+            var resultLength = 0;
+            var requiresEscaping = false;
+
+            checked
+            {
+                foreach (var c in source)
+                {
+                    switch (c)
+                    {
+                        case '\r':
+                            requiresEscaping = true;
+                            break;
+                        case '\n' or '^' or '%' or '!' or '"':
+                            resultLength += 2;
+                            requiresEscaping = true;
+                            break;
+                        default:
+                            resultLength++;
+                            break;
+                    }
+                }
+            }
+
+            if (!requiresEscaping) return source;
+
+            return string.Create(
+                resultLength,
+                source,
+                static (destination, source) =>
+                {
+                    var index = 0;
+                    foreach (var c in source)
+                    {
+                        switch (c)
+                        {
+                            case '\r':
+                                break;
+                            case '\n':
+                                destination[index++] = '\\';
+                                destination[index++] = 'n';
+                                break;
+                            case '^':
+                                destination[index++] = '^';
+                                destination[index++] = '^';
+                                break;
+                            case '%':
+                                destination[index++] = '%';
+                                destination[index++] = '%';
+                                break;
+                            case '!':
+                                destination[index++] = '^';
+                                destination[index++] = '!';
+                                break;
+                            case '"':
+                                destination[index++] = '^';
+                                destination[index++] = '"';
+                                break;
+                            default:
+                                destination[index++] = c;
+                                break;
+                        }
+                    }
+                });
+        }
+    }
+
     extension(string value)
     {
         /// <summary>
@@ -134,5 +295,10 @@ public static class StringExtensions
                     destination[index] = '"';
                 });
         }
+    }
+
+    private static char GetUpperHexDigit(int value)
+    {
+        return (char)(value < 10 ? '0' + value : 'A' + value - 10);
     }
 }

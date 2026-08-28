@@ -37,6 +37,11 @@ public abstract class DisposableObject : IDisposable
     private int _disposed;
 
     /// <summary>
+    /// Gets a value indicating whether the object has been disposed of. This property can be used to check the disposal state before performing operations on the object.
+    /// </summary>
+    public bool IsDisposed => Interlocked.CompareExchange(ref _disposed, 0, 0) != 0;
+
+    /// <summary>
     /// Releases all resources used by the object.
     /// </summary>
     /// <remarks>Call this method when the object is no longer needed to free unmanaged resources
@@ -54,7 +59,7 @@ public abstract class DisposableObject : IDisposable
     /// </summary>
     protected void ThrowIfDisposed()
     {
-        ObjectDisposedException.ThrowIf(_disposed != 0, GetType());
+        ObjectDisposedException.ThrowIf(IsDisposed, GetType());
     }
 
     /// <summary>

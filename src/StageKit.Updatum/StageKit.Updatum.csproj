@@ -12,6 +12,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\StageKit.Primitives\StageKit.Primitives.csproj"/>
         <ProjectReference Include="..\StageKit.Runtime\StageKit.Runtime.csproj"/>
     </ItemGroup>
 

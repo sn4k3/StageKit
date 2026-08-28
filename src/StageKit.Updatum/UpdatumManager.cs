@@ -11,6 +11,9 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Timers;
 using Octokit;
+using StageKit.Primitives;
+using StageKit.Primitives.Extensions;
+using StageKit.Primitives.System;
 using StageKit.Runtime;
 using StageKit.Updatum.Extensions;
 using Timer = System.Timers.Timer;
@@ -20,7 +23,7 @@ namespace StageKit.Updatum;
 /// <summary>
 /// Represents the Updatum class.
 /// </summary>
-public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
+public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
 {
     #region Timer
 
@@ -36,7 +39,7 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
         {
             await CheckForUpdatesAsync(_disposeCancellationSource.Token).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (_disposed)
+        catch (OperationCanceledException) when (IsDisposed)
         {
             // Disposal cancels any timer-triggered operation.
         }
@@ -44,6 +47,29 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
         {
             Debug.WriteLine(ex);
         }
+    }
+
+    #endregion
+
+    #region Dispose
+
+    /// <inheritdoc />
+    protected override void DisposeManaged()
+    {
+        _disposeCancellationSource.Cancel();
+        if (_autoUpdateCheckTimer is not null)
+        {
+            _autoUpdateCheckTimer.Stop();
+            _autoUpdateCheckTimer.Elapsed -= AutoUpdateCheckTimerOnElapsed;
+            _autoUpdateCheckTimer.Dispose();
+        }
+
+        _disposeCancellationSource.Dispose();
+        _propertyChanged = null;
+        CheckForUpdateCompleted = null;
+        UpdateFound = null;
+        DownloadCompleted = null;
+        InstallUpdateCompleted = null;
     }
 
     #endregion
@@ -108,6 +134,16 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
     /// Default buffer size for the download stream.
     /// </summary>
     private const int DefaultBufferSize = 8192;
+
+    /// <summary>
+    /// GitHub REST API media type used to retrieve release asset metadata.
+    /// </summary>
+    private const string GitHubApiMediaType = "application/vnd.github+json";
+
+    /// <summary>
+    /// Prefix used by GitHub for SHA-256 release asset digests.
+    /// </summary>
+    private const string GitHubSha256DigestPrefix = "sha256:";
 
     /// <summary>
     /// Default file extension for Linux AppImage files.
@@ -175,7 +211,6 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
     // Capture the current synchronization context (e.g., UI thread context)
     private readonly SemaphoreSlim _operationGate = new(1, 1);
     private readonly CancellationTokenSource _disposeCancellationSource = new();
-    private bool _disposed;
     private Timer? _autoUpdateCheckTimer;
     private string _assetRegexPattern = EntryApplication.GenericRuntimeIdentifier;
 
@@ -206,7 +241,7 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
     public SynchronizationContext? EventSynchronizationContext { get; set; } = SynchronizationContext.Current;
 
     /// <summary>
-    /// Gets the GitHub client used to access the GitHub API.
+    /// Gets the GitHub client used to access releases and release asset metadata through the GitHub API.
     /// </summary>
     public GitHubClient GithubClient { get; } =
         new(new Octokit.ProductHeaderValue(EntryApplication.AssemblyName ?? nameof(UpdatumManager),
@@ -219,7 +254,8 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
     public HttpClient AssetHttpClient { get; init; } = HttpClient;
 
     /// <summary>
-    /// Gets or sets whether a matching SHA-256 checksum asset is required before a downloaded update is accepted.
+    /// Gets or sets whether a GitHub SHA-256 digest or matching SHA-256 sidecar is required before a downloaded
+    /// update is accepted.
     /// </summary>
     public bool RequireAssetChecksum
     {
@@ -228,7 +264,7 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
     }
 
     /// <summary>
-    /// Gets or sets the suffix appended to a release asset name to locate its SHA-256 checksum asset.
+    /// Gets or sets the suffix appended to a release asset name to locate its fallback SHA-256 checksum asset.
     /// </summary>
     /// <remarks>Defaults to <c>.sha256</c>.</remarks>
     public string AssetChecksumSuffix
@@ -661,6 +697,13 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
         Repository = repository;
     }
 
+    [SetsRequiredMembers]
+    internal UpdatumManager(string owner, string repository, GitHubClient githubClient) : this(owner, repository)
+    {
+        ArgumentNullException.ThrowIfNull(githubClient);
+        GithubClient = githubClient;
+    }
+
     #endregion
 
     #region Methods
@@ -743,7 +786,7 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
         {
             State = UpdatumState.None;
             _operationGate.Release();
-            if (timerState && !_disposed)
+            if (timerState && !IsDisposed)
             {
                 AutoUpdateCheckTimer.Start();
             }
@@ -920,6 +963,7 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
     /// <returns>A <see cref="UpdatumDownloadedAsset"/> object, otherwise returns null if failed.</returns>
     /// <exception cref="ArgumentNullException">Thrown when release is null after resolution.</exception>
     /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled.</exception>
+    /// <exception cref="ApiException">Thrown when GitHub release asset metadata cannot be retrieved.</exception>
     /// <exception cref="HttpRequestException">Thrown when the HTTP request fails.</exception>
     /// <exception cref="IOException">Thrown when file operations fail.</exception>
     public async Task<UpdatumDownloadedAsset?> DownloadUpdateAsync(Release? release = null,
@@ -962,8 +1006,7 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
             DownloadSizeBytes = totalBytes > 0 ? totalBytes : -1;
 
             long totalRead = 0;
-            await using (var fileStream = new FileStream(targetPath, System.IO.FileMode.CreateNew, FileAccess.Write,
-                             FileShare.None, DefaultBufferSize, FileOptions.Asynchronous | FileOptions.SequentialScan))
+            await using (var fileStream = new SafeFileStream(targetPath))
             await using (var contentStream =
                          await response.Content.ReadAsStreamAsync(operationCancellationToken).ConfigureAwait(false))
             {
@@ -996,6 +1039,8 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
                 {
                     ArrayPool<byte>.Shared.Return(buffer);
                 }
+
+                await fileStream.CommitAsync(operationCancellationToken).ConfigureAwait(false);
             }
 
             if (totalBytes > 0 && totalRead != totalBytes)
@@ -1040,7 +1085,7 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
         // Browser download URLs cannot authenticate downloads from private repositories.
         if (GithubClient.Credentials.AuthenticationType == AuthenticationType.Anonymous) return request;
 
-        request.RequestUri = new Uri(asset.Url);
+        request.RequestUri = GetTrustedGitHubApiUri(asset.Url);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/octet-stream"));
 
         switch (GithubClient.Credentials.AuthenticationType)
@@ -1074,6 +1119,21 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
         string targetPath,
         CancellationToken cancellationToken)
     {
+        var gitHubDigest = await GetGitHubAssetDigestAsync(asset, cancellationToken).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(gitHubDigest) &&
+            gitHubDigest.StartsWith(GitHubSha256DigestPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            var hashText = gitHubDigest[GitHubSha256DigestPrefix.Length..];
+            if (hashText.Length != 64 || !Sha256Regex().IsMatch(hashText))
+            {
+                throw new InvalidDataException(
+                    $"GitHub returned an invalid SHA-256 digest for release asset '{asset.Name}'.");
+            }
+
+            return await VerifySha256Async(asset, targetPath, Convert.FromHexString(hashText), cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         var checksumAssetName = $"{asset.Name}{AssetChecksumSuffix}";
         var checksumAsset = release.Assets.FirstOrDefault(candidate =>
             candidate.Name.Equals(checksumAssetName, StringComparison.OrdinalIgnoreCase));
@@ -1083,7 +1143,8 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
             if (RequireAssetChecksum)
             {
                 throw new InvalidDataException(
-                    $"Release asset '{asset.Name}' has no matching '{checksumAssetName}' checksum asset.");
+                    $"Release asset '{asset.Name}' has neither a GitHub SHA-256 digest nor a matching " +
+                    $"'{checksumAssetName}' checksum asset.");
             }
 
             return null;
@@ -1106,7 +1167,51 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
             throw new InvalidDataException($"Checksum asset '{checksumAsset.Name}' does not contain a SHA-256 hash.");
         }
 
-        var expectedHash = Convert.FromHexString(match.Value);
+        return await VerifySha256Async(asset, targetPath, Convert.FromHexString(match.Value), cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    internal virtual async Task<string?> GetGitHubAssetDigestAsync(
+        ReleaseAsset asset,
+        CancellationToken cancellationToken)
+    {
+        var assetApiUri = GetTrustedGitHubApiUri(asset.Url);
+        var response = await GithubClient.Connection
+            .Get<GitHubReleaseAssetMetadata>(
+                assetApiUri,
+                new Dictionary<string, string>(),
+                GitHubApiMediaType,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return response.Body.Digest;
+    }
+
+    private Uri GetTrustedGitHubApiUri(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            throw new InvalidDataException($"Release asset API URL '{url}' is not an absolute URL.");
+        }
+
+        var baseAddress = GithubClient.Connection.BaseAddress;
+        if (!uri.Scheme.Equals(baseAddress.Scheme, StringComparison.OrdinalIgnoreCase) ||
+            !uri.IdnHost.Equals(baseAddress.IdnHost, StringComparison.OrdinalIgnoreCase) ||
+            uri.Port != baseAddress.Port)
+        {
+            throw new InvalidDataException(
+                $"Release asset API URL '{uri}' does not match the configured GitHub API origin '{baseAddress}'.");
+        }
+
+        return uri;
+    }
+
+    private static async Task<string> VerifySha256Async(
+        ReleaseAsset asset,
+        string targetPath,
+        byte[] expectedHash,
+        CancellationToken cancellationToken)
+    {
         await using var fileStream = new FileStream(targetPath, System.IO.FileMode.Open, FileAccess.Read,
             FileShare.Read, DefaultBufferSize, FileOptions.Asynchronous | FileOptions.SequentialScan);
         var actualHash = await SHA256.HashDataAsync(fileStream, cancellationToken).ConfigureAwait(false);
@@ -1116,6 +1221,11 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
         }
 
         return Convert.ToHexString(actualHash);
+    }
+
+    private sealed record GitHubReleaseAssetMetadata
+    {
+        public string? Digest { get; init; }
     }
 
     private async ValueTask<bool> VerifyAssetSignatureAsync(string targetPath, CancellationToken cancellationToken)
@@ -1142,13 +1252,7 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
 
     private static void ValidateAssetFileName(string assetName)
     {
-        if (string.IsNullOrWhiteSpace(assetName)
-            || assetName is "." or ".."
-            || Path.IsPathRooted(assetName)
-            || !Path.GetFileName(assetName).Equals(assetName, StringComparison.Ordinal)
-            || assetName.Contains('/')
-            || assetName.Contains('\\')
-            || assetName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        if (!FileUtilities.IsPathLeafName(assetName))
         {
             throw new InvalidDataException($"Release asset name '{assetName}' is not a safe file name.");
         }
@@ -1334,14 +1438,26 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
         var currentVersion = EntryApplication.AssemblyVersion ?? CurrentVersion;
         var newVersionStr = downloadedAsset.TagVersionStr;
 
-        StreamWriter CreateScriptFile(out string scriptFilePath)
+        TemporaryFile CreateScriptFile(out string scriptFilePath, out StreamWriter stream)
         {
             var extension = OperatingSystem.IsWindows() ? ".bat" : ".sh";
-            scriptFilePath = Path.Combine(tmpPath, $"StageKit.Updatum-{Guid.NewGuid():N}{extension}");
-            var stream = new StreamWriter(new FileStream(scriptFilePath, System.IO.FileMode.CreateNew, FileAccess.Write,
-                FileShare.None));
-            stream.NewLine = "\n"; // Use Unix line endings
-            return stream;
+            var temporaryFile = new TemporaryFile(tmpPath, extension);
+            scriptFilePath = temporaryFile.FilePath;
+
+            try
+            {
+                stream = new StreamWriter(temporaryFile.Create())
+                {
+                    NewLine = "\n" // Use Unix line endings
+                };
+                temporaryFile.Keep();
+                return temporaryFile;
+            }
+            catch
+            {
+                temporaryFile.Dispose();
+                throw;
+            }
         }
 
         // *************
@@ -1366,22 +1482,22 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
             var info = EntryApplication.GetApplicationInfoDict();
             foreach (var kp in info)
             {
-                stream.WriteLine($"set \"{kp.Key}={Utilities.BatchSetValue(kp.Value)}\"");
+                stream.WriteLine($"set \"{kp.Key}={kp.Value.EscapeWindowsBatchValue()}\"");
             }
 
             stream.WriteLine();
 
             // Set variables
             stream.WriteLine("REM Variables");
-            stream.WriteLine($"set \"oldVersion={Utilities.BatchSetValue(EntryApplication.AssemblyVersionString)}\"");
-            stream.WriteLine($"set \"newVersion={Utilities.BatchSetValue(newVersionStr)}\"");
-            stream.WriteLine($"set \"DOWNLOAD_FILEPATH={Utilities.BatchSetValue(downloadedAsset.FilePath)}\"");
+            stream.WriteLine($"set \"oldVersion={EntryApplication.AssemblyVersionString.EscapeWindowsBatchValue()}\"");
+            stream.WriteLine($"set \"newVersion={newVersionStr.EscapeWindowsBatchValue()}\"");
+            stream.WriteLine($"set \"DOWNLOAD_FILEPATH={downloadedAsset.FilePath.EscapeWindowsBatchValue()}\"");
             stream.WriteLine(
-                $"set \"DOWNLOAD_WORKSPACE_PATH={Utilities.BatchSetValue(downloadedAsset.TemporaryDirectoryPath)}\"");
-            stream.WriteLine($"set \"INSTALL_WORKSPACE_PATH={Utilities.BatchSetValue(installWorkspacePath)}\"");
-            stream.WriteLine($"set \"FILEPATH={Utilities.BatchSetValue(filePath)}\"");
+                $"set \"DOWNLOAD_WORKSPACE_PATH={downloadedAsset.TemporaryDirectoryPath.EscapeWindowsBatchValue()}\"");
+            stream.WriteLine($"set \"INSTALL_WORKSPACE_PATH={installWorkspacePath.EscapeWindowsBatchValue()}\"");
+            stream.WriteLine($"set \"FILEPATH={filePath.EscapeWindowsBatchValue()}\"");
             stream.WriteLine($"set \"RUN_AFTER_UPGRADE={runArguments != NoRunAfterUpgradeToken}\"");
-            stream.WriteLine($"set \"RUN_ARGUMENTS={Utilities.BatchSetValue(runArguments)}\"");
+            stream.WriteLine($"set \"RUN_ARGUMENTS={runArguments.EscapeWindowsBatchValue()}\"");
             stream.WriteLine();
         }
 
@@ -1555,22 +1671,22 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
             var info = EntryApplication.GetApplicationInfoDict();
             foreach (var kp in info)
             {
-                stream.WriteLine($"{kp.Key}={Utilities.BashAnsiCString(kp.Value)}");
+                stream.WriteLine($"{kp.Key}={kp.Value.QuoteBashAnsiCString()}");
             }
 
             stream.WriteLine();
 
             // Set variables
             stream.WriteLine("# Variables");
-            stream.WriteLine($"oldVersion={Utilities.BashAnsiCString(EntryApplication.AssemblyVersionString)}");
-            stream.WriteLine($"newVersion={Utilities.BashAnsiCString(newVersionStr)}");
-            stream.WriteLine($"DOWNLOAD_FILEPATH={Utilities.BashAnsiCString(downloadedAsset.FilePath)}");
+            stream.WriteLine($"oldVersion={EntryApplication.AssemblyVersionString.QuoteBashAnsiCString()}");
+            stream.WriteLine($"newVersion={newVersionStr.QuoteBashAnsiCString()}");
+            stream.WriteLine($"DOWNLOAD_FILEPATH={downloadedAsset.FilePath.QuoteBashAnsiCString()}");
             stream.WriteLine(
-                $"DOWNLOAD_WORKSPACE_PATH={Utilities.BashAnsiCString(downloadedAsset.TemporaryDirectoryPath)}");
-            stream.WriteLine($"INSTALL_WORKSPACE_PATH={Utilities.BashAnsiCString(installWorkspacePath)}");
-            stream.WriteLine($"FILEPATH={Utilities.BashAnsiCString(filePath)}");
-            stream.WriteLine($"RUN_AFTER_UPGRADE={Utilities.BashAnsiCString(runArguments != NoRunAfterUpgradeToken)}");
-            stream.WriteLine($"RUN_ARGUMENTS={Utilities.BashAnsiCString(runArguments)}");
+                $"DOWNLOAD_WORKSPACE_PATH={downloadedAsset.TemporaryDirectoryPath.QuoteBashAnsiCString()}");
+            stream.WriteLine($"INSTALL_WORKSPACE_PATH={installWorkspacePath.QuoteBashAnsiCString()}");
+            stream.WriteLine($"FILEPATH={filePath.QuoteBashAnsiCString()}");
+            stream.WriteLine($"RUN_AFTER_UPGRADE={(runArguments != NoRunAfterUpgradeToken).ToString().QuoteBashAnsiCString()}");
+            stream.WriteLine($"RUN_ARGUMENTS={runArguments.QuoteBashAnsiCString()}");
             stream.WriteLine();
 
             // Functions
@@ -1773,20 +1889,32 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
                         if (OperatingSystem.IsWindows())
                         {
                             string upgradeScriptFilePath;
-                            await using (var stream = CreateScriptFile(out upgradeScriptFilePath))
+                            using (var temporaryScriptFile =
+                                   CreateScriptFile(out upgradeScriptFilePath, out var stream))
+                            await using (stream)
                             {
                                 WriteWindowsScriptHeader(stream);
 
                                 await stream.WriteLineAsync(
-                                    $"set \"SOURCE_PATH={Utilities.BatchSetValue(extractDirectoryPath)}\"").ConfigureAwait(false);
-                                await stream.WriteLineAsync($"set \"DEST_PATH={Utilities.BatchSetValue(targetDirectoryPath)}\"").ConfigureAwait(false);
-                                await stream.WriteLineAsync($"set \"STAGED_PATH={Utilities.BatchSetValue(stagedDirectoryPath)}\"").ConfigureAwait(false);
-                                await stream.WriteLineAsync($"set \"BACKUP_PATH={Utilities.BatchSetValue(backupDirectoryPath)}\"").ConfigureAwait(false);
+                                    $"set \"SOURCE_PATH={extractDirectoryPath.EscapeWindowsBatchValue()}\"")
+                                    .ConfigureAwait(false);
+                                await stream
+                                .WriteLineAsync($"set \"DEST_PATH={targetDirectoryPath.EscapeWindowsBatchValue()}\"")
+                                    .ConfigureAwait(false);
+                                await stream
+                                    .WriteLineAsync(
+                                        $"set \"STAGED_PATH={stagedDirectoryPath.EscapeWindowsBatchValue()}\"")
+                                    .ConfigureAwait(false);
+                                await stream
+                                    .WriteLineAsync(
+                                        $"set \"BACKUP_PATH={backupDirectoryPath.EscapeWindowsBatchValue()}\"")
+                                    .ConfigureAwait(false);
                                 await stream.WriteLineAsync().ConfigureAwait(false);
 
                                 // Source path verification
                                 await stream.WriteLineAsync("if not exist \"%SOURCE_PATH%\" (").ConfigureAwait(false);
-                                await stream.WriteLineAsync("  echo - Error: Source path does not exist").ConfigureAwait(false);
+                                await stream.WriteLineAsync("  echo - Error: Source path does not exist")
+                                    .ConfigureAwait(false);
                                 await stream.WriteLineAsync("  exit /b 1").ConfigureAwait(false);
                                 await stream.WriteLineAsync(')').ConfigureAwait(false);
                                 await stream.WriteLineAsync().ConfigureAwait(false);
@@ -1804,32 +1932,42 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
                                         var parent = di.Parent;
                                         if (parent is not null)
                                         {
-                                            await stream.WriteLineAsync("echo - Directory is able to rename version name").ConfigureAwait(false);
+                                            await stream
+                                                .WriteLineAsync("echo - Directory is able to rename version name")
+                                                .ConfigureAwait(false);
                                             var newTargetDirectoryPath =
                                                 Path.Combine(parent.FullName, newDirectoryName);
                                             await stream.WriteLineAsync(
-                                                $"if exist \"{Utilities.BatchSetValue(newTargetDirectoryPath)}\" (").ConfigureAwait(false);
+                                    $"if exist \"{newTargetDirectoryPath.EscapeWindowsBatchValue()}\" (")
+                                                .ConfigureAwait(false);
                                             await stream.WriteLineAsync(
-                                                "  echo - Could not rename directory: target already exists").ConfigureAwait(false);
+                                                    "  echo - Could not rename directory: target already exists")
+                                                .ConfigureAwait(false);
                                             await stream.WriteLineAsync(") else (").ConfigureAwait(false);
-                                            await stream.WriteLineAsync("  echo - Attempt to rename directory").ConfigureAwait(false);
+                                            await stream.WriteLineAsync("  echo - Attempt to rename directory")
+                                                .ConfigureAwait(false);
                                             await stream.WriteLineAsync(
-                                                $"  move /Y \"%DEST_PATH%\" \"{Utilities.BatchSetValue(newTargetDirectoryPath)}\" >nul").ConfigureAwait(false);
+                                    $"  move /Y \"%DEST_PATH%\" \"{newTargetDirectoryPath.EscapeWindowsBatchValue()}\" >nul")
+                                                .ConfigureAwait(false);
                                             await stream.WriteLineAsync("  if errorlevel 1 (").ConfigureAwait(false);
                                             await stream.WriteLineAsync(
-                                                "    echo - Could not rename directory; continuing with the original path").ConfigureAwait(false);
+                                                    "    echo - Could not rename directory; continuing with the original path")
+                                                .ConfigureAwait(false);
                                             await stream.WriteLineAsync("  ) else (").ConfigureAwait(false);
                                             await stream.WriteLineAsync(
-                                                $"    set \"{nameof(EntryApplication.BaseDirectory)}={Utilities.BatchSetValue(newTargetDirectoryPath)}\"").ConfigureAwait(false);
+                                    $"    set \"{nameof(EntryApplication.BaseDirectory)}={newTargetDirectoryPath.EscapeWindowsBatchValue()}\"")
+                                                .ConfigureAwait(false);
                                             await stream.WriteLineAsync(
-                                                $"    set \"DEST_PATH=%{nameof(EntryApplication.BaseDirectory)}%\"").ConfigureAwait(false);
+                                                    $"    set \"DEST_PATH=%{nameof(EntryApplication.BaseDirectory)}%\"")
+                                                .ConfigureAwait(false);
 
                                             if (!string.IsNullOrWhiteSpace(newExecutingFilePath))
                                             {
                                                 newExecutingFilePath =
                                                     newExecutingFilePath.Replace(di.FullName, newTargetDirectoryPath);
                                                 await stream.WriteLineAsync(
-                                                    $"    set \"{nameof(EntryApplication.ExecutablePath)}={Utilities.BatchSetValue(newExecutingFilePath)}\"").ConfigureAwait(false);
+                                    $"    set \"{nameof(EntryApplication.ExecutablePath)}={newExecutingFilePath.EscapeWindowsBatchValue()}\"")
+                                                    .ConfigureAwait(false);
                                             }
 
                                             await stream.WriteLineAsync("  )").ConfigureAwait(false);
@@ -1842,19 +1980,26 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
                                 WriteWindowsScriptInjectCustomScript(stream);
 
                                 await stream.WriteLineAsync(
-                                    $"if not \"%{nameof(EntryApplication.ExecutablePath)}%\"==\"\" if /I \"%RUN_AFTER_UPGRADE%\"==\"True\" (").ConfigureAwait(false);
-                                await stream.WriteLineAsync($"  echo - Execute the upgraded application").ConfigureAwait(false);
-                                await stream.WriteLineAsync($"  if exist \"%{nameof(EntryApplication.ExecutablePath)}%\" (").ConfigureAwait(false);
+                                        $"if not \"%{nameof(EntryApplication.ExecutablePath)}%\"==\"\" if /I \"%RUN_AFTER_UPGRADE%\"==\"True\" (")
+                                    .ConfigureAwait(false);
+                                await stream.WriteLineAsync($"  echo - Execute the upgraded application")
+                                    .ConfigureAwait(false);
+                                await stream
+                                    .WriteLineAsync($"  if exist \"%{nameof(EntryApplication.ExecutablePath)}%\" (")
+                                    .ConfigureAwait(false);
                                 await stream.WriteLineAsync(EntryApplication.IsRunningFromDotNetProcess
-                                    ? $"    start \"\" \"{Environment.ProcessPath}\" \"%{nameof(EntryApplication.ExecutablePath)}%\" %RUN_ARGUMENTS%"
-                                    : $"    start \"\" \"%{nameof(EntryApplication.ExecutablePath)}%\" %RUN_ARGUMENTS%").ConfigureAwait(false);
+                                        ? $"    start \"\" \"{Environment.ProcessPath}\" \"%{nameof(EntryApplication.ExecutablePath)}%\" %RUN_ARGUMENTS%"
+                                        : $"    start \"\" \"%{nameof(EntryApplication.ExecutablePath)}%\" %RUN_ARGUMENTS%")
+                                    .ConfigureAwait(false);
                                 await stream.WriteLineAsync("  ) else (").ConfigureAwait(false);
                                 await stream.WriteLineAsync(
-                                    $"    echo File not found: %{nameof(EntryApplication.ExecutablePath)}%, not executing!").ConfigureAwait(false);
+                                        $"    echo File not found: %{nameof(EntryApplication.ExecutablePath)}%, not executing!")
+                                    .ConfigureAwait(false);
                                 await stream.WriteLineAsync("  )").ConfigureAwait(false);
                                 await stream.WriteLineAsync(") else (").ConfigureAwait(false);
                                 await stream.WriteLineAsync(
-                                    "  echo - Skip execution of application, by the configuration or unable to locate the entry point").ConfigureAwait(false);
+                                        "  echo - Skip execution of application, by the configuration or unable to locate the entry point")
+                                    .ConfigureAwait(false);
                                 await stream.WriteLineAsync(")").ConfigureAwait(false);
 
                                 await stream.WriteLineAsync().ConfigureAwait(false);
@@ -1879,18 +2024,29 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
                         else // Linux or macOS
                         {
                             string upgradeScriptFilePath;
-                            using (var stream = CreateScriptFile(out upgradeScriptFilePath))
+                            using (var temporaryScriptFile =
+                                   CreateScriptFile(out upgradeScriptFilePath, out var stream))
+                            await using (stream)
                             {
                                 WriteLinuxScriptHeader(stream);
-                                await stream.WriteLineAsync($"SOURCE_PATH={Utilities.BashAnsiCString(extractDirectoryPath)}").ConfigureAwait(false);
-                                await stream.WriteLineAsync($"DEST_PATH={Utilities.BashAnsiCString(targetDirectoryPath)}").ConfigureAwait(false);
-                                await stream.WriteLineAsync($"STAGED_PATH={Utilities.BashAnsiCString(stagedDirectoryPath)}").ConfigureAwait(false);
-                                await stream.WriteLineAsync($"BACKUP_PATH={Utilities.BashAnsiCString(backupDirectoryPath)}").ConfigureAwait(false);
+                                await stream
+                                    .WriteLineAsync($"SOURCE_PATH={extractDirectoryPath.QuoteBashAnsiCString()}")
+                                    .ConfigureAwait(false);
+                                await stream
+                                    .WriteLineAsync($"DEST_PATH={targetDirectoryPath.QuoteBashAnsiCString()}")
+                                    .ConfigureAwait(false);
+                                await stream
+                                    .WriteLineAsync($"STAGED_PATH={stagedDirectoryPath.QuoteBashAnsiCString()}")
+                                    .ConfigureAwait(false);
+                                await stream
+                                    .WriteLineAsync($"BACKUP_PATH={backupDirectoryPath.QuoteBashAnsiCString()}")
+                                    .ConfigureAwait(false);
                                 await stream.WriteLineAsync().ConfigureAwait(false);
 
                                 // Source path verification
                                 await stream.WriteLineAsync("if [ ! -d \"$SOURCE_PATH\" ]; then").ConfigureAwait(false);
-                                await stream.WriteLineAsync("  echo \"- Error: Source path does not exist\"").ConfigureAwait(false);
+                                await stream.WriteLineAsync("  echo \"- Error: Source path does not exist\"")
+                                    .ConfigureAwait(false);
                                 await stream.WriteLineAsync("  exit 1").ConfigureAwait(false);
                                 await stream.WriteLineAsync("fi").ConfigureAwait(false);
                                 await stream.WriteLineAsync().ConfigureAwait(false);
@@ -1900,16 +2056,22 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
 
                                 if (OperatingSystem.IsMacOS())
                                 {
-                                    await stream.WriteLineAsync("echo \"- Removing com.apple.quarantine flag\"").ConfigureAwait(false);
+                                    await stream.WriteLineAsync("echo \"- Removing com.apple.quarantine flag\"")
+                                        .ConfigureAwait(false);
                                     await stream.WriteLineAsync(
-                                        "find \"$SOURCE_PATH\" -print0 | xargs -0 xattr -d com.apple.quarantine &> /dev/null || true").ConfigureAwait(false);
+                                            "find \"$SOURCE_PATH\" -print0 | xargs -0 xattr -d com.apple.quarantine &> /dev/null || true")
+                                        .ConfigureAwait(false);
                                     await stream.WriteLineAsync().ConfigureAwait(false);
 
                                     if (InstallUpdateCodesignMacOSApp)
                                     {
-                                        await stream.WriteLineAsync("echo \"- Force codesign to allow the app to run directly\"").ConfigureAwait(false);
+                                        await stream
+                                            .WriteLineAsync(
+                                                "echo \"- Force codesign to allow the app to run directly\"")
+                                            .ConfigureAwait(false);
                                         await stream.WriteLineAsync(
-                                            "find \"$SOURCE_PATH\" -maxdepth 1 -type d -name \"*.app\" -print0 | xargs -0 -I {} codesign --force --deep --sign - \"{}\" || true").ConfigureAwait(false);
+                                                "find \"$SOURCE_PATH\" -maxdepth 1 -type d -name \"*.app\" -print0 | xargs -0 -I {} codesign --force --deep --sign - \"{}\" || true")
+                                            .ConfigureAwait(false);
                                         await stream.WriteLineAsync().ConfigureAwait(false);
                                     }
                                 }
@@ -1927,31 +2089,42 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
                                         var parent = di.Parent;
                                         if (parent is not null)
                                         {
-                                            await stream.WriteLineAsync("echo \"- Directory is able to rename version name\"").ConfigureAwait(false);
+                                            await stream
+                                                .WriteLineAsync("echo \"- Directory is able to rename version name\"")
+                                                .ConfigureAwait(false);
                                             var newTargetDirectoryPath =
                                                 Path.Combine(parent.FullName, newDirectoryName);
                                             await stream.WriteLineAsync(
-                                                $"NEW_DEST_PATH={Utilities.BashAnsiCString(newTargetDirectoryPath)}").ConfigureAwait(false);
-                                            await stream.WriteLineAsync("if [[ -e \"$NEW_DEST_PATH\" ]]; then").ConfigureAwait(false);
+                                        $"NEW_DEST_PATH={newTargetDirectoryPath.QuoteBashAnsiCString()}")
+                                                .ConfigureAwait(false);
+                                            await stream.WriteLineAsync("if [[ -e \"$NEW_DEST_PATH\" ]]; then")
+                                                .ConfigureAwait(false);
                                             await stream.WriteLineAsync(
-                                                "  echo \"- Could not rename directory: target already exists\"").ConfigureAwait(false);
-                                            await stream.WriteLineAsync("elif mv -- \"$DEST_PATH\" \"$NEW_DEST_PATH\"; then").ConfigureAwait(false);
+                                                    "  echo \"- Could not rename directory: target already exists\"")
+                                                .ConfigureAwait(false);
+                                            await stream
+                                                .WriteLineAsync("elif mv -- \"$DEST_PATH\" \"$NEW_DEST_PATH\"; then")
+                                                .ConfigureAwait(false);
                                             await stream.WriteLineAsync(
-                                                $"  {nameof(EntryApplication.BaseDirectory)}=\"$NEW_DEST_PATH\"").ConfigureAwait(false);
+                                                    $"  {nameof(EntryApplication.BaseDirectory)}=\"$NEW_DEST_PATH\"")
+                                                .ConfigureAwait(false);
                                             await stream.WriteLineAsync(
-                                                $"  DEST_PATH=\"${nameof(EntryApplication.BaseDirectory)}\"").ConfigureAwait(false);
+                                                    $"  DEST_PATH=\"${nameof(EntryApplication.BaseDirectory)}\"")
+                                                .ConfigureAwait(false);
 
                                             if (!string.IsNullOrWhiteSpace(newExecutingFilePath))
                                             {
                                                 newExecutingFilePath =
                                                     newExecutingFilePath.Replace(di.FullName, newTargetDirectoryPath);
                                                 await stream.WriteLineAsync(
-                                                    $"  {nameof(EntryApplication.ExecutablePath)}={Utilities.BashAnsiCString(newExecutingFilePath)}").ConfigureAwait(false);
+                                        $"  {nameof(EntryApplication.ExecutablePath)}={newExecutingFilePath.QuoteBashAnsiCString()}")
+                                                    .ConfigureAwait(false);
                                             }
 
                                             await stream.WriteLineAsync("else").ConfigureAwait(false);
                                             await stream.WriteLineAsync(
-                                                "  echo \"- Could not rename directory; continuing with the original path\"").ConfigureAwait(false);
+                                                    "  echo \"- Could not rename directory; continuing with the original path\"")
+                                                .ConfigureAwait(false);
                                             await stream.WriteLineAsync("fi").ConfigureAwait(false);
                                             await stream.WriteLineAsync().ConfigureAwait(false);
                                         }
@@ -1963,35 +2136,48 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
 
                                 // Execute the upgraded application
                                 await stream.WriteLineAsync(
-                                    $"if [ -n \"${nameof(EntryApplication.ExecutablePath)}\" ] && [ \"${{RUN_AFTER_UPGRADE:-False}}\" = \"True\" ]; then").ConfigureAwait(false);
-                                await stream.WriteLineAsync("  echo \"- Execute the upgraded application\"").ConfigureAwait(false);
-                                await stream.WriteLineAsync($"  if [ -f \"${nameof(EntryApplication.ExecutablePath)}\" ]; then").ConfigureAwait(false);
+                                        $"if [ -n \"${nameof(EntryApplication.ExecutablePath)}\" ] && [ \"${{RUN_AFTER_UPGRADE:-False}}\" = \"True\" ]; then")
+                                    .ConfigureAwait(false);
+                                await stream.WriteLineAsync("  echo \"- Execute the upgraded application\"")
+                                    .ConfigureAwait(false);
+                                await stream
+                                    .WriteLineAsync($"  if [ -f \"${nameof(EntryApplication.ExecutablePath)}\" ]; then")
+                                    .ConfigureAwait(false);
                                 if (EntryApplication.IsRunningFromDotNetProcess)
                                 {
                                     await stream.WriteLineAsync(
-                                        $"    nohup \"{Environment.ProcessPath}\" \"${nameof(EntryApplication.ExecutablePath)}\" $RUN_ARGUMENTS >/dev/null 2>&1 &").ConfigureAwait(false);
+                                            $"    nohup \"{Environment.ProcessPath}\" \"${nameof(EntryApplication.ExecutablePath)}\" $RUN_ARGUMENTS >/dev/null 2>&1 &")
+                                        .ConfigureAwait(false);
                                 }
                                 else
                                 {
                                     // Make executable if it's not
-                                    await stream.WriteLineAsync($"    chmod +x \"${nameof(EntryApplication.ExecutablePath)}\"").ConfigureAwait(false);
+                                    await stream
+                                        .WriteLineAsync($"    chmod +x \"${nameof(EntryApplication.ExecutablePath)}\"")
+                                        .ConfigureAwait(false);
                                     await stream.WriteLineAsync(
-                                        $"    nohup \"${nameof(EntryApplication.ExecutablePath)}\" $RUN_ARGUMENTS >/dev/null 2>&1 &").ConfigureAwait(false);
+                                            $"    nohup \"${nameof(EntryApplication.ExecutablePath)}\" $RUN_ARGUMENTS >/dev/null 2>&1 &")
+                                        .ConfigureAwait(false);
                                 }
 
-                                await stream.WriteLineAsync("    sleep 1").ConfigureAwait(false); // Let the process start
+                                await stream.WriteLineAsync("    sleep 1")
+                                    .ConfigureAwait(false); // Let the process start
                                 await stream.WriteLineAsync("    if ps -p $! >/dev/null; then").ConfigureAwait(false);
-                                await stream.WriteLineAsync("      echo \"- Success: Application running (PID: $!)\"").ConfigureAwait(false);
+                                await stream.WriteLineAsync("      echo \"- Success: Application running (PID: $!)\"")
+                                    .ConfigureAwait(false);
                                 await stream.WriteLineAsync("    else").ConfigureAwait(false);
-                                await stream.WriteLineAsync("      echo \"- Error: Process failed to start\"").ConfigureAwait(false);
+                                await stream.WriteLineAsync("      echo \"- Error: Process failed to start\"")
+                                    .ConfigureAwait(false);
                                 await stream.WriteLineAsync("    fi").ConfigureAwait(false);
                                 await stream.WriteLineAsync("  else").ConfigureAwait(false);
                                 await stream.WriteLineAsync(
-                                    $"    echo \"- File not found: ${nameof(EntryApplication.ExecutablePath)}, not executing!\"").ConfigureAwait(false);
+                                        $"    echo \"- File not found: ${nameof(EntryApplication.ExecutablePath)}, not executing!\"")
+                                    .ConfigureAwait(false);
                                 await stream.WriteLineAsync("  fi").ConfigureAwait(false);
                                 await stream.WriteLineAsync("else").ConfigureAwait(false);
                                 await stream.WriteLineAsync(
-                                    "  echo \"- Skip execution of application (RUN_AFTER_UPGRADE is not true).\"").ConfigureAwait(false);
+                                        "  echo \"- Skip execution of application (RUN_AFTER_UPGRADE is not true).\"")
+                                    .ConfigureAwait(false);
                                 await stream.WriteLineAsync("fi").ConfigureAwait(false);
                                 await stream.WriteLineAsync().ConfigureAwait(false);
 
@@ -1999,7 +2185,7 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
                             }
 
                             // Make the script executable
-                            File.SetUnixFileMode(upgradeScriptFilePath, Utilities.Unix755FileMode);
+                            UnixSystem.SetUnix755Executable(upgradeScriptFilePath);
 
                             cancellationToken.ThrowIfCancellationRequested();
                             RaiseEvent(InstallUpdateCompleted, downloadedAsset);
@@ -2054,7 +2240,8 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
                         //if (!OperatingSystem.IsWindows()) throw new NotSupportedException($"The file type ({fileExtension}) is only supported on Windows.");
 
                         string upgradeScriptFilePath;
-                        using (var stream = CreateScriptFile(out upgradeScriptFilePath))
+                        using (var temporaryScriptFile = CreateScriptFile(out upgradeScriptFilePath, out var stream))
+                        using (stream)
                         {
                             WriteWindowsScriptHeader(stream);
                             WriteWindowsScriptFileValidation(stream);
@@ -2063,21 +2250,31 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
 
                             await stream.WriteLineAsync("echo - Calling the installer").ConfigureAwait(false);
                             await stream.WriteLineAsync(
-                                $"start \"\" /WAIT \"%FILEPATH%\" {InstallUpdateWindowsInstallerArguments}").ConfigureAwait(false);
-                            await stream.WriteLineAsync(" REM /WAIT - Start application and wait for it to terminate.").ConfigureAwait(false);
+                                    $"start \"\" /WAIT \"%FILEPATH%\" {InstallUpdateWindowsInstallerArguments}")
+                                .ConfigureAwait(false);
+                            await stream.WriteLineAsync(" REM /WAIT - Start application and wait for it to terminate.")
+                                .ConfigureAwait(false);
                             await stream.WriteLineAsync().ConfigureAwait(false);
 
-                            await stream.WriteLineAsync("if /I \"%RUN_AFTER_UPGRADE%\"==\"True\" (").ConfigureAwait(false);
-                            await stream.WriteLineAsync("  echo - Execute the upgraded application").ConfigureAwait(false);
-                            await stream.WriteLineAsync($"  if exist \"%{nameof(EntryApplication.ExecutablePath)}%\" (").ConfigureAwait(false);
+                            await stream.WriteLineAsync("if /I \"%RUN_AFTER_UPGRADE%\"==\"True\" (")
+                                .ConfigureAwait(false);
+                            await stream.WriteLineAsync("  echo - Execute the upgraded application")
+                                .ConfigureAwait(false);
+                            await stream.WriteLineAsync($"  if exist \"%{nameof(EntryApplication.ExecutablePath)}%\" (")
+                                .ConfigureAwait(false);
                             await stream.WriteLineAsync(
-                                $"    start \"\" \"%{nameof(EntryApplication.ExecutablePath)}%\" %RUN_ARGUMENTS%").ConfigureAwait(false);
+                                    $"    start \"\" \"%{nameof(EntryApplication.ExecutablePath)}%\" %RUN_ARGUMENTS%")
+                                .ConfigureAwait(false);
                             await stream.WriteLineAsync("  ) else (").ConfigureAwait(false);
                             await stream.WriteLineAsync(
-                                $"    echo - File not found: \"%{nameof(EntryApplication.ExecutablePath)}%\", not executing!").ConfigureAwait(false);
+                                    $"    echo - File not found: \"%{nameof(EntryApplication.ExecutablePath)}%\", not executing!")
+                                .ConfigureAwait(false);
                             await stream.WriteLineAsync("  )").ConfigureAwait(false);
                             await stream.WriteLineAsync(") else (").ConfigureAwait(false);
-                            await stream.WriteLineAsync("  echo - Skip execution of application (RUN_AFTER_UPGRADE is not true)").ConfigureAwait(false);
+                            await stream
+                                .WriteLineAsync(
+                                    "  echo - Skip execution of application (RUN_AFTER_UPGRADE is not true)")
+                                .ConfigureAwait(false);
                             await stream.WriteLineAsync(")").ConfigureAwait(false);
                             await stream.WriteLineAsync().ConfigureAwait(false);
 
@@ -2299,14 +2496,18 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
                     if (OperatingSystem.IsWindows())
                     {
                         string upgradeScriptFilePath;
-                        using (var stream = CreateScriptFile(out upgradeScriptFilePath))
+                        using (var temporaryScriptFile = CreateScriptFile(out upgradeScriptFilePath, out var stream))
+                        using (stream)
                         {
                             WriteWindowsScriptHeader(stream);
-                            await stream.WriteLineAsync($"set \"SOURCE_FILEPATH={Utilities.BatchSetValue(filePath)}\"").ConfigureAwait(false);
-                            await stream.WriteLineAsync($"set \"CURRENT_FILEPATH={Utilities.BatchSetValue(currentFilePath)}\"").ConfigureAwait(false);
-                            stream.WriteLine($"set \"TARGET_FILEPATH={Utilities.BatchSetValue(targetFilePath)}\"");
-                            stream.WriteLine($"set \"STAGED_FILEPATH={Utilities.BatchSetValue(stagedFilePath)}\"");
-                            stream.WriteLine($"set \"BACKUP_FILEPATH={Utilities.BatchSetValue(backupFilePath)}\"");
+                            await stream.WriteLineAsync($"set \"SOURCE_FILEPATH={filePath.EscapeWindowsBatchValue()}\"")
+                                .ConfigureAwait(false);
+                            await stream
+                                .WriteLineAsync($"set \"CURRENT_FILEPATH={currentFilePath.EscapeWindowsBatchValue()}\"")
+                                .ConfigureAwait(false);
+                            stream.WriteLine($"set \"TARGET_FILEPATH={targetFilePath.EscapeWindowsBatchValue()}\"");
+                            stream.WriteLine($"set \"STAGED_FILEPATH={stagedFilePath.EscapeWindowsBatchValue()}\"");
+                            stream.WriteLine($"set \"BACKUP_FILEPATH={backupFilePath.EscapeWindowsBatchValue()}\"");
                             stream.WriteLine();
 
                             // Source path verification
@@ -2359,14 +2560,15 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
                     else
                     {
                         string upgradeScriptFilePath;
-                        using (var stream = CreateScriptFile(out upgradeScriptFilePath))
+                        using (var temporaryScriptFile = CreateScriptFile(out upgradeScriptFilePath, out var stream))
+                        using (stream)
                         {
                             WriteLinuxScriptHeader(stream);
-                            stream.WriteLine($"SOURCE_FILEPATH={Utilities.BashAnsiCString(filePath)}");
-                            stream.WriteLine($"CURRENT_FILEPATH={Utilities.BashAnsiCString(currentFilePath)}");
-                            stream.WriteLine($"TARGET_FILEPATH={Utilities.BashAnsiCString(targetFilePath)}");
-                            stream.WriteLine($"STAGED_FILEPATH={Utilities.BashAnsiCString(stagedFilePath)}");
-                            stream.WriteLine($"BACKUP_FILEPATH={Utilities.BashAnsiCString(backupFilePath)}");
+                            stream.WriteLine($"SOURCE_FILEPATH={filePath.QuoteBashAnsiCString()}");
+                            stream.WriteLine($"CURRENT_FILEPATH={currentFilePath.QuoteBashAnsiCString()}");
+                            stream.WriteLine($"TARGET_FILEPATH={targetFilePath.QuoteBashAnsiCString()}");
+                            stream.WriteLine($"STAGED_FILEPATH={stagedFilePath.QuoteBashAnsiCString()}");
+                            stream.WriteLine($"BACKUP_FILEPATH={backupFilePath.QuoteBashAnsiCString()}");
                             stream.WriteLine();
 
                             // Source path verification
@@ -2421,7 +2623,7 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
                         }
 
                         // Make the script executable
-                        File.SetUnixFileMode(upgradeScriptFilePath, Utilities.Unix755FileMode);
+                        UnixSystem.SetUnix755Executable(upgradeScriptFilePath);
 
                         cancellationToken.ThrowIfCancellationRequested();
                         RaiseEvent(InstallUpdateCompleted, downloadedAsset);
@@ -2618,50 +2820,6 @@ public partial class UpdatumManager : INotifyPropertyChanged, IDisposable
         {
             handler(this, args);
         }
-    }
-
-    #endregion
-
-    #region Dispose
-
-    /// <inheritdoc/>
-    public void Dispose()
-    {
-        Dispose(true);
-        GC.SuppressFinalize(this);
-    }
-
-    /// <summary>
-    /// Disposes the resources used by the <see cref="UpdatumManager"/>.
-    /// </summary>
-    /// <param name="disposing"></param>
-    protected virtual void Dispose(bool disposing)
-    {
-        if (_disposed) return;
-        _disposed = true;
-
-        if (disposing)
-        {
-            _disposeCancellationSource.Cancel();
-            if (_autoUpdateCheckTimer is not null)
-            {
-                _autoUpdateCheckTimer.Stop();
-                _autoUpdateCheckTimer.Elapsed -= AutoUpdateCheckTimerOnElapsed;
-                _autoUpdateCheckTimer.Dispose();
-            }
-
-            _disposeCancellationSource.Dispose();
-            _propertyChanged = null;
-            CheckForUpdateCompleted = null;
-            UpdateFound = null;
-            DownloadCompleted = null;
-            InstallUpdateCompleted = null;
-        }
-    }
-
-    private void ThrowIfDisposed()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
     }
 
     #endregion

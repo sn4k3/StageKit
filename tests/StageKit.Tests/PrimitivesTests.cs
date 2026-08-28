@@ -1,4 +1,5 @@
 using StageKit.Primitives;
+using StageKit.Primitives.Extensions;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -136,6 +137,43 @@ public sealed class PrimitivesTests
     public void PathUtilities_NormalizeArchiveEntryName_NormalizesWindowsSeparatorsOnUnix()
     {
         Assert.Equal("folder/file.txt", PathUtilities.NormalizeArchiveEntryName(@"folder\file.txt"));
+    }
+
+    [Theory]
+    [InlineData("asset.zip", true)]
+    [InlineData("", false)]
+    [InlineData(".", false)]
+    [InlineData("..", false)]
+    [InlineData("folder/asset.zip", false)]
+    [InlineData("folder\\asset.zip", false)]
+    public void FileUtilities_IsPathLeafName_ReturnsExpected(string value, bool expected)
+    {
+        Assert.Equal(expected, FileUtilities.IsPathLeafName(value));
+    }
+
+    [Fact]
+    public void QuoteBashAnsiCString_EscapesSpecialAndControlCharacters()
+    {
+        const string value = "a'b\\c\n\r\t\b\f\u0001\u007F";
+
+        var result = value.QuoteBashAnsiCString();
+
+        Assert.Equal("$'a\\'b\\\\c\\n\\r\\t\\b\\f\\x01\\x7F'", result);
+    }
+
+    [Fact]
+    public void QuoteBashAnsiCString_RejectsNullCharacter()
+    {
+        Assert.Throws<ArgumentException>(() => "value\0suffix".QuoteBashAnsiCString());
+    }
+
+    [Theory]
+    [InlineData("", "")]
+    [InlineData("plain", "plain")]
+    [InlineData("a\r\n^%!\"b", "a\\n^^%%^!^\"b")]
+    public void EscapeWindowsBatchValue_EscapesSetValueMetacharacters(string value, string expected)
+    {
+        Assert.Equal(expected, value.EscapeWindowsBatchValue());
     }
 
     [Fact]

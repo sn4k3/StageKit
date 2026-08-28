@@ -19,6 +19,7 @@ All public helpers are exposed from the `StageKit.Primitives` namespace. IO-rela
 - Atomic file writes with temporary-file replacement through `SafeFile`
 - Stream-based atomic file writes through `SafeFileStream`
 - Path, temporary file, and temporary directory helpers
+- Bash ANSI-C and Windows batch value quoting helpers through `StringExtensions`
 - Disposable base type with thread-safe idempotent disposal through `DisposableObject`
 - Finalizable disposable base type through `UnmanagedDisposableObject`
 - Leave-open lifecycle base type through `LeaveOpenDisposableObject`
@@ -112,6 +113,16 @@ if (!PathUtilities.IsSubPathOf(candidatePath, rootPath))
 
 var entryName = PathUtilities.NormalizeArchiveEntryName(relativePath);
 ```
+
+Use `StringExtensions` when generating shell scripts:
+
+```csharp
+var bashValue = value.QuoteBashAnsiCString();
+var batchValue = value.EscapeWindowsBatchValue();
+```
+
+`QuoteBashAnsiCString()` rejects null characters because Bash variables cannot contain them. The batch helper removes
+carriage returns, writes line feeds as `\n`, and escapes batch metacharacters for delayed expansion.
 
 Use `TemporaryDirectory` when a temporary workspace should be removed automatically:
 

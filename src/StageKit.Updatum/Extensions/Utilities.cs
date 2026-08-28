@@ -1,7 +1,7 @@
 ﻿using System.Buffers;
 using System.Diagnostics;
+using System.Buffers.Binary;
 using System.Runtime.CompilerServices;
-using System.Text;
 
 namespace StageKit.Updatum.Extensions;
 
@@ -15,14 +15,6 @@ internal
 #endif
     static class Utilities
 {
-    /// <summary>
-    /// Gets the unix file mode for 775 permissions.
-    /// </summary>
-    public const UnixFileMode Unix755FileMode = UnixFileMode.UserRead | UnixFileMode.UserWrite |
-                                                UnixFileMode.UserExecute |
-                                                UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
-                                                UnixFileMode.OtherRead | UnixFileMode.OtherExecute;
-
     /// <summary>
     /// Gets the default applications directory for linux.
     /// </summary>
@@ -76,64 +68,6 @@ internal
     ];
 
     /// <summary>
-    /// Starts a process with the given name and arguments.
-    /// </summary>
-    /// <param name="name">The name of the process to start.</param>
-    /// <param name="arguments">The arguments to pass to the process.</param>
-    /// <param name="waitForCompletion">True to wait for the process to complete.</param>
-    /// <param name="waitTimeout">The timeout in milliseconds to wait for the process to complete.</param>
-    /// <returns>The exit code of the process.</returns>
-    public static int StartProcess(string name, string? arguments, bool waitForCompletion = false,
-        int waitTimeout = Timeout.Infinite)
-    {
-        try
-        {
-            using var process = Process.Start(new ProcessStartInfo(name, arguments ?? string.Empty)
-                { UseShellExecute = true });
-            if (process is null) return -1;
-            if (waitForCompletion)
-            {
-                if (!process.WaitForExit(waitTimeout)) return -1;
-                return process.ExitCode;
-            }
-
-            return 0;
-        }
-        catch (Exception e)
-        {
-            Debug.WriteLine(e);
-            return -1;
-        }
-    }
-
-    /// <summary>
-    /// Gets a temporary folder with the given name.
-    /// </summary>
-    /// <param name="name">Child folder name</param>
-    /// <param name="init">True to delete existence directory and create a new.</param>
-    /// <returns>The path to the temporary folder.</returns>
-    public static string GetTemporaryFolder(string name, bool init = false)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        var tmpDir = Path.Combine(Path.GetTempPath(), name);
-
-        // Delete if it was a file
-        if (File.Exists(tmpDir))
-            File.Delete(tmpDir);
-
-        if (init)
-        {
-            if (Directory.Exists(tmpDir))
-                Directory.Delete(tmpDir, true); // Delete existing directory
-
-            Directory.CreateDirectory(tmpDir); // Create new directory
-        }
-
-        return tmpDir;
-    }
-
-
-    /// <summary>
     /// Determines whether the specified file is a Windows setup or installer executable based on common installer
     /// signatures.
     /// </summary>
@@ -174,22 +108,22 @@ internal
                 4096,
                 FileOptions.SequentialScan);
 
-            using var reader = new BinaryReader(stream, Encoding.UTF8, true);
-
             // Check for valid DOS header (MZ)
             if (stream.Length < 64) return false;
-            var dosSignature = reader.ReadUInt16();
+            Span<byte> header = stackalloc byte[64];
+            stream.ReadExactly(header);
+            var dosSignature = BinaryPrimitives.ReadUInt16LittleEndian(header);
             if (dosSignature != 0x5A4D) return false; // "MZ"
 
             // Read PE offset from DOS header at offset 0x3C
-            stream.Seek(0x3C, SeekOrigin.Begin);
-            var peOffset = reader.ReadInt32();
+            var peOffset = BinaryPrimitives.ReadInt32LittleEndian(header[0x3C..]);
 
-            if (peOffset < 0 || peOffset + 4 > stream.Length) return false;
+            if (peOffset < 0 || peOffset > stream.Length - sizeof(uint)) return false;
 
             // Verify PE signature
             stream.Seek(peOffset, SeekOrigin.Begin);
-            var peSignature = reader.ReadUInt32();
+            stream.ReadExactly(header[..sizeof(uint)]);
+            var peSignature = BinaryPrimitives.ReadUInt32LittleEndian(header);
             if (peSignature != 0x00004550) return false; // "PE\0\0"
 
             // Read the entire file to search for installer signatures
@@ -278,147 +212,4 @@ internal
         return data.IndexOf(decoded, StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
-    /// <summary>
-    /// Decodes a UTF-8 encoded string from a span of bytes that have been obfuscated with a predefined key.
-    /// </summary>
-    /// <remarks>Each byte in the input span is de-obfuscated using a bitwise XOR with a predefined key before
-    /// decoding. The method assumes the original data was UTF-8 encoded and obfuscated using the same key.</remarks>
-    /// <param name="encoded">A read-only span of bytes representing the obfuscated UTF-8 encoded string to decode.</param>
-    /// <returns>A string containing the decoded text represented by the input span.</returns>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static string GetDecodedString(ReadOnlySpan<byte> encoded)
-    {
-        Span<byte> decoded = stackalloc byte[encoded.Length];
-        for (var i = 0; i < encoded.Length; i++)
-        {
-            decoded[i] = (byte)(encoded[i] ^ ObfuscationKey);
-        }
-
-        return Encoding.UTF8.GetString(decoded);
-    }
-
-    /// <summary>
-    /// Encodes a string using the obfuscation key.
-    /// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static byte[] GetEncodedBytes(string? value)
-    {
-        if (value is null) return [];
-        var bytes = Encoding.UTF8.GetBytes(value);
-        for (var i = 0; i < bytes.Length; i++)
-        {
-            bytes[i] = (byte)(bytes[i] ^ ObfuscationKey);
-        }
-
-        return bytes;
-    }
-
-    /// <summary>
-    /// Bash-safe one-line string literal that preserves special characters (including newlines)
-    /// using ANSI-C quoting: $'...'
-    /// </summary>
-    /// <exception cref="ArgumentException"></exception>
-    internal static string BashAnsiCString(object? value)
-    {
-        if (value is null) return "$''";
-
-        if (value is not string strValue)
-        {
-            strValue = value.ToString() ?? string.Empty;
-        }
-
-        if (string.IsNullOrEmpty(strValue)) return "$''";
-
-
-        if (strValue.Contains('\0'))
-            throw new ArgumentException("Bash strings cannot contain NUL (\\0).");
-
-        // Pre-calculate approximate capacity (most chars don't need escaping)
-        var sb = new StringBuilder(strValue.Length + strValue.Length / 4 + 3);
-        sb.Append("$'");
-
-        foreach (var ch in strValue)
-        {
-            switch (ch)
-            {
-                case '\\': sb.Append(@"\\"); break;
-                case '\'': sb.Append(@"\'"); break;
-                case '\n': sb.Append(@"\n"); break;
-                case '\r': sb.Append(@"\r"); break;
-                case '\t': sb.Append(@"\t"); break;
-                case '\b': sb.Append(@"\b"); break;
-                case '\f': sb.Append(@"\f"); break;
-                case var _ when ch < 0x20 || ch == 0x7F:
-                    // Escape control chars and DEL as \xHH
-                    sb.Append(@"\x");
-                    sb.Append(HexDigit(ch >> 4));
-                    sb.Append(HexDigit(ch & 0xF));
-                    break;
-                default:
-                    sb.Append(ch);
-                    break;
-            }
-        }
-
-        sb.Append('\'');
-        return sb.ToString();
-    }
-
-    /// <summary>
-    /// Batch-safe value for: set "VAR=value"
-    /// Notes:
-    /// - Encodes CR/LF as "\n" (two characters) to keep the set command single-line and safe.
-    /// - Escapes: ^, %, !, "
-    ///   - ! is escaped to survive when Delayed Expansion is ON.
-    /// </summary>
-    internal static string BatchSetValue(object? value)
-    {
-        if (value is null) return string.Empty;
-
-        if (value is not string strValue)
-        {
-            strValue = value.ToString() ?? string.Empty;
-        }
-
-        if (string.IsNullOrEmpty(strValue)) return strValue;
-
-        // Pre-calculate capacity accounting for worst-case escaping
-        var sb = new StringBuilder(strValue.Length + strValue.Length / 2);
-
-        foreach (var ch in strValue)
-        {
-            switch (ch)
-            {
-                case '\r':
-                    // Skip standalone CR or CR in CRLF (next iteration handles \n)
-                    break;
-                case '\n':
-                    sb.Append(@"\n");
-                    break;
-                case '^':
-                    sb.Append("^^");
-                    break;
-                case '%':
-                    sb.Append("%%");
-                    break;
-                case '!':
-                    sb.Append("^!");
-                    break;
-                case '"':
-                    sb.Append("^\"");
-                    break;
-                default:
-                    sb.Append(ch);
-                    break;
-            }
-        }
-
-        return sb.ToString();
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static char HexDigit(int value)
-    {
-        return (char)(value < 10 ? '0' + value : 'A' + value - 10);
-    }
 }

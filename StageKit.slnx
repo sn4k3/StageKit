@@ -17,6 +17,7 @@
     </Folder>
     <Folder Name="/demo/">
         <Project Path="demo/StageKit.Demo/StageKit.Demo.csproj" />
+        <Project Path="demo/Updatum.Demo/Updatum.Demo.csproj" />
     </Folder>
     <Folder Name="/builds/">
         <Project Path="builds/build/build.csproj" />
