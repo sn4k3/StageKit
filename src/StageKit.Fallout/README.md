@@ -110,7 +110,7 @@ already live in `Directory.Build.props` or the project file:
 | `SoftwareLicense` | `PackageLicenseExpression` |
 | `SoftwareRepositoryUrl` | `RepositoryUrl` |
 | `SoftwarePackageTags` / `SoftwarePackageTagsList` | `PackageTags` |
-| `BuildRuntimeCacheFileName` | `BuildRuntimeCacheFileName`, defaulting to `build-runtime.json` |
+| `BuildRuntimeManifestFileName` | `BuildRuntimeManifestFileName`, defaulting to `build-runtime.json` |
 
 `MainProject` is the **last** runnable, non-excluded project in solution order. `ExcludedProjectNameTokens` disqualifies
 candidates by name token (`test`, `demo`, `build`, `sample`, `fake`, `docs`, and more). Override `MainProject` directly
@@ -147,7 +147,7 @@ the tool is extracted before use.
 ### Build runtime manifest
 
 Non-single-file publishes and portable zips receive a `BuildRuntime` JSON manifest (named by
-`BuildRuntimeCacheFileName`) describing the runtime identifier, build version, packaging type, build timestamp, and
+`BuildRuntimeManifestFileName`) describing the runtime identifier, build version, packaging type, build timestamp, and
 host OS description. `StageKit.Runtime` uses it to report the packaging shape at run time.
 
 ### Release notes

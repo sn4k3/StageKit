@@ -42,10 +42,10 @@ public partial class StageKitBuild
         var directory = SingleFileInputsDirectory / Guid.NewGuid().ToString("N");
         directory.CreateDirectory();
 
-        var manifestPath = directory / BuildRuntimeCacheFileName;
+        var manifestPath = directory / BuildRuntimeManifestFileName;
         var targetsPath = directory / "Fallout.SingleFile.targets";
 
-        PublishUtilities.WriteRuntimeManifest(directory, BuildRuntimeCacheFileName,
+        PublishUtilities.WriteRuntimeManifest(directory, BuildRuntimeManifestFileName,
             new BuildRuntime(context.RuntimeIdentifier, SoftwareVersion, true,
                 ApplicationPackagingType.DotNetSingleFile));
 

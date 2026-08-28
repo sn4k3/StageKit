@@ -18,7 +18,7 @@ public partial class StageKitBuild : FalloutBuild
     [
         "ArtifactsPath", "SolutionName", "ProductName", "Company", "CompanyRDNS", "Authors", "Summary",
         "Description", "Version", "Copyright", "PackageLicenseExpression", "RepositoryUrl", "PackageTags",
-        nameof(BuildRuntimeCacheFileName)
+        nameof(BuildRuntimeManifestFileName)
     ];
 
     private readonly Dictionary<string, IReadOnlyDictionary<string, string?>> _evaluatedProjectProperties =
@@ -213,7 +213,7 @@ public partial class StageKitBuild : FalloutBuild
     {
         get
         {
-            field ??= SolutionName;
+            field ??= GetMainProjectProperty("SoftwareName") ?? SolutionName;
             ThrowIfMissingProperty(field);
             return field;
         }
@@ -407,13 +407,13 @@ public partial class StageKitBuild : FalloutBuild
     /// </summary>
     [field: AllowNull]
     [field: MaybeNull]
-    public virtual string BuildRuntimeCacheFileName
+    public virtual string BuildRuntimeManifestFileName
     {
         get
         {
             if (string.IsNullOrWhiteSpace(field))
             {
-                var fileName = GetBuildRuntimeCacheFileName();
+                var fileName = GetMainProjectProperty(nameof(BuildRuntimeManifestFileName));
                 if (!string.IsNullOrWhiteSpace(fileName))
                     field = fileName;
             }

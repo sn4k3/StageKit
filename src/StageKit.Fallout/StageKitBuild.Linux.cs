@@ -54,7 +54,7 @@ public partial class StageKitBuild
         if (linuxContexts.Length == 0)
             return;
 
-        if (!IsLinuxHost)
+        if (!OperatingSystem.IsLinux())
         {
             WarnLinuxAppImagesUnsupportedHost();
             return;
@@ -129,10 +129,11 @@ public partial class StageKitBuild
     protected virtual void CreateLinuxAppDir(PublishRidContext context, AbsolutePath appDirPath)
     {
         var linuxIconFile = LinuxIconFile;
-        if (!linuxIconFile.Extension.Equals(".svg", StringComparison.OrdinalIgnoreCase))
+        var iconExtension = linuxIconFile.Extension.ToLowerInvariant();
+        if (iconExtension is not ".svg" and not ".png")
         {
             throw new InvalidOperationException(
-                $"The configured Linux application icon '{linuxIconFile}' must use the .svg extension.");
+                $"The configured Linux application icon '{linuxIconFile}' must use the .svg or .png extension.");
         }
 
         var options = LinuxAppBundleOptions;
@@ -154,7 +155,8 @@ public partial class StageKitBuild
 
         var usrBinPath = appDirPath / "usr" / "bin";
         var applicationsPath = appDirPath / "usr" / "share" / "applications";
-        var iconsPath = appDirPath / "usr" / "share" / "icons" / "hicolor" / "scalable" / "apps";
+        var iconsPath = appDirPath / "usr" / "share" / "icons" / "hicolor" /
+                        (iconExtension == ".svg" ? "scalable" : "256x256") / "apps";
         var metainfoPath = appDirPath / "usr" / "share" / "metainfo";
         usrBinPath.CreateDirectory();
         applicationsPath.CreateDirectory();
@@ -165,7 +167,7 @@ public partial class StageKitBuild
         var desktopFileName = $"{options.ApplicationId}.desktop";
         var desktopPath = appDirPath / desktopFileName;
         var installedDesktopPath = applicationsPath / desktopFileName;
-        var iconFileName = $"{options.IconName}.svg";
+        var iconFileName = $"{options.IconName}{iconExtension}";
         var appStreamPath = metainfoPath / $"{options.ApplicationId}.appdata.xml";
         var appRun = LinuxAppBundle.GetAppRunScript(options);
         var desktop = LinuxAppBundle.GetDesktopEntry(options);
@@ -181,7 +183,7 @@ public partial class StageKitBuild
 
         context.PublishPath.Copy(usrBinPath, ExistsPolicy.MergeAndOverwrite);
         UnixSystem.SetUnix755Executable(usrBinPath / options.ExecutableName!);
-        PublishUtilities.WriteRuntimeManifest(usrBinPath, BuildRuntimeCacheFileName,
+        PublishUtilities.WriteRuntimeManifest(usrBinPath, BuildRuntimeManifestFileName,
             new BuildRuntime(context.RuntimeIdentifier, SoftwareVersion, true,
                 ApplicationPackagingType.LinuxAppImage));
     }

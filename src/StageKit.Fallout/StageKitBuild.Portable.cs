@@ -31,7 +31,7 @@ public partial class StageKitBuild
         {
             stagingPath.DeleteDirectory();
             context.PublishPath.Copy(stagingPath, ExistsPolicy.MergeAndOverwrite);
-            PublishUtilities.WriteRuntimeManifest(stagingPath, BuildRuntimeCacheFileName,
+            PublishUtilities.WriteRuntimeManifest(stagingPath, BuildRuntimeManifestFileName,
                 new BuildRuntime(context.RuntimeIdentifier, SoftwareVersion, false, ApplicationPackagingType.Portable));
 
             archivePath.DeleteFile();

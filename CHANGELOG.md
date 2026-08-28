@@ -1,5 +1,6 @@
 # Unreleased
 
+- Add a schema version to Fallout runtime manifests for forward-compatible evolution.
 - Rename `ApplicationBundleType` to `ApplicationPackagingType` (now a `[Flags]` enum with `Portable`,
   `DotNetSingleFile`, `WindowsInstaller`, `LinuxAppImage`, `LinuxFlatpak`, `MacOSAppBundle`)
 - Replace `EntryApplication.BundleType` with `PackagingType`

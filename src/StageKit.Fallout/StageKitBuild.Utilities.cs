@@ -117,15 +117,6 @@ public partial class StageKitBuild
     }
 
     /// <summary>
-    /// Gets the configured runtime-cache file name from the main project.
-    /// </summary>
-    /// <returns>The configured file name, or <see langword="null"/> when it is not defined.</returns>
-    protected virtual string? GetBuildRuntimeCacheFileName()
-    {
-        return GetMainProjectProperty(nameof(BuildRuntimeCacheFileName));
-    }
-
-    /// <summary>
     /// Gets an evaluated property from the main project.
     /// </summary>
     /// <param name="propertyName">The MSBuild property name.</param>

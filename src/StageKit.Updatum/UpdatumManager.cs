@@ -1120,6 +1120,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         CancellationToken cancellationToken)
     {
         var gitHubDigest = await GetGitHubAssetDigestAsync(asset, cancellationToken).ConfigureAwait(false);
+        Debug.WriteLine($"GitHub digest for release asset '{asset.Name}': {gitHubDigest}");
         if (!string.IsNullOrWhiteSpace(gitHubDigest) &&
             gitHubDigest.StartsWith(GitHubSha256DigestPrefix, StringComparison.OrdinalIgnoreCase))
         {
@@ -1129,6 +1130,8 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                 throw new InvalidDataException(
                     $"GitHub returned an invalid SHA-256 digest for release asset '{asset.Name}'.");
             }
+
+            Debug.WriteLine($"Verifying SHA-256 digest for release asset '{asset.Name}': {hashText}");
 
             return await VerifySha256Async(asset, targetPath, Convert.FromHexString(hashText), cancellationToken)
                 .ConfigureAwait(false);
@@ -1219,6 +1222,8 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         {
             throw new InvalidDataException($"SHA-256 verification failed for release asset '{asset.Name}'.");
         }
+
+        Debug.WriteLine($"SHA-256 verification succeeded for release asset '{asset.Name}': {Convert.ToHexString(actualHash)}");
 
         return Convert.ToHexString(actualHash);
     }
@@ -1685,7 +1690,8 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                 $"DOWNLOAD_WORKSPACE_PATH={downloadedAsset.TemporaryDirectoryPath.QuoteBashAnsiCString()}");
             stream.WriteLine($"INSTALL_WORKSPACE_PATH={installWorkspacePath.QuoteBashAnsiCString()}");
             stream.WriteLine($"FILEPATH={filePath.QuoteBashAnsiCString()}");
-            stream.WriteLine($"RUN_AFTER_UPGRADE={(runArguments != NoRunAfterUpgradeToken).ToString().QuoteBashAnsiCString()}");
+            stream.WriteLine(
+                $"RUN_AFTER_UPGRADE={(runArguments != NoRunAfterUpgradeToken).ToString().QuoteBashAnsiCString()}");
             stream.WriteLine($"RUN_ARGUMENTS={runArguments.QuoteBashAnsiCString()}");
             stream.WriteLine();
 
@@ -1896,10 +1902,11 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                                 WriteWindowsScriptHeader(stream);
 
                                 await stream.WriteLineAsync(
-                                    $"set \"SOURCE_PATH={extractDirectoryPath.EscapeWindowsBatchValue()}\"")
+                                        $"set \"SOURCE_PATH={extractDirectoryPath.EscapeWindowsBatchValue()}\"")
                                     .ConfigureAwait(false);
                                 await stream
-                                .WriteLineAsync($"set \"DEST_PATH={targetDirectoryPath.EscapeWindowsBatchValue()}\"")
+                                    .WriteLineAsync(
+                                        $"set \"DEST_PATH={targetDirectoryPath.EscapeWindowsBatchValue()}\"")
                                     .ConfigureAwait(false);
                                 await stream
                                     .WriteLineAsync(
@@ -1938,7 +1945,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                                             var newTargetDirectoryPath =
                                                 Path.Combine(parent.FullName, newDirectoryName);
                                             await stream.WriteLineAsync(
-                                    $"if exist \"{newTargetDirectoryPath.EscapeWindowsBatchValue()}\" (")
+                                                    $"if exist \"{newTargetDirectoryPath.EscapeWindowsBatchValue()}\" (")
                                                 .ConfigureAwait(false);
                                             await stream.WriteLineAsync(
                                                     "  echo - Could not rename directory: target already exists")
@@ -1947,7 +1954,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                                             await stream.WriteLineAsync("  echo - Attempt to rename directory")
                                                 .ConfigureAwait(false);
                                             await stream.WriteLineAsync(
-                                    $"  move /Y \"%DEST_PATH%\" \"{newTargetDirectoryPath.EscapeWindowsBatchValue()}\" >nul")
+                                                    $"  move /Y \"%DEST_PATH%\" \"{newTargetDirectoryPath.EscapeWindowsBatchValue()}\" >nul")
                                                 .ConfigureAwait(false);
                                             await stream.WriteLineAsync("  if errorlevel 1 (").ConfigureAwait(false);
                                             await stream.WriteLineAsync(
@@ -1955,7 +1962,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                                                 .ConfigureAwait(false);
                                             await stream.WriteLineAsync("  ) else (").ConfigureAwait(false);
                                             await stream.WriteLineAsync(
-                                    $"    set \"{nameof(EntryApplication.BaseDirectory)}={newTargetDirectoryPath.EscapeWindowsBatchValue()}\"")
+                                                    $"    set \"{nameof(EntryApplication.BaseDirectory)}={newTargetDirectoryPath.EscapeWindowsBatchValue()}\"")
                                                 .ConfigureAwait(false);
                                             await stream.WriteLineAsync(
                                                     $"    set \"DEST_PATH=%{nameof(EntryApplication.BaseDirectory)}%\"")
@@ -1966,7 +1973,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                                                 newExecutingFilePath =
                                                     newExecutingFilePath.Replace(di.FullName, newTargetDirectoryPath);
                                                 await stream.WriteLineAsync(
-                                    $"    set \"{nameof(EntryApplication.ExecutablePath)}={newExecutingFilePath.EscapeWindowsBatchValue()}\"")
+                                                        $"    set \"{nameof(EntryApplication.ExecutablePath)}={newExecutingFilePath.EscapeWindowsBatchValue()}\"")
                                                     .ConfigureAwait(false);
                                             }
 
@@ -2095,7 +2102,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                                             var newTargetDirectoryPath =
                                                 Path.Combine(parent.FullName, newDirectoryName);
                                             await stream.WriteLineAsync(
-                                        $"NEW_DEST_PATH={newTargetDirectoryPath.QuoteBashAnsiCString()}")
+                                                    $"NEW_DEST_PATH={newTargetDirectoryPath.QuoteBashAnsiCString()}")
                                                 .ConfigureAwait(false);
                                             await stream.WriteLineAsync("if [[ -e \"$NEW_DEST_PATH\" ]]; then")
                                                 .ConfigureAwait(false);
@@ -2117,7 +2124,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                                                 newExecutingFilePath =
                                                     newExecutingFilePath.Replace(di.FullName, newTargetDirectoryPath);
                                                 await stream.WriteLineAsync(
-                                        $"  {nameof(EntryApplication.ExecutablePath)}={newExecutingFilePath.QuoteBashAnsiCString()}")
+                                                        $"  {nameof(EntryApplication.ExecutablePath)}={newExecutingFilePath.QuoteBashAnsiCString()}")
                                                     .ConfigureAwait(false);
                                             }
 

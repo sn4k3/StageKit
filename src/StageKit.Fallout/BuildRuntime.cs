@@ -35,6 +35,11 @@ public record BuildRuntime
     }
 
     /// <summary>
+    /// Gets the version of the runtime manifest schema.
+    /// </summary>
+    public int SchemaVersion { get; init; } = 1;
+
+    /// <summary>
     /// Gets or sets the runtime identifier for the build.
     /// </summary>
     public required string Runtime { get; init; }

@@ -79,7 +79,7 @@ public partial class StageKitBuild
 
             stagingPath.DeleteDirectory();
             installerSourcePath.Copy(stagingPath, ExistsPolicy.MergeAndOverwrite);
-            PublishUtilities.WriteRuntimeManifest(stagingPath, BuildRuntimeCacheFileName,
+            PublishUtilities.WriteRuntimeManifest(stagingPath, BuildRuntimeManifestFileName,
                 new BuildRuntime(context.RuntimeIdentifier, SoftwareVersion, true,
                     ApplicationPackagingType.WindowsInstaller));
 

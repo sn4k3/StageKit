@@ -14,9 +14,11 @@ public partial class StageKitBuild
     /// <summary>
     /// Gets the application packaging types selected for publishing.
     /// </summary>
+    [Parameter(
+        "The application packaging types to create when publishing. Default: Portable, WindowsInstaller, MacOSAppBundle, LinuxAppImage")]
     public ApplicationPackagingType PublishBundles { get; protected set; } =
         ApplicationPackagingType.Portable |
-        ApplicationPackagingType.DotNetSingleFile |
+        //ApplicationPackagingType.DotNetSingleFile |
         ApplicationPackagingType.WindowsInstaller |
         ApplicationPackagingType.MacOSAppBundle |
         ApplicationPackagingType.LinuxAppImage;
@@ -86,21 +88,6 @@ public partial class StageKitBuild
         .DependsOn(Restore)
         .DependsOn(DependOnTargets)
         .Executes(ExecutePublish);
-
-    /// <summary>
-    /// Gets a value indicating whether the current host supports Unix application staging.
-    /// </summary>
-    protected virtual bool IsUnixHost => !OperatingSystem.IsWindows();
-
-    /// <summary>
-    /// Gets a value indicating whether the current host supports macOS code signing.
-    /// </summary>
-    protected virtual bool IsMacOSHost => OperatingSystem.IsMacOS();
-
-    /// <summary>
-    /// Gets a value indicating whether the current host supports AppImage creation.
-    /// </summary>
-    protected virtual bool IsLinuxHost => OperatingSystem.IsLinux();
 
     /// <summary>
     /// Gets the parent directory for temporary non-single-file bundle payloads.
@@ -191,7 +178,7 @@ public partial class StageKitBuild
 
         if (!PublishBundles.HasFlag(ApplicationPackagingType.DotNetSingleFile))
         {
-            PublishUtilities.WriteRuntimeManifest(context.PublishPath, BuildRuntimeCacheFileName,
+            PublishUtilities.WriteRuntimeManifest(context.PublishPath, BuildRuntimeManifestFileName,
                 new BuildRuntime(context.RuntimeIdentifier, SoftwareVersion, false, ApplicationPackagingType.Portable));
         }
     }
@@ -216,7 +203,7 @@ public partial class StageKitBuild
                 singleFileInputs = CreateSingleFilePublishInputs(context);
                 settings = settings
                     .SetProperty("FalloutBuildRuntimeManifest", singleFileInputs.ManifestPath)
-                    .SetProperty("FalloutBuildRuntimeManifestFileName", BuildRuntimeCacheFileName)
+                    .SetProperty("FalloutBuildRuntimeManifestFileName", BuildRuntimeManifestFileName)
                     .SetProperty("CustomAfterMicrosoftCommonTargets", singleFileInputs.TargetsPath);
             }
 
@@ -244,7 +231,7 @@ public partial class StageKitBuild
         var runtimeIdentifiers = PublishRid.ValidateRuntimeIdentifiers(RIds);
         var softwareName = FileUtilities.ValidatePathLeafName(SoftwareName, nameof(SoftwareName));
         var softwareVersion = FileUtilities.ValidatePathLeafName(SoftwareVersion, nameof(SoftwareVersion));
-        _ = FileUtilities.ValidatePathLeafName(BuildRuntimeCacheFileName, nameof(BuildRuntimeCacheFileName));
+        _ = FileUtilities.ValidatePathLeafName(BuildRuntimeManifestFileName, nameof(BuildRuntimeManifestFileName));
         var publishDirectory = PublishDirectory;
         var contexts = runtimeIdentifiers
             .Select(runtimeIdentifier => CreatePublishContext(
@@ -370,7 +357,7 @@ public partial class StageKitBuild
                 {
                     var runtime = PublishRid.ParseRuntimeIdentifier(context.RuntimeIdentifier);
                     if (ShouldCreatePortableZip(context.RuntimeIdentifier) ||
-                        !IsUnixHost ||
+                        !EnvironmentInfo.IsUnix ||
                         PublishMultiArch)
                     {
                         CreatePortableZip(context);

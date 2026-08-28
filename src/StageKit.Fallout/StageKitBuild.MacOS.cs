@@ -1,4 +1,5 @@
-﻿using Fallout.Common.IO;
+﻿using Fallout.Common;
+using Fallout.Common.IO;
 using Fallout.Common.Tooling;
 using Serilog;
 using StageKit.Primitives;
@@ -28,7 +29,7 @@ public partial class StageKitBuild
         if (macContexts.Length == 0)
             return;
 
-        if (!IsUnixHost)
+        if (!EnvironmentInfo.IsUnix)
         {
             WarnMacOSAppsUnsupportedHost();
             return;
@@ -113,11 +114,11 @@ public partial class StageKitBuild
             var executablePath = appPath / "Contents" / "MacOS";
             ValidateMacOSPayload(context, MacAppBundleOptions.ExecutableName!);
             context.PublishPath.Copy(executablePath, ExistsPolicy.MergeAndOverwrite);
-            PublishUtilities.WriteRuntimeManifest(executablePath, BuildRuntimeCacheFileName,
+            PublishUtilities.WriteRuntimeManifest(executablePath, BuildRuntimeManifestFileName,
                 new BuildRuntime(context.RuntimeIdentifier, SoftwareVersion, true,
                     ApplicationPackagingType.MacOSAppBundle));
 
-            if (IsMacOSHost)
+            if (OperatingSystem.IsMacOS())
                 SignMacOSApp(appPath);
 
             archivePath.DeleteFile();
@@ -162,7 +163,7 @@ public partial class StageKitBuild
             {
                 var runtimePath = executablePath / payload.DirectoryName;
                 payload.Context.PublishPath.Copy(runtimePath, ExistsPolicy.MergeAndOverwrite);
-                PublishUtilities.WriteRuntimeManifest(runtimePath, BuildRuntimeCacheFileName,
+                PublishUtilities.WriteRuntimeManifest(runtimePath, BuildRuntimeManifestFileName,
                     new BuildRuntime("osx-multiarch", SoftwareVersion, true, ApplicationPackagingType.MacOSAppBundle));
             }
 
@@ -171,7 +172,7 @@ public partial class StageKitBuild
                 MacAppBundle.GetMultiArchEntryScript(options).ReplaceLineEndings("\n"));
             UnixSystem.SetUnix755Executable(launcherPath);
 
-            if (IsMacOSHost)
+            if (OperatingSystem.IsMacOS())
                 SignMacOSApp(appPath);
 
             archivePath.DeleteFile();

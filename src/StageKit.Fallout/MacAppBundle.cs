@@ -2,7 +2,6 @@
 using System.Xml;
 using System.Xml.Linq;
 using StageKit.Primitives.Extensions;
-using static StageKit.Fallout.AppBundleUtilities;
 
 namespace StageKit.Fallout;
 
@@ -38,17 +37,17 @@ public static class MacAppBundle
     public static string GetInfoPList(MacAppBundleOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        ValidateRequired(options.ProductName, nameof(options.ProductName));
-        ValidateRequired(options.BundleIdentifier, nameof(options.BundleIdentifier));
-        ValidateRequired(options.Version, nameof(options.Version));
-        ValidateRequired(options.DevelopmentRegion, nameof(options.DevelopmentRegion));
-        ValidateRequired(options.MinimumSystemVersion, nameof(options.MinimumSystemVersion));
-        ValidateRequired(options.ApplicationCategory, nameof(options.ApplicationCategory));
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.ProductName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.BundleIdentifier);
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.Version);
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.DevelopmentRegion);
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.MinimumSystemVersion);
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.ApplicationCategory);
 
         var iconFileName = options.IconFileName ?? $"{options.ProductName}.icns";
         var executableName = options.ExecutableName ?? options.ProductName;
-        ValidateRequired(iconFileName, nameof(options.IconFileName));
-        ValidateRequired(executableName, nameof(options.ExecutableName));
+        ArgumentException.ThrowIfNullOrWhiteSpace(iconFileName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(executableName);
 
         var entries = new[]
         {
@@ -122,7 +121,7 @@ public static class MacAppBundle
 
         var entries = entitlements.Select(entitlement =>
         {
-            ValidateRequired(entitlement.Key, nameof(entitlements));
+            ArgumentException.ThrowIfNullOrWhiteSpace(entitlement.Key);
             return BooleanEntry(entitlement.Key, entitlement.Value);
         });
 
@@ -164,9 +163,9 @@ public static class MacAppBundle
         string x64RuntimeIdentifier,
         string? customCodeBeforeExec)
     {
-        ValidateRequired(executableName, nameof(executableName));
-        ValidateRequired(arm64RuntimeIdentifier, nameof(arm64RuntimeIdentifier));
-        ValidateRequired(x64RuntimeIdentifier, nameof(x64RuntimeIdentifier));
+        ArgumentException.ThrowIfNullOrWhiteSpace(executableName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(arm64RuntimeIdentifier);
+        ArgumentException.ThrowIfNullOrWhiteSpace(x64RuntimeIdentifier);
 
         var escapedExecutableName = executableName.EscapeBashDoubleQuoted();
         var escapedArm64RuntimeIdentifier = arm64RuntimeIdentifier.EscapeBashDoubleQuoted();
@@ -234,7 +233,7 @@ public static class MacAppBundle
                     nameof(fragment));
             }
 
-            ValidateRequired(keyElement.Value, nameof(fragment));
+            ArgumentException.ThrowIfNullOrWhiteSpace(keyElement.Value);
             if (!keys.Add(keyElement.Value))
             {
                 throw new ArgumentException($"The Info.plist key '{keyElement.Value}' is duplicated.",

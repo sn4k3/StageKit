@@ -9,18 +9,20 @@
         <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
 
         <!-- Metadata -->
-        <MainProductName>StageKit</MainProductName>
-        <ProductName>$(MainProductName)</ProductName>
+        <RepositoryName Condition="'$(RepositoryName)' == '' And $([System.IO.Directory]::GetFiles('$(MSBuildThisFileDirectory)', '*.sln').Length) &gt; 0">$([System.IO.Path]::GetFileNameWithoutExtension($([System.IO.Directory]::GetFiles('$(MSBuildThisFileDirectory)', '*.sln')[0])))</RepositoryName>
+        <RepositoryName Condition="'$(RepositoryName)' == '' And $([System.IO.Directory]::GetFiles('$(MSBuildThisFileDirectory)', '*.slnx').Length) &gt; 0">$([System.IO.Path]::GetFileNameWithoutExtension($([System.IO.Directory]::GetFiles('$(MSBuildThisFileDirectory)', '*.slnx')[0])))</RepositoryName>
+        <RepositoryName Condition="'$(RepositoryName)' == ''">$([System.IO.Path]::GetFileNameWithoutExtension($(MSBuildProjectDirectory)))</RepositoryName>
+
         <Company>PTRTECH</Company>
         <CompanyRDNS>pt.ptrtech</CompanyRDNS>
         <Authors>Tiago Conceição</Authors>
         <Copyright>Copyright 2026-$([System.DateTime]::Now.ToString(`yyyy`)) © PTRTECH</Copyright>
         <Description>StageKit repository project.</Description>
-        <Version>0.2.6</Version>
+        <Version>0.3.0</Version>
 
         <!-- Package -->
-        <ApplicationIcon>$(MSBuildThisFileDirectory)media\$(MainProductName).ico</ApplicationIcon>
-        <PackageIcon>$(MainProductName)_128.png</PackageIcon>
+        <ApplicationIcon>$(MSBuildThisFileDirectory)media\$(RepositoryName).ico</ApplicationIcon>
+        <PackageIcon>$(RepositoryName)_128.png</PackageIcon>
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
@@ -45,7 +47,7 @@
 
         <!-- Sign -->
         <SignAssembly>True</SignAssembly>
-        <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)$(MainProductName).snk</AssemblyOriginatorKeyFile>
+        <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)$(RepositoryName).snk</AssemblyOriginatorKeyFile>
 
         <!-- No pack under Debug -->
         <IsPackable Condition="'$(Configuration)' == 'Debug'">false</IsPackable>
@@ -56,7 +58,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <None Include="$(MSBuildThisFileDirectory)media\$(MainProductName)_128.png" Pack="true" PackagePath="" Visible="false"/>
+        <None Include="$(MSBuildThisFileDirectory)media\$(RepositoryName)_128.png" Pack="true" PackagePath="" Visible="false"/>
     </ItemGroup>
 
     <Choose>

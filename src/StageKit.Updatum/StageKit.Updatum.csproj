@@ -2,7 +2,7 @@
 
     <PropertyGroup>
         <Description>Secure GitHub release discovery, download verification, and cross-platform application updates for StageKit applications.</Description>
-        <PackageTags>stagekit;updater;auto-update;github-releases;sha256;application-update</PackageTags>
+        <PackageTags>stagekit;updater;auto-update;github-releases;sha256;application-update;self-updating</PackageTags>
         <GenerateDocumentationFile>True</GenerateDocumentationFile>
     </PropertyGroup>
 

@@ -2,7 +2,6 @@
 using System.Xml.Linq;
 using Fallout.Common.Utilities;
 using StageKit.Primitives.Extensions;
-using static StageKit.Fallout.AppBundleUtilities;
 
 namespace StageKit.Fallout;
 
@@ -28,7 +27,8 @@ public static partial class LinuxAppBundle
         ValidateOptions(options);
         var executableName = GetExecutableName(options);
         var iconName = options.IconName ?? options.ProductName;
-        ValidateRequired(iconName, nameof(options.IconName));
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(iconName);
 
         var desktopEntry = $$"""
                              [Desktop Entry]
@@ -81,8 +81,8 @@ public static partial class LinuxAppBundle
     public static string GetAppStreamMetadata(LinuxAppBundleOptions options)
     {
         ValidateOptions(options);
-        ValidateRequired(options.MetadataLicense, nameof(options.MetadataLicense));
-        ValidateRequired(options.ContentRatingType, nameof(options.ContentRatingType));
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.MetadataLicense);
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.ContentRatingType);
         ValidateList(options.Controls, nameof(options.Controls));
 
         var component = new XElement(
@@ -149,9 +149,9 @@ public static partial class LinuxAppBundle
     public static string GetFlatpakManifest(LinuxAppBundleOptions options)
     {
         ValidateOptions(options);
-        ValidateRequired(options.FlatpakRuntime, nameof(options.FlatpakRuntime));
-        ValidateRequired(options.FlatpakRuntimeVersion, nameof(options.FlatpakRuntimeVersion));
-        ValidateRequired(options.FlatpakSdk, nameof(options.FlatpakSdk));
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.FlatpakRuntime);
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.FlatpakRuntimeVersion);
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.FlatpakSdk);
         ValidateList(options.FlatpakFinishArguments, nameof(options.FlatpakFinishArguments));
 
         var executableName = GetExecutableName(options);
@@ -182,7 +182,7 @@ public static partial class LinuxAppBundle
                        - type: dir
                          path: {{sourceDirectory.SingleQuoteYaml()}}
                          dest: app-sources
-                 """;
+                 """.ReplaceLineEndings("\n");
     }
 
     private static XElement? CreateScreenshots(IReadOnlyList<string> screenshotUrls)
@@ -219,26 +219,26 @@ public static partial class LinuxAppBundle
     private static void ValidateOptions(LinuxAppBundleOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        ValidateRequired(options.ApplicationId, nameof(options.ApplicationId));
-        ValidateRequired(options.ProductName, nameof(options.ProductName));
-        ValidateRequired(options.Summary, nameof(options.Summary));
-        ValidateRequired(options.Description, nameof(options.Description));
-        ValidateRequired(options.License, nameof(options.License));
-        ValidateRequired(options.RepositoryUrl, nameof(options.RepositoryUrl));
-        ValidateRequired(options.Authors, nameof(options.Authors));
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.ApplicationId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.ProductName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.Summary);
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.Description);
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.License);
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.RepositoryUrl);
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.Authors);
         ValidateList(options.Categories, nameof(options.Categories));
     }
 
     private static string GetExecutableName(LinuxAppBundleOptions options)
     {
         var executableName = options.ExecutableName ?? options.ProductName;
-        ValidateRequired(executableName, nameof(options.ExecutableName));
+        ArgumentException.ThrowIfNullOrWhiteSpace(executableName);
         return executableName;
     }
 
     private static void ValidateList(IReadOnlyList<string> values, string parameterName)
     {
-        ArgumentNullException.ThrowIfNull(values, parameterName);
+        ArgumentNullException.ThrowIfNull(values);
         if (values.Any(string.IsNullOrWhiteSpace))
         {
             throw new ArgumentException("List items cannot be null, empty, or white space.", parameterName);

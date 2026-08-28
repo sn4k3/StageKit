@@ -177,7 +177,7 @@ public class PublishPipelineTests
         {
             var build = new TestBuild
             {
-                TestBuildRuntimeCacheFileName = "runtime.json",
+                TestBuildRuntimeManifestFileName = "runtime.json",
                 UseDefaultPreparation = true
             };
             build.SetPublishBundles(0);
@@ -225,7 +225,7 @@ public class PublishPipelineTests
         {
             var build = new TestBuild
             {
-                TestBuildRuntimeCacheFileName = "runtime.json",
+                TestBuildRuntimeManifestFileName = "runtime.json",
                 UseDefaultPreparation = true
             };
             var context = CreateContext(build, "win-x64", publishDirectory);
@@ -352,33 +352,33 @@ public class PublishPipelineTests
     }
 
     /// <summary>
-    /// Verifies that a missing runtime-cache property uses the package default file name.
+    /// Verifies that a missing runtime-manifest property uses the package default file name.
     /// </summary>
     [Fact]
-    public void BuildRuntimeCacheFileName_ProjectDoesNotDefineValue_UsesDefaultFileName()
+    public void BuildRuntimeManifestFileName_ProjectDoesNotDefineValue_UsesDefaultFileName()
     {
         var build = new TestBuild
         {
-            UseDefaultBuildRuntimeCacheFileName = true,
-            RuntimeCacheFileNameFromMainProject = null
+            UseDefaultBuildRuntimeManifestFileName = true,
+            RuntimeManifestFileNameFromMainProject = null
         };
 
-        Assert.Equal("build-runtime.json", build.BuildRuntimeCacheFileName);
+        Assert.Equal("build-runtime.json", build.BuildRuntimeManifestFileName);
     }
 
     /// <summary>
-    /// Verifies that a blank runtime-cache property uses the package default file name.
+    /// Verifies that a blank runtime-manifest property uses the package default file name.
     /// </summary>
     [Fact]
-    public void BuildRuntimeCacheFileName_ProjectDefinesWhitespace_UsesDefaultFileName()
+    public void BuildRuntimeManifestFileName_ProjectDefinesWhitespace_UsesDefaultFileName()
     {
         var build = new TestBuild
         {
-            UseDefaultBuildRuntimeCacheFileName = true,
-            RuntimeCacheFileNameFromMainProject = "  "
+            UseDefaultBuildRuntimeManifestFileName = true,
+            RuntimeManifestFileNameFromMainProject = "  "
         };
 
-        Assert.Equal("build-runtime.json", build.BuildRuntimeCacheFileName);
+        Assert.Equal("build-runtime.json", build.BuildRuntimeManifestFileName);
     }
 
     /// <summary>
@@ -491,7 +491,7 @@ public class PublishPipelineTests
     [Theory]
     [InlineData("SoftwareName")]
     [InlineData("SoftwareVersion")]
-    [InlineData("BuildRuntimeCacheFileName")]
+    [InlineData("BuildRuntimeManifestFileName")]
     public void ExecutePublish_UnsafePathComponent_ThrowsBeforeRestore(string propertyName)
     {
         var rootDirectory = Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}");
@@ -508,8 +508,8 @@ public class PublishPipelineTests
                 case "SoftwareVersion":
                     build.TestSoftwareVersion = "../outside";
                     break;
-                case "BuildRuntimeCacheFileName":
-                    build.TestBuildRuntimeCacheFileName = "../outside.json";
+                case "BuildRuntimeManifestFileName":
+                    build.TestBuildRuntimeManifestFileName = "../outside.json";
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(propertyName), propertyName, null);
@@ -1056,7 +1056,7 @@ public class PublishPipelineTests
             using var archive = ZipFile.OpenRead(archivePath);
             Assert.NotNull(archive.GetEntry("TestApp"));
             Assert.NotNull(archive.GetEntry("dependency.dll"));
-            Assert.NotNull(archive.GetEntry(build.TestBuildRuntimeCacheFileName));
+            Assert.NotNull(archive.GetEntry(build.TestBuildRuntimeManifestFileName));
         }
         finally
         {
@@ -1312,16 +1312,16 @@ public class PublishPipelineTests
     }
 
     /// <summary>
-    /// Verifies an existing non-SVG Linux icon is rejected before AppDir staging begins.
+    /// Verifies an existing unsupported Linux icon is rejected before AppDir staging begins.
     /// </summary>
     [Fact]
-    public void CreateLinuxAppDir_NonSvgIcon_ThrowsBeforeCreatingStaging()
+    public void CreateLinuxAppDir_UnsupportedIcon_ThrowsBeforeCreatingStaging()
     {
         var rootDirectory = Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}");
         var publishDirectory = CreateRawOutput(rootDirectory, "linux-x64");
         var stagingPath = Path.Combine(rootDirectory, "AppDir");
-        var iconPath = Path.Combine(rootDirectory, "source.png");
-        File.WriteAllText(iconPath, "not-svg");
+        var iconPath = Path.Combine(rootDirectory, "source.ico");
+        File.WriteAllText(iconPath, "unsupported-icon");
         var build = new TestBuild
         {
             TestLinuxIconFile = iconPath
@@ -1333,8 +1333,41 @@ public class PublishPipelineTests
             var exception = Assert.Throws<InvalidOperationException>(() => build.InvokeCreateLinuxAppDir(
                 CreateContext(build, "linux-x64", publishDirectory), (AbsolutePath)stagingPath));
 
-            Assert.Contains(".svg", exception.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains(".svg or .png", exception.Message, StringComparison.OrdinalIgnoreCase);
             Assert.False(Directory.Exists(stagingPath));
+        }
+        finally
+        {
+            Directory.Delete(rootDirectory, true);
+        }
+    }
+
+    /// <summary>
+    /// Verifies a PNG Linux icon is copied with its original extension.
+    /// </summary>
+    [Fact]
+    public void CreateLinuxAppDir_PngIcon_CopiesPngIcon()
+    {
+        var rootDirectory = Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}");
+        var publishDirectory = CreateRawOutput(rootDirectory, "linux-x64");
+        var stagingPath = Path.Combine(rootDirectory, "AppDir");
+        var iconPath = Path.Combine(rootDirectory, "source.png");
+        File.WriteAllText(iconPath, "png-icon");
+        var build = new TestBuild
+        {
+            TestLinuxIconFile = iconPath
+        };
+        ConfigureLinuxOptions(build, iconName: "configured-icon");
+
+        try
+        {
+            build.InvokeCreateLinuxAppDir(
+                CreateContext(build, "linux-x64", publishDirectory),
+                (AbsolutePath)stagingPath);
+
+            Assert.Equal("png-icon", File.ReadAllText(Path.Combine(stagingPath, "configured-icon.png")));
+            Assert.Equal("png-icon", File.ReadAllText(Path.Combine(
+                stagingPath, "usr", "share", "icons", "hicolor", "256x256", "apps", "configured-icon.png")));
         }
         finally
         {
@@ -2936,7 +2969,7 @@ public class PublishPipelineTests
 
         internal List<string> RestoredRuntimeIdentifiers { get; } = [];
 
-        internal string TestBuildRuntimeCacheFileName { get; set; } = "runtime.json";
+        internal string TestBuildRuntimeManifestFileName { get; set; } = "runtime.json";
 
         internal string TestSoftwareName { get; set; } = "TestApp";
 
@@ -2956,9 +2989,9 @@ public class PublishPipelineTests
 
         internal string CapturedSingleFileTargetsPath { get; private set; } = string.Empty;
 
-        internal bool UseDefaultBuildRuntimeCacheFileName { get; set; }
+        internal bool UseDefaultBuildRuntimeManifestFileName { get; set; }
 
-        internal string? RuntimeCacheFileNameFromMainProject { get; set; }
+        internal string? RuntimeManifestFileNameFromMainProject { get; set; }
 
         internal bool UseTargetPipeline { get; set; }
 
@@ -3074,8 +3107,10 @@ public class PublishPipelineTests
 
         public override string SoftwareVersion => TestSoftwareVersion;
 
-        public override string BuildRuntimeCacheFileName =>
-            UseDefaultBuildRuntimeCacheFileName ? base.BuildRuntimeCacheFileName : TestBuildRuntimeCacheFileName;
+        public override string BuildRuntimeManifestFileName =>
+            UseDefaultBuildRuntimeManifestFileName
+                ? base.BuildRuntimeManifestFileName
+                : TestBuildRuntimeManifestFileName;
 
         public override Project MainProject => TestMainProject ?? base.MainProject;
 
@@ -3091,12 +3126,6 @@ public class PublishPipelineTests
 
         public override AbsolutePath ReleaseNotesFile => TestReleaseNotesFile;
 
-        protected override bool IsUnixHost => TestUnixHost;
-
-        protected override bool IsMacOSHost => TestMacOSHost;
-
-        protected override bool IsLinuxHost => TestLinuxHost;
-
         protected override bool IsFuseAvailable => TestFuseAvailable;
 
         protected override Architecture HostArchitecture => TestHostArchitecture;
@@ -3104,11 +3133,6 @@ public class PublishPipelineTests
         protected override AbsolutePath AppImageToolCacheDirectory => TestAppImageToolCacheDirectory;
 
         protected override AbsolutePath AppImageStagingDirectory => TestAppImageStagingDirectory;
-
-        protected override string? GetBuildRuntimeCacheFileName()
-        {
-            return RuntimeCacheFileNameFromMainProject;
-        }
 
         protected override string? GetMainProjectProperty(string propertyName)
         {
@@ -3484,7 +3508,7 @@ public class PublishPipelineTests
             InstallerSourcePaths.Add(sourcePath);
 
             using var manifest = JsonDocument.Parse(
-                File.ReadAllText(Path.Combine(sourcePath, TestBuildRuntimeCacheFileName)));
+                File.ReadAllText(Path.Combine(sourcePath, TestBuildRuntimeManifestFileName)));
             Assert.Equal(context.RuntimeIdentifier, manifest.RootElement.GetProperty("Runtime").GetString());
             Assert.True(manifest.RootElement.GetProperty("IsBundle").GetBoolean());
             Assert.Equal(nameof(ApplicationPackagingType.WindowsInstaller),

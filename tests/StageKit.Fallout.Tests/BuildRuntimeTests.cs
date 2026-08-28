@@ -23,6 +23,7 @@ public class BuildRuntimeTests
         Assert.Equal("2.3.4", runtime.BuildVersion);
         Assert.True(runtime.IsBundle);
         Assert.Equal(ApplicationPackagingType.LinuxAppImage, runtime.PackagingType);
+        Assert.Equal(1, runtime.SchemaVersion);
         Assert.InRange(runtime.BuildDateTimeUtc, before, DateTime.UtcNow);
         Assert.False(string.IsNullOrWhiteSpace(runtime.BuildOSDescription));
     }
@@ -38,6 +39,7 @@ public class BuildRuntimeTests
 
         var json = JsonSerializer.Serialize(runtime);
 
+        Assert.Contains("\"SchemaVersion\":1", json, StringComparison.Ordinal);
         Assert.Contains($"\"PackagingType\":\"{nameof(ApplicationPackagingType.WindowsInstaller)}\"", json,
             StringComparison.Ordinal);
     }
