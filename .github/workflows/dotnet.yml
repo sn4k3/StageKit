@@ -28,18 +28,18 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
       - name: Cache NuGet packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ env.NUGET_PACKAGES }}
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets', 'NuGet.Config', 'global.json') }}
           restore-keys: |
             ${{ runner.os }}-nuget-
 
@@ -49,14 +49,20 @@ jobs:
       - name: Build
         run: dotnet build StageKit.slnx --configuration Release --no-restore
 
-      - name: Test net8.0
+      - name: Test StageKit
         run: >-
-          dotnet run --project StageKit.Tests/StageKit.Tests.csproj
-          --framework net8.0 --configuration Release --no-build --
+          dotnet run --project tests/StageKit.Tests/StageKit.Tests.csproj
+          --configuration Release --no-build --no-restore --
           -noLogo -noColor -parallel none -automated sync
 
-      - name: Test net10.0
+      - name: Test StageKit.Updatum
         run: >-
-          dotnet run --project StageKit.Tests/StageKit.Tests.csproj
-          --framework net10.0 --configuration Release --no-build --
+          dotnet run --project tests/StageKit.Updatum.Tests/StageKit.Updatum.Tests.csproj
+          --configuration Release --no-build --no-restore --
+          -noLogo -noColor -parallel none -automated sync
+
+      - name: Test StageKit.Fallout
+        run: >-
+          dotnet run --project tests/StageKit.Fallout.Tests/StageKit.Fallout.Tests.csproj
+          --framework net10.0 --configuration Release --no-build --no-restore --
           -noLogo -noColor -parallel none -automated sync

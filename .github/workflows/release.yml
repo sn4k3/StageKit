@@ -25,14 +25,25 @@ jobs:
       contents: write
       packages: write
 
+    env:
+      NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
     steps:
       - name: Check out source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets', 'NuGet.Config', 'global.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
       - name: Restore dependencies
         run: dotnet restore StageKit.slnx -p:NuGetAudit=false
@@ -40,15 +51,21 @@ jobs:
       - name: Build
         run: dotnet build StageKit.slnx --configuration Release --no-restore
 
-      - name: Test net8.0
+      - name: Test StageKit
         run: >-
-          dotnet run --project StageKit.Tests/StageKit.Tests.csproj
-          --framework net8.0 --configuration Release --no-build --no-restore --
+          dotnet run --project tests/StageKit.Tests/StageKit.Tests.csproj
+          --configuration Release --no-build --no-restore --
           -noLogo -noColor -parallel none -automated sync
 
-      - name: Test net10.0
+      - name: Test StageKit.Updatum
         run: >-
-          dotnet run --project StageKit.Tests/StageKit.Tests.csproj
+          dotnet run --project tests/StageKit.Updatum.Tests/StageKit.Updatum.Tests.csproj
+          --configuration Release --no-build --no-restore --
+          -noLogo -noColor -parallel none -automated sync
+
+      - name: Test StageKit.Fallout
+        run: >-
+          dotnet run --project tests/StageKit.Fallout.Tests/StageKit.Fallout.Tests.csproj
           --framework net10.0 --configuration Release --no-build --no-restore --
           -noLogo -noColor -parallel none -automated sync
 
@@ -56,7 +73,7 @@ jobs:
         id: metadata
         shell: bash
         run: |
-          version="$(dotnet msbuild StageKit/StageKit.csproj -getProperty:Version | tail -n 1)"
+          version="$(dotnet msbuild src/StageKit/StageKit.csproj -getProperty:Version | tail -n 1)"
           if [[ -z "$version" || "$version" == "null" ]]; then
             echo "Unable to determine package version." >&2
             exit 1
@@ -69,24 +86,30 @@ jobs:
 
       - name: Pack StageKit.Primitives
         run: >-
-          dotnet pack StageKit.Primitives/StageKit.Primitives.csproj
+          dotnet pack src/StageKit.Primitives/StageKit.Primitives.csproj
           --configuration Release --no-build --no-restore
           --output artifacts/packages
 
       - name: Pack StageKit.Runtime
         run: >-
-          dotnet pack StageKit.Runtime/StageKit.Runtime.csproj
+          dotnet pack src/StageKit.Runtime/StageKit.Runtime.csproj
+          --configuration Release --no-build --no-restore
+          --output artifacts/packages
+
+      - name: Pack StageKit.Updatum
+        run: >-
+          dotnet pack src/StageKit.Updatum/StageKit.Updatum.csproj
           --configuration Release --no-build --no-restore
           --output artifacts/packages
 
       - name: Pack StageKit
         run: >-
-          dotnet pack StageKit/StageKit.csproj
+          dotnet pack src/StageKit/StageKit.csproj
           --configuration Release --no-build --no-restore
           --output artifacts/packages
 
       - name: Upload packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nuget-packages
           path: artifacts/packages/*.nupkg
