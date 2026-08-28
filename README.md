@@ -10,7 +10,7 @@
 
 StageKit is a lightweight .NET application infrastructure library for JSON settings files, observable settings objects, crash report capture, application runtime metadata, and unhandled exception handling.
 
-The repository also includes smaller packages for reusable building blocks: `StageKit.Primitives` for low-level primitives and `StageKit.Runtime` for entry-application/runtime inspection helpers.
+The repository also includes smaller packages for reusable building blocks: `StageKit.Primitives` for low-level primitives, `StageKit.Runtime` for entry-application/runtime inspection helpers, and `StageKit.Updatum` for GitHub release updates.
 
 ## Features
 
@@ -31,6 +31,7 @@ The repository also includes smaller packages for reusable building blocks: `Sta
 - Configurable profile, config, and log paths
 - Portable profile path parsing with `ApplicationKit.IsPortable` state
 - Small application "birthday" helpers for version/about screens
+- GitHub release discovery, secure asset downloads, and staged cross-platform application updates
 
 ## Install
 
@@ -50,6 +51,12 @@ For only runtime and entry-application helpers:
 dotnet add package StageKit.Runtime
 ```
 
+For GitHub release discovery and application updates:
+
+```bash
+dotnet add package StageKit.Updatum
+```
+
 ## Requirements
 
 - .NET 8 or newer
@@ -60,6 +67,33 @@ dotnet add package StageKit.Runtime
 - `StageKit` - application infrastructure: settings, crash reports, retention, backups, support bundles, single-instance guards, and app metadata.
 - `StageKit.Primitives` - dependency-light primitives: `SafeFile`, `SafeFileStream`, `PathUtilities`, `TemporaryDirectory`, `TemporaryFile`, `DisposableObject`, `LeaveOpenDisposableObject`, and `GCSafeHandle`.
 - `StageKit.Runtime` - entry-application and runtime helpers: assembly metadata, process paths, bundle detection, relaunch utilities, and combined diagnostics through `RuntimeDiagnostics`.
+- `StageKit.Updatum` - GitHub release discovery, optional SHA-256 and platform-signature verification, download progress, and staged Windows/Linux/macOS update installation.
+
+## Application Updates
+
+Use `StageKit.Updatum` to select a compatible GitHub release asset, download it into an isolated temporary workspace, and start a staged update:
+
+```csharp
+using StageKit.Updatum;
+
+using var updater = new UpdatumManager("owner", "repository")
+{
+    AssetRegexPattern = "win-x64",
+    AssetExtensionFilter = ".zip",
+    RequireAssetChecksum = true
+};
+
+if (await updater.CheckForUpdatesAsync(cancellationToken))
+{
+    var download = await updater.DownloadUpdateAsync(cancellationToken);
+    if (download is not null)
+    {
+        await updater.InstallUpdateAsync(download, true, null, cancellationToken);
+    }
+}
+```
+
+For checksum verification, publish a sidecar asset named exactly `<asset-name>.sha256`. Configure `AssetSignatureVerifier` when the application must also enforce a platform-specific trust policy such as Authenticode or macOS code signing. See the `StageKit.Updatum` package README for installation behavior and security details.
 
 ## Quick Start
 
@@ -479,7 +513,7 @@ using StageKit.Runtime;
 
 Console.WriteLine(EntryApplication.AssemblyTitle);
 Console.WriteLine(EntryApplication.ExecutablePath);
-Console.WriteLine(EntryApplication.BundleType);
+Console.WriteLine(EntryApplication.PackagingType);
 Console.WriteLine(RuntimeDiagnostics.GetReport());
 ```
 

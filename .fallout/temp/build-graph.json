@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "falloutVersion": "10.4.0.15",
+  "targets": [
+    {
+      "name": "Clean",
+      "description": null,
+      "declaredIn": "StageKitBuild",
+      "default": false,
+      "listed": true,
+      "dependsOn": [],
+      "after": [],
+      "triggeredBy": [],
+      "triggers": []
+    },
+    {
+      "name": "Compile",
+      "description": null,
+      "declaredIn": "StageKitBuild",
+      "default": true,
+      "listed": true,
+      "dependsOn": [
+        "Restore"
+      ],
+      "after": [],
+      "triggeredBy": [],
+      "triggers": []
+    },
+    {
+      "name": "Print",
+      "description": null,
+      "declaredIn": "StageKitBuild",
+      "default": false,
+      "listed": true,
+      "dependsOn": [],
+      "after": [],
+      "triggeredBy": [],
+      "triggers": []
+    },
+    {
+      "name": "Publish",
+      "description": null,
+      "declaredIn": "StageKitBuild",
+      "default": false,
+      "listed": true,
+      "dependsOn": [
+        "Restore"
+      ],
+      "after": [],
+      "triggeredBy": [],
+      "triggers": []
+    },
+    {
+      "name": "Restore",
+      "description": null,
+      "declaredIn": "StageKitBuild",
+      "default": false,
+      "listed": true,
+      "dependsOn": [],
+      "after": [
+        "Clean"
+      ],
+      "triggeredBy": [],
+      "triggers": []
+    },
+    {
+      "name": "Run",
+      "description": null,
+      "declaredIn": "StageKitBuild",
+      "default": false,
+      "listed": true,
+      "dependsOn": [
+        "Compile"
+      ],
+      "after": [],
+      "triggeredBy": [],
+      "triggers": []
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <GenerateDocumentationFile>True</GenerateDocumentationFile>
+
+        <Version>1.0.0</Version>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.400" PrivateAssets="All"/>
+        <PackageReference Include="Fallout.Common" Version="10.4.0"/>
+        <PackageReference Include="Fallout.Utilities" Version="10.4.0"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="StageKit.Fallout.Tests, PublicKey=0024000004800000940000000602000000240000525341310004000001000100D15F1E7E8EAD128DB7121831D28CD2A046D0C460993B46E54D32752E49678D916D823174DB6FE17AD9A2A6E79E421DE69DAD83C3744D7A16C7DCF1565951F41E22278C003F64E433BB202D405999AC90F98C187CC1D2C2F91D152777D0683086F382503E59E2408AC9A23114D156FD100F333AE7A7A092484F43C77413ECFDB8"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\StageKit.Primitives\StageKit.Primitives.csproj"/>
+        <ProjectReference Include="..\StageKit.Runtime\StageKit.Runtime.csproj"/>
+    </ItemGroup>
+
+</Project>

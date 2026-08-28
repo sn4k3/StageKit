@@ -1,3 +1,12 @@
+# Unreleased
+
+- Integrate `StageKit.Updatum` for GitHub release discovery, verified downloads, and cross-platform application updates.
+- Serialize updater operations and keep `State`/`IsBusy` active until asynchronous work actually completes.
+- Use isolated temporary workspaces, reject unsafe release-asset names, and support SHA-256 sidecars plus application-provided platform signature verification.
+- Make portable and single-file update scripts stage replacements and restore backups when commit fails.
+- Honor install cancellation, `forceTerminate`, and no-relaunch behavior consistently, including bounded Flatpak installation that kills timed-out child processes.
+- Dispatch updater property notifications through the configured synchronization context and add a dedicated Updatum regression test suite.
+
 # v0.2.6 (24/08/2026)
 
 - Fix single-file detection for publish configurations that extract assemblies to a temporary directory, plus Flatpak
@@ -5,7 +14,7 @@
 
 # v0.2.5 (24/08/2026)
 
-- Add `WindowsInstaller` to `ApplicationBundleType`
+- Add `WindowsInstaller` to `ApplicationPackagingType`.
 - Fix single-file and Flatpak executable-path detection.
 - Harden archive path normalization and reparse-point containment checks.
 - Add `UnmanagedDisposableObject` for types requiring finalizer fallback.

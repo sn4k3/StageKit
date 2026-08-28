@@ -94,7 +94,7 @@ Storage helpers in `StageKit` include `ApplicationBackup`, `SupportBundleExporte
 
 `StageKit.Primitives` contains `DisposableObject`, `LeaveOpenDisposableObject`, `GCSafeHandle`, `SafeFile`, `SafeFileStream`, `PathUtilities`, `TemporaryDirectory`, and `TemporaryFile`. Keep this package dependency-light and suitable for reuse by other libraries. IO-related files may live under the `IO/` folder, but their public namespace should remain `StageKit.Primitives` unless the IO surface becomes large enough to justify a separate namespace.
 
-`StageKit.Runtime` contains `EntryApplication`, `ApplicationBundleType`, and `RuntimeDiagnostics`. Keep this package focused on runtime, process, entry assembly, bundle detection, relaunch, and diagnostics helpers.
+`StageKit.Runtime` contains `EntryApplication`, `ApplicationPackagingType`, and `RuntimeDiagnostics`. Keep this package focused on runtime, process, entry assembly, packaging detection, relaunch, and diagnostics helpers.
 
 `ApplicationInstanceGuard` is a direct named-mutex single-instance helper. Dispose can run on any thread: it closes the mutex handle (instead of calling thread-affine `ReleaseMutex`). If still owned, the OS marks the mutex abandoned and the next `Acquire` treats `AbandonedMutexException` as primary. It intentionally has no IPC or activation forwarding yet.
 
