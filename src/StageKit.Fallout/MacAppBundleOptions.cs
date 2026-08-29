@@ -25,7 +25,7 @@ public class MacAppBundleOptions
         BundleIdentifier = build.SoftwareRDNS;
         Version = build.SoftwareVersion;
         Copyright = build.SoftwareCopyright;
-        ExecutableName = build.SoftwareName;
+        ExecutableName = build.SoftwareExecutableFileNameWithoutExtension;
     }
 
     /// <summary>

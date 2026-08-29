@@ -4,6 +4,7 @@ using Fallout.Common.Tools.DotNet;
 using Fallout.Solutions;
 using Serilog;
 using StageKit.Primitives;
+using StageKit.Primitives.System;
 using StageKit.Runtime;
 using static Fallout.Common.Tools.DotNet.DotNetTasks;
 
@@ -15,13 +16,8 @@ public partial class StageKitBuild
     /// Gets the application packaging types selected for publishing.
     /// </summary>
     [Parameter(
-        "The application packaging types to create when publishing. Default: Portable, WindowsInstaller, MacOSAppBundle, LinuxAppImage")]
-    public ApplicationPackagingType PublishBundles { get; protected set; } =
-        ApplicationPackagingType.Portable |
-        //ApplicationPackagingType.DotNetSingleFile |
-        ApplicationPackagingType.WindowsInstaller |
-        ApplicationPackagingType.MacOSAppBundle |
-        ApplicationPackagingType.LinuxAppImage;
+        "The application packaging types to create when publishing. Default: Portable")]
+    public ApplicationPackagingType PublishBundles { get; protected set; } = ApplicationPackagingType.Portable;
 
     /// <summary>
     /// Gets the file extensions removed directly from the publish directory after successful publishing.
@@ -88,6 +84,21 @@ public partial class StageKitBuild
         .DependsOn(Restore)
         .DependsOn(DependOnTargets)
         .Executes(ExecutePublish);
+
+    /// <summary>
+    /// Gets a value indicating whether the current host supports Unix application staging.
+    /// </summary>
+    protected virtual bool IsUnixHost => !OperatingSystem.IsWindows();
+
+    /// <summary>
+    /// Gets a value indicating whether the current host supports macOS code signing.
+    /// </summary>
+    protected virtual bool IsMacOSHost => OperatingSystem.IsMacOS();
+
+    /// <summary>
+    /// Gets a value indicating whether the current host supports AppImage creation.
+    /// </summary>
+    protected virtual bool IsLinuxHost => OperatingSystem.IsLinux();
 
     /// <summary>
     /// Gets the parent directory for temporary non-single-file bundle payloads.
@@ -162,18 +173,15 @@ public partial class StageKitBuild
     /// <param name="context">The runtime publish context.</param>
     protected virtual void PreparePublishedOutput(PublishRidContext context)
     {
-        var executablePath = context.PublishPath / SoftwareName;
-        if (!OperatingSystem.IsWindows() &&
-            !context.RuntimeIdentifier.StartsWith("win-", StringComparison.OrdinalIgnoreCase))
+        var runtime = PublishRid.ParseRuntimeIdentifier(context.RuntimeIdentifier);
+        if (runtime.Family is not PublishRidFamily.Windows)
         {
+            var executablePath = context.PublishPath / GetPublishedExecutableName(context.RuntimeIdentifier);
             if (!executablePath.FileExists())
                 throw new FileNotFoundException($"Published executable '{executablePath}' does not exist.",
                     executablePath);
 
-            File.SetUnixFileMode(executablePath,
-                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
-                UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
-                UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+            UnixSystem.SetUnix755Executable(executablePath);
         }
 
         if (!PublishBundles.HasFlag(ApplicationPackagingType.DotNetSingleFile))
@@ -230,6 +238,8 @@ public partial class StageKitBuild
     {
         var runtimeIdentifiers = PublishRid.ValidateRuntimeIdentifiers(RIds);
         var softwareName = FileUtilities.ValidatePathLeafName(SoftwareName, nameof(SoftwareName));
+        _ = FileUtilities.ValidatePathLeafName(SoftwareExecutableFileNameWithoutExtension,
+            nameof(SoftwareExecutableFileNameWithoutExtension));
         var softwareVersion = FileUtilities.ValidatePathLeafName(SoftwareVersion, nameof(SoftwareVersion));
         _ = FileUtilities.ValidatePathLeafName(BuildRuntimeManifestFileName, nameof(BuildRuntimeManifestFileName));
         var publishDirectory = PublishDirectory;
@@ -263,6 +273,14 @@ public partial class StageKitBuild
 
         DeletePublishFilesByExtension(publishDirectory);
         CleanupPublishTemporaryDirectories();
+    }
+
+    private string GetPublishedExecutableName(string runtimeIdentifier)
+    {
+        var runtime = PublishRid.ParseRuntimeIdentifier(runtimeIdentifier);
+        return runtime.Family is PublishRidFamily.Windows
+            ? $"{SoftwareExecutableFileNameWithoutExtension}.exe"
+            : SoftwareExecutableFileNameWithoutExtension;
     }
 
     /// <summary>
@@ -357,7 +375,7 @@ public partial class StageKitBuild
                 {
                     var runtime = PublishRid.ParseRuntimeIdentifier(context.RuntimeIdentifier);
                     if (ShouldCreatePortableZip(context.RuntimeIdentifier) ||
-                        !EnvironmentInfo.IsUnix ||
+                        !IsUnixHost ||
                         PublishMultiArch)
                     {
                         CreatePortableZip(context);

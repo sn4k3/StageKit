@@ -2,7 +2,7 @@
 
 [![Logo](https://raw.githubusercontent.com/sn4k3/StageKit/main/media/StageKit_landscape.svg)](#)
 
-[![License](https://img.shields.io/github/license/sn4k3/StageKit?style=for-the-badge)](https://github.com/sn4k3/StageKit/blob/master/LICENSE)
+[![License](https://img.shields.io/github/license/sn4k3/StageKit?style=for-the-badge)](https://github.com/sn4k3/StageKit/blob/main/LICENSE)
 [![GitHub repo size](https://img.shields.io/github/repo-size/sn4k3/StageKit?style=for-the-badge)](#)
 [![Code size](https://img.shields.io/github/languages/code-size/sn4k3/StageKit?style=for-the-badge)](#)
 [![Nuget](https://img.shields.io/nuget/v/StageKit.Runtime?style=for-the-badge)](https://www.nuget.org/packages/StageKit.Runtime)
@@ -103,6 +103,10 @@ and let the process launcher handle quoting.
 - `LinuxAppImage`
 - `LinuxFlatpak`
 - `MacOSAppBundle`
+
+Runtime detection returns `Portable` when no supported bundle marker is found. `None` and `WindowsInstaller` are shared
+metadata values for build and update workflows; an application installed by a Windows installer normally reports
+`Portable` because the installer itself is not observable after launch.
 
 Convenience properties are also available:
 

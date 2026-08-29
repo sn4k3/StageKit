@@ -18,7 +18,7 @@
     </PropertyGroup>
 
     <PropertyGroup>
-        <DefineConstants>$(DefineConstants);ApplicationName=$(ApplicationName);BuildVersion=$(BuildVersion);Company=$(Company);Copyright=$(Copyright);RepositoryUrl=$(RepositoryUrl);ApplicationIcon=$(ApplicationIcon);LicenseFile=$(LicenseFile);UpgradeCode=$(UpgradeCode)</DefineConstants>
+        <DefineConstants>$(DefineConstants);ApplicationName=$(ApplicationName);ApplicationExecutableName=$(ApplicationExecutableName);BuildVersion=$(BuildVersion);Company=$(Company);Copyright=$(Copyright);RepositoryUrl=$(RepositoryUrl);ApplicationIcon=$(ApplicationIcon);LicenseFile=$(LicenseFile);UpgradeCode=$(UpgradeCode)</DefineConstants>
     </PropertyGroup>
 
     <ItemGroup>
@@ -31,6 +31,8 @@
                Text="PublishDirectory must be provided by the Fallout publish pipeline."/>
         <Error Condition="'$(ApplicationName)' == ''"
                Text="ApplicationName must be provided by the Fallout publish pipeline."/>
+        <Error Condition="'$(ApplicationExecutableName)' == ''"
+               Text="ApplicationExecutableName must be provided by the Fallout publish pipeline."/>
         <Error Condition="'$(BuildVersion)' == ''"
                Text="BuildVersion must be provided by the Fallout publish pipeline."/>
         <Error Condition="'$(RuntimeIdentifier)' == ''"
@@ -39,8 +41,8 @@
                Text="Platform must be x64 or arm64, but was '$(Platform)'."/>
         <Error Condition="!Exists('$(PublishDirectory)')"
                Text="PublishDirectory '$(PublishDirectory)' does not exist."/>
-        <Error Condition="!Exists('$(PublishDirectory)\$(ApplicationName).exe')"
-               Text="Application executable '$(PublishDirectory)\$(ApplicationName).exe' does not exist."/>
+        <Error Condition="!Exists('$(PublishDirectory)\$(ApplicationExecutableName).exe')"
+               Text="Application executable '$(PublishDirectory)\$(ApplicationExecutableName).exe' does not exist."/>
         <Error Condition="!Exists('$(ApplicationIcon)')"
                Text="Application icon '$(ApplicationIcon)' does not exist."/>
         <Error Condition="!Exists('$(LicenseFile)')"

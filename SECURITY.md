@@ -11,6 +11,7 @@ Package links:
 - [StageKit](https://www.nuget.org/packages/StageKit)
 - [StageKit.Primitives](https://www.nuget.org/packages/StageKit.Primitives)
 - [StageKit.Runtime](https://www.nuget.org/packages/StageKit.Runtime)
+- [StageKit.Updatum](https://www.nuget.org/packages/StageKit.Updatum)
 
 | Version | Supported          |
 | ------- | ------------------ |
@@ -68,7 +69,10 @@ We will:
 
 In scope:
 
-- Vulnerabilities in the `StageKit`, `StageKit.Primitives`, or `StageKit.Runtime` library source code (this repository), including settings persistence, crash report handling, exception logging, atomic file writes, file path handling, runtime diagnostics, and process relaunch behavior.
+- Vulnerabilities in the `StageKit`, `StageKit.Primitives`, `StageKit.Runtime`, or `StageKit.Updatum` library source code
+  (this repository), including settings persistence, crash report handling, exception logging, atomic file writes, file
+  path handling, runtime diagnostics, process relaunch behavior, update asset selection, and download verification.
+- Vulnerabilities in `StageKit.Fallout` that could compromise generated application artifacts.
 - Security issues in the NuGet package metadata, signing, or build pipeline (GitHub Actions workflows in this repository).
 
 Out of scope:

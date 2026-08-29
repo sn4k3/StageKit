@@ -15,13 +15,17 @@ Thank you for your interest in contributing! Everyone is welcome to contribute t
 
 ```powershell
 dotnet restore
-dotnet build .\StageKit.slnx -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true
-dotnet test .\StageKit.Tests\StageKit.Tests.csproj -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true
+dotnet build .\StageKit.slnx --configuration Release -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true
+dotnet run --project .\tests\StageKit.Tests\StageKit.Tests.csproj --framework net10.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none
+dotnet run --project .\tests\StageKit.Updatum.Tests\StageKit.Updatum.Tests.csproj --framework net10.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none
+dotnet run --project .\tests\StageKit.Fallout.Tests\StageKit.Fallout.Tests.csproj --framework net10.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none
 ```
 
-The library multi-targets `net8.0` and `net10.0`; the test project targets `net10.0` only.
+The libraries multi-target `net8.0` and `net10.0`; the test projects target `net10.0` only.
 
-Main packages are `StageKit`, `StageKit.Primitives`, and `StageKit.Runtime`. Keep package-specific README files updated when changing user-facing APIs in those packages.
+Published packages are `StageKit`, `StageKit.Primitives`, `StageKit.Runtime`, and `StageKit.Updatum`.
+`StageKit.Fallout` is the repository's build-pipeline library and is consumed through a project reference. Keep the
+corresponding package README updated whenever a user-facing API or workflow changes.
 
 ## Code Guidelines
 
@@ -36,7 +40,7 @@ Main packages are `StageKit`, `StageKit.Primitives`, and `StageKit.Runtime`. Kee
 - Keep code clean — avoid leaving large blocks of commented-out code unless essential
 - Factory methods are prefixed with `Create`; measurement/query methods are prefixed with `Get`
 - Extensions use C# 14's explicit extension block syntax where appropriate.
-- Prefer `ArgumentNullException.ThrowIfNull(...)` for null guard clauses.
+- Prefer `ArgumentNullException.ThrowIfNull(...)` and `ArgumentException.ThrowIfNullOrWhiteSpace(...)` for guard clauses.
 - Do not add new runtime dependencies unless the benefit is clear for a small infrastructure library.
 
 ## Commit Messages

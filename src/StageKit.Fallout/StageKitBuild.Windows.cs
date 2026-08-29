@@ -63,6 +63,9 @@ public partial class StageKitBuild
             return;
         }
 
+        Log.Information("Creating Windows installer bundle for {Rid} ({Platform})",
+            context.RuntimeIdentifier, platform);
+
         var stagingPath = PublishStagingDirectory / Guid.NewGuid().ToString("N");
         AbsolutePath? normalPublishPath = null;
         try
@@ -103,7 +106,27 @@ public partial class StageKitBuild
     protected virtual void BuildWindowsInstaller(Project project, PublishRidContext context,
         AbsolutePath sourcePath, string platform)
     {
-        DotNetBuild(settings => settings
+        DotNetBuild(settings => ConfigureWindowsInstallerBuildSettings(
+            settings, project, context, sourcePath, platform));
+    }
+
+    /// <summary>
+    /// Configures the build settings used for one installer project.
+    /// </summary>
+    /// <param name="settings">The settings to configure.</param>
+    /// <param name="project">The installer project.</param>
+    /// <param name="context">The runtime publish context.</param>
+    /// <param name="sourcePath">The staged installer payload.</param>
+    /// <param name="platform">The installer platform.</param>
+    /// <returns>The configured installer build settings.</returns>
+    protected virtual DotNetBuildSettings ConfigureWindowsInstallerBuildSettings(
+        DotNetBuildSettings settings,
+        Project project,
+        PublishRidContext context,
+        AbsolutePath sourcePath,
+        string platform)
+    {
+        return settings
             .SetProjectFile(project)
             .SetConfiguration(Configuration)
             .SetPlatform(platform)
@@ -112,7 +135,8 @@ public partial class StageKitBuild
             .SetProperty("PublishDirectory", sourcePath)
             .SetProperty("BuildVersion", SoftwareVersion)
             .SetProperty("ApplicationName", SoftwareName)
-            .SetProperty("OutputName", context.BundleOutputPath.Name));
+            .SetProperty("ApplicationExecutableName", SoftwareExecutableFileNameWithoutExtension)
+            .SetProperty("OutputName", context.BundleOutputPath.Name);
     }
 
     /// <summary>

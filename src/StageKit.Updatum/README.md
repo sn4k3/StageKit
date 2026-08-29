@@ -2,7 +2,7 @@
 
 [![Logo](https://raw.githubusercontent.com/sn4k3/StageKit/main/media/StageKit_landscape.svg)](#)
 
-[![License](https://img.shields.io/github/license/sn4k3/StageKit?style=for-the-badge)](https://github.com/sn4k3/StageKit/blob/master/LICENSE)
+[![License](https://img.shields.io/github/license/sn4k3/StageKit?style=for-the-badge)](https://github.com/sn4k3/StageKit/blob/main/LICENSE)
 [![GitHub repo size](https://img.shields.io/github/repo-size/sn4k3/StageKit?style=for-the-badge)](#)
 [![Code size](https://img.shields.io/github/languages/code-size/sn4k3/StageKit?style=for-the-badge)](#)
 [![Nuget](https://img.shields.io/nuget/v/StageKit.Updatum?style=for-the-badge)](https://www.nuget.org/packages/StageKit.Updatum)
@@ -129,6 +129,18 @@ no-relaunch settings.
 Call `SafeDeleteFile()` on a downloaded asset when installation is not attempted. It removes the downloaded file and its empty
 managed workspace on a best-effort basis.
 
+For single-file updates, the default `EntryApplicationName` strategy preserves the current executable name and updates a
+version embedded in that name when possible. Choose a custom or downloaded name when release assets use a different convention:
+
+```csharp
+updater.InstallUpdateSingleFileExecutableNameStrategy =
+    UpdatumSingleFileExecutableNameStrategy.CustomName;
+updater.InstallUpdateSingleFileExecutableName = "MyApp_v{0}";
+```
+
+`{0}` is replaced with the downloaded tag version. `CustomName` falls back to the current executable name and then the
+downloaded asset name; `DownloadName` always keeps the downloaded asset name.
+
 ## Download verification
 
 Downloads are placed in unique directories below the operating system temporary directory. Asset names containing path
@@ -199,8 +211,9 @@ updater.AssetRegexPattern = RuntimeInformation.RuntimeIdentifier.Replace("-", st
 
 ### Multiple assets with the same name but different extension
 
-For `MyApp_win-x64_v1.0.0.zip` (portable) and `MyApp_win-x64_v1.0.0.msi` (installer), use `AssetExtensionFilter`. If omitted, the
-first matching asset is used.
+For `MyApp_win-x64_v1.0.0.zip` (portable) and `MyApp_win-x64_v1.0.0.msi` (installer), use `AssetExtensionFilter`. If omitted,
+Updatum first applies its packaging-based extension preference and falls back to the first matching asset only when the
+preferred extension is unavailable.
 
 ```csharp
 if (IsPortableApp) updater.AssetExtensionFilter = "zip";

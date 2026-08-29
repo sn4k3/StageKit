@@ -2,7 +2,7 @@
 
 [![Logo](https://raw.githubusercontent.com/sn4k3/StageKit/main/media/StageKit_landscape.svg)](#)
 
-[![License](https://img.shields.io/github/license/sn4k3/StageKit?style=for-the-badge)](https://github.com/sn4k3/StageKit/blob/master/LICENSE)
+[![License](https://img.shields.io/github/license/sn4k3/StageKit?style=for-the-badge)](https://github.com/sn4k3/StageKit/blob/main/LICENSE)
 [![GitHub repo size](https://img.shields.io/github/repo-size/sn4k3/StageKit?style=for-the-badge)](#)
 [![Code size](https://img.shields.io/github/languages/code-size/sn4k3/StageKit?style=for-the-badge)](#)
 [![Nuget](https://img.shields.io/nuget/v/StageKit.Primitives?style=for-the-badge)](https://www.nuget.org/packages/StageKit.Primitives)
@@ -18,8 +18,9 @@ All public helpers are exposed from the `StageKit.Primitives` namespace. IO-rela
 
 - Atomic file writes with temporary-file replacement through `SafeFile`
 - Stream-based atomic file writes through `SafeFileStream`
-- Path, temporary file, and temporary directory helpers
+- Path, leaf-name validation, temporary file, and temporary directory helpers
 - Bash ANSI-C and Windows batch value quoting helpers through `StringExtensions`
+- Host-aware path comparison and Unix executable-permission helpers
 - Disposable base type with thread-safe idempotent disposal through `DisposableObject`
 - Finalizable disposable base type through `UnmanagedDisposableObject`
 - Leave-open lifecycle base type through `LeaveOpenDisposableObject`
@@ -114,6 +115,20 @@ if (!PathUtilities.IsSubPathOf(candidatePath, rootPath))
 var entryName = PathUtilities.NormalizeArchiveEntryName(relativePath);
 ```
 
+Use `FileUtilities` when a value must be one simple file or directory name rather than a rooted or nested path:
+
+```csharp
+if (!FileUtilities.IsPathLeafName(assetName))
+{
+    throw new InvalidOperationException("The asset name is invalid.");
+}
+
+var validatedName = FileUtilities.ValidatePathLeafName(assetName, nameof(assetName));
+```
+
+`ValidatePathLeafName(...)` returns the validated value and throws `InvalidOperationException` for blank names, rooted
+paths, path separators, `.`/`..`, or characters rejected by `Path.GetInvalidFileNameChars()`.
+
 Use `StringExtensions` when generating shell scripts:
 
 ```csharp
@@ -138,6 +153,24 @@ using var file = new TemporaryFile(extension: "json");
 await File.WriteAllTextAsync(file.FilePath, json);
 
 file.Keep();
+```
+
+## System Helpers
+
+`HostSystem.HostStringComparison` provides the comparison StageKit uses for file-system paths: ordinal,
+case-insensitive comparison on Windows and ordinal comparison elsewhere.
+
+```csharp
+using StageKit.Primitives.System;
+
+bool samePath = string.Equals(leftPath, rightPath, HostSystem.HostStringComparison);
+```
+
+Use `UnixSystem.SetUnix755Executable(...)` to grant owner write/execute and group/other execute permissions to a Unix
+launcher. The method is a no-op on Windows.
+
+```csharp
+UnixSystem.SetUnix755Executable(scriptPath);
 ```
 
 ## DisposableObject

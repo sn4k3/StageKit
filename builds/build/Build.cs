@@ -1,5 +1,7 @@
+using Fallout.Solutions;
 using Serilog;
 using StageKit.Fallout;
+using StageKit.Runtime;
 
 internal class Build : StageKitBuild
 {
@@ -11,12 +13,20 @@ internal class Build : StageKitBuild
 
         // In this case, remove these tokens to MainProject to detect
         ExcludedProjectNameTokens.Remove("demo");
+
+        // Set default publish bundles to
+        PublishBundles = ApplicationPackagingType.Portable
+                         | ApplicationPackagingType.WindowsInstaller
+                         | ApplicationPackagingType.LinuxAppImage
+                         | ApplicationPackagingType.MacOSAppBundle;
     }
 
     /// <summary>
-    /// Gets the FakeApp product name, which differs from the solution name.
+    /// Gets the product name, which differs from the solution name.
     /// </summary>
-    public override string SoftwareName => MainProject.Name;
+    public override string SoftwareName => SolutionName;
+
+    public override Project MainProject => Solution.AllProjects.First(project => project.Name == "StageKit.Demo");
 
     /// <inheritdoc />
     protected override LinuxAppBundleOptions CreateLinuxAppBundleOptions()
@@ -29,7 +39,7 @@ internal class Build : StageKitBuild
                                               echo '  \__ \/ __/ __ `/ __ `/ _ \/ ,<  / / __/'
                                               echo ' ___/ / /_/ /_/ / /_/ /  __/ /| |/ / /_'
                                               echo '/____/\__/\__,_/\__, /\___/_/ |_/_/\__/' 
-                                                          /____/'
+                                              echo '               /____/'
                                                     
                                                echo "
                                             --------------------------------------------------------------------------
@@ -57,7 +67,7 @@ internal class Build : StageKitBuild
         return options;
     }
 
-    public new static int Main()
+    public static int Main()
     {
         return Execute<Build>(x => x.Compile);
     }

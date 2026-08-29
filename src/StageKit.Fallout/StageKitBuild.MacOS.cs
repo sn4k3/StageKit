@@ -1,5 +1,4 @@
-﻿using Fallout.Common;
-using Fallout.Common.IO;
+﻿using Fallout.Common.IO;
 using Fallout.Common.Tooling;
 using Serilog;
 using StageKit.Primitives;
@@ -29,7 +28,7 @@ public partial class StageKitBuild
         if (macContexts.Length == 0)
             return;
 
-        if (!EnvironmentInfo.IsUnix)
+        if (!IsUnixHost)
         {
             WarnMacOSAppsUnsupportedHost();
             return;
@@ -104,6 +103,9 @@ public partial class StageKitBuild
     /// <param name="context">The macOS runtime publish context.</param>
     protected virtual void CreateMacOSApp(PublishRidContext context)
     {
+        Log.Information("Creating and compressing macOS application bundle for {Rid}",
+            context.RuntimeIdentifier);
+
         var stagingPath = PublishStagingDirectory / Guid.NewGuid().ToString("N");
         var archivePath = (AbsolutePath)$"{context.BundleOutputPath}.zip";
 
@@ -118,7 +120,7 @@ public partial class StageKitBuild
                 new BuildRuntime(context.RuntimeIdentifier, SoftwareVersion, true,
                     ApplicationPackagingType.MacOSAppBundle));
 
-            if (OperatingSystem.IsMacOS())
+            if (IsMacOSHost)
                 SignMacOSApp(appPath);
 
             archivePath.DeleteFile();
@@ -138,6 +140,10 @@ public partial class StageKitBuild
     protected virtual void CreateMultiArchMacOSApp(PublishRidContext x64Context,
         PublishRidContext arm64Context)
     {
+        Log.Information(
+            "Creating and compressing multi-architecture macOS application bundle for {X64Rid} and {Arm64Rid}",
+            x64Context.RuntimeIdentifier, arm64Context.RuntimeIdentifier);
+
         var stagingPath = PublishStagingDirectory / Guid.NewGuid().ToString("N");
         var archivePath = (AbsolutePath)$"{GetMultiArchMacOSBundleOutputPath(x64Context)}.zip";
 
@@ -172,7 +178,7 @@ public partial class StageKitBuild
                 MacAppBundle.GetMultiArchEntryScript(options).ReplaceLineEndings("\n"));
             UnixSystem.SetUnix755Executable(launcherPath);
 
-            if (OperatingSystem.IsMacOS())
+            if (IsMacOSHost)
                 SignMacOSApp(appPath);
 
             archivePath.DeleteFile();

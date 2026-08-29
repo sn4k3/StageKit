@@ -8,7 +8,7 @@ Library projects multi-target `net8.0` and `net10.0` (see `Directory.Build.props
 
 ```powershell
 dotnet restore
-dotnet build .\StageKit.slnx -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true
+dotnet build .\StageKit.slnx --configuration Release -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true
 dotnet test .\tests\StageKit.Tests\StageKit.Tests.csproj -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true
 ```
 

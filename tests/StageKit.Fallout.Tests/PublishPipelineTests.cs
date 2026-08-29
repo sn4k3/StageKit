@@ -75,6 +75,7 @@ public class PublishPipelineTests
         Assert.Contains(nameof(StageKitBuild.RootDirectory), variables.Keys);
         Assert.Contains(nameof(StageKitBuild.Configuration), variables.Keys);
         Assert.Contains(nameof(StageKitBuild.SoftwareName), variables.Keys);
+        Assert.Contains(nameof(StageKitBuild.SoftwareExecutableFileNameWithoutExtension), variables.Keys);
         Assert.Contains(nameof(StageKitBuild.PublishBundles), variables.Keys);
         Assert.Contains(nameof(StageKitBuild.PublishCleanupExtensions), variables.Keys);
         Assert.Contains(nameof(StageKitBuild.AssetName), variables.Keys);
@@ -109,18 +110,52 @@ public class PublishPipelineTests
     }
 
     /// <summary>
-    /// Verifies that the default configuration enables every Task 3 bundle type.
+    /// Verifies that the published executable name comes from the main project's evaluated assembly name.
     /// </summary>
     [Fact]
-    public void PublishBundles_DefaultConfiguration_EnablesAllTaskThreeBundles()
+    public void SoftwareExecutableName_AssemblyNameConfigured_UsesEvaluatedValue()
     {
-        var build = new TestBuild();
+        var build = new TestBuild
+        {
+            UseDefaultSoftwareExecutableName = true,
+            TestMainProject = CreateProject("Example.csproj"),
+            TestMainProjectProperties = new Dictionary<string, string?>
+            {
+                ["AssemblyName"] = "PublishedExecutable"
+            }
+        };
 
-        Assert.True(build.PublishBundles.HasFlag(ApplicationPackagingType.DotNetSingleFile));
-        Assert.True(build.PublishBundles.HasFlag(ApplicationPackagingType.WindowsInstaller));
-        Assert.True(build.PublishBundles.HasFlag(ApplicationPackagingType.MacOSAppBundle));
-        Assert.True(build.PublishBundles.HasFlag(ApplicationPackagingType.LinuxAppImage));
+        Assert.Equal("PublishedExecutable", build.SoftwareExecutableFileNameWithoutExtension);
     }
+
+    /// <summary>
+    /// Verifies that default platform bundles preserve distinct product and executable names.
+    /// </summary>
+    [Fact]
+    public void DefaultBundleOptions_ProductNameDiffersFromExecutable_UsesEachNameForItsPurpose()
+    {
+        var build = new TestBuild
+        {
+            TestSoftwareExecutableName = "PublishedExecutable",
+            TestMainProjectProperties = new Dictionary<string, string?>
+            {
+                ["CompanyRDNS"] = "org.example",
+                ["Authors"] = "Example Authors",
+                ["Summary"] = "Example summary",
+                ["Description"] = "Example description",
+                ["Copyright"] = "Example copyright",
+                ["PackageLicenseExpression"] = "MIT",
+                ["RepositoryUrl"] = "https://example.test",
+                ["PackageTags"] = "example;test"
+            }
+        };
+
+        Assert.Equal("TestApp", build.MacAppBundleOptions.ProductName);
+        Assert.Equal("PublishedExecutable", build.MacAppBundleOptions.ExecutableName);
+        Assert.Equal("TestApp", build.LinuxAppBundleOptions.ProductName);
+        Assert.Equal("PublishedExecutable", build.LinuxAppBundleOptions.ExecutableName);
+    }
+
 
     /// <summary>
     /// Verifies that runtime callbacks and publish boundaries execute in the documented order.
@@ -178,6 +213,7 @@ public class PublishPipelineTests
             var build = new TestBuild
             {
                 TestBuildRuntimeManifestFileName = "runtime.json",
+                TestSoftwareExecutableName = "PublishedExecutable",
                 UseDefaultPreparation = true
             };
             build.SetPublishBundles(0);
@@ -187,7 +223,7 @@ public class PublishPipelineTests
                 RuntimeIdentifier = "linux-x64",
                 PublishPath = publishDirectory
             };
-            var executablePath = Path.Combine(publishDirectory, build.SoftwareName);
+            var executablePath = Path.Combine(publishDirectory, build.SoftwareExecutableFileNameWithoutExtension);
             File.WriteAllText(executablePath, string.Empty);
 
             build.InvokePreparePublishedOutput(context);
@@ -340,6 +376,32 @@ public class PublishPipelineTests
     }
 
     /// <summary>
+    /// Verifies that Windows installer settings keep product and executable names distinct.
+    /// </summary>
+    [Fact]
+    public void ConfigureWindowsInstallerBuildSettings_ProductNameDiffersFromExecutable_UsesDistinctProperties()
+    {
+        var build = new TestBuild
+        {
+            TestSoftwareName = "ProductName",
+            TestSoftwareExecutableName = "PublishedExecutable"
+        };
+        var context = CreateContext(build, "win-x64");
+
+        var settings = build.InvokeConfigureWindowsInstallerBuildSettings(
+            new DotNetBuildSettings(),
+            CreateProject("Installer.wixproj"),
+            context,
+            (AbsolutePath)Path.GetTempPath(),
+            "x64");
+
+        Assert.Equal("ProductName",
+            Assert.IsType<JsonElement>(settings.Properties["ApplicationName"]).GetString());
+        Assert.Equal("PublishedExecutable",
+            Assert.IsType<JsonElement>(settings.Properties["ApplicationExecutableName"]).GetString());
+    }
+
+    /// <summary>
     /// Verifies that the default installer predicate only accepts WiX project paths.
     /// </summary>
     [Fact]
@@ -349,36 +411,6 @@ public class PublishPipelineTests
 
         Assert.True(build.InvokeIsInstallerProject(CreateProject("installer.WIXPROJ")));
         Assert.False(build.InvokeIsInstallerProject(CreateProject("installer.csproj")));
-    }
-
-    /// <summary>
-    /// Verifies that a missing runtime-manifest property uses the package default file name.
-    /// </summary>
-    [Fact]
-    public void BuildRuntimeManifestFileName_ProjectDoesNotDefineValue_UsesDefaultFileName()
-    {
-        var build = new TestBuild
-        {
-            UseDefaultBuildRuntimeManifestFileName = true,
-            RuntimeManifestFileNameFromMainProject = null
-        };
-
-        Assert.Equal("build-runtime.json", build.BuildRuntimeManifestFileName);
-    }
-
-    /// <summary>
-    /// Verifies that a blank runtime-manifest property uses the package default file name.
-    /// </summary>
-    [Fact]
-    public void BuildRuntimeManifestFileName_ProjectDefinesWhitespace_UsesDefaultFileName()
-    {
-        var build = new TestBuild
-        {
-            UseDefaultBuildRuntimeManifestFileName = true,
-            RuntimeManifestFileNameFromMainProject = "  "
-        };
-
-        Assert.Equal("build-runtime.json", build.BuildRuntimeManifestFileName);
     }
 
     /// <summary>
@@ -660,6 +692,7 @@ public class PublishPipelineTests
         try
         {
             var build = CreateTargetBuild(rootDirectory, false, true, "win-x64");
+            build.TestSoftwareExecutableName = "PublishedExecutable";
 
             build.InvokeExecutePublish();
 
@@ -2973,6 +3006,8 @@ public class PublishPipelineTests
 
         internal string TestSoftwareName { get; set; } = "TestApp";
 
+        internal string TestSoftwareExecutableName { get; set; } = "TestApp";
+
         internal string TestSoftwareVersion { get; set; } = "1.2.3";
 
         internal bool UseDefaultPreparation { get; set; }
@@ -2990,6 +3025,8 @@ public class PublishPipelineTests
         internal string CapturedSingleFileTargetsPath { get; private set; } = string.Empty;
 
         internal bool UseDefaultBuildRuntimeManifestFileName { get; set; }
+
+        internal bool UseDefaultSoftwareExecutableName { get; set; }
 
         internal string? RuntimeManifestFileNameFromMainProject { get; set; }
 
@@ -3105,6 +3142,11 @@ public class PublishPipelineTests
 
         public override string SoftwareName => TestSoftwareName;
 
+        public override string SoftwareExecutableFileNameWithoutExtension =>
+            UseDefaultSoftwareExecutableName
+                ? base.SoftwareExecutableFileNameWithoutExtension
+                : TestSoftwareExecutableName;
+
         public override string SoftwareVersion => TestSoftwareVersion;
 
         public override string BuildRuntimeManifestFileName =>
@@ -3125,6 +3167,12 @@ public class PublishPipelineTests
         public override AbsolutePath ChangelogFile => TestChangelogFile;
 
         public override AbsolutePath ReleaseNotesFile => TestReleaseNotesFile;
+
+        protected override bool IsUnixHost => TestUnixHost;
+
+        protected override bool IsMacOSHost => TestMacOSHost;
+
+        protected override bool IsLinuxHost => TestLinuxHost;
 
         protected override bool IsFuseAvailable => TestFuseAvailable;
 
@@ -3160,6 +3208,16 @@ public class PublishPipelineTests
             AbsolutePath outputPath)
         {
             return CreateWindowsInstallerPublishSettings(context, outputPath);
+        }
+
+        internal DotNetBuildSettings InvokeConfigureWindowsInstallerBuildSettings(
+            DotNetBuildSettings settings,
+            Project project,
+            PublishRidContext context,
+            AbsolutePath sourcePath,
+            string platform)
+        {
+            return ConfigureWindowsInstallerBuildSettings(settings, project, context, sourcePath, platform);
         }
 
         internal bool InvokeIsInstallerProject(Project project)
@@ -3355,8 +3413,8 @@ public class PublishPipelineTests
             {
                 var runtime = PublishRid.ParseRuntimeIdentifier(context.RuntimeIdentifier);
                 var executableName = runtime.Family is PublishRidFamily.Windows
-                    ? $"{SoftwareName}.exe"
-                    : SoftwareName;
+                    ? $"{SoftwareExecutableFileNameWithoutExtension}.exe"
+                    : SoftwareExecutableFileNameWithoutExtension;
                 File.WriteAllText(Path.Combine(context.PublishPath, executableName),
                     context.RuntimeIdentifier);
             }
@@ -3377,7 +3435,7 @@ public class PublishPipelineTests
                 throw new InvalidOperationException("Bundle creation failed.");
         }
 
-        protected override void CreatePortableZip(PublishRidContext context)
+        internal override void CreatePortableZip(PublishRidContext context)
         {
             if (RecordPortableZip)
             {

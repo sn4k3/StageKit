@@ -1,4 +1,5 @@
 ﻿using Fallout.Common.IO;
+using Serilog;
 using StageKit.Runtime;
 
 namespace StageKit.Fallout;
@@ -22,8 +23,10 @@ public partial class StageKitBuild
     /// Creates a portable ZIP from one published runtime output.
     /// </summary>
     /// <param name="context">The runtime publish context.</param>
-    protected virtual void CreatePortableZip(PublishRidContext context)
+    internal virtual void CreatePortableZip(PublishRidContext context)
     {
+        Log.Information("Compressing portable application bundle for {Rid}", context.RuntimeIdentifier);
+
         var stagingPath = PublishStagingDirectory / Guid.NewGuid().ToString("N");
         var archivePath = (AbsolutePath)$"{context.BundleOutputPath}.zip";
 

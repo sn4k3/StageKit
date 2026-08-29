@@ -12,11 +12,11 @@ namespace StageKit.Fallout;
 /// Provides the StageKit build pipeline: solution and project discovery, software metadata resolved from
 /// MSBuild properties, and the restore/compile/run/publish targets together with their platform bundles.
 /// </summary>
-public partial class StageKitBuild : FalloutBuild
+public abstract partial class StageKitBuild : FalloutBuild
 {
     private static readonly string[] MainProjectPropertyNames =
     [
-        "ArtifactsPath", "SolutionName", "ProductName", "Company", "CompanyRDNS", "Authors", "Summary",
+        "ArtifactsPath", "SolutionName", "ProductName", "AssemblyName", "Company", "CompanyRDNS", "Authors", "Summary",
         "Description", "Version", "Copyright", "PackageLicenseExpression", "RepositoryUrl", "PackageTags",
         nameof(BuildRuntimeManifestFileName)
     ];
@@ -191,14 +191,12 @@ public partial class StageKitBuild : FalloutBuild
         {
             if (field is null)
             {
-                field = GetMainProjectProperty("SolutionName");
-                if (string.IsNullOrWhiteSpace(field))
-                {
-                    field = Solution.Name ?? GetMainProjectProperty("ProductName");
-                }
+                field = Solution.Name
+                        ?? GetMainProjectProperty("Product")
+                        ?? GetMainProjectProperty("AssemblyName")
+                        ?? GetMainProjectProperty("SolutionName");
+                ThrowIfMissingProperty(field);
             }
-
-            ThrowIfMissingProperty(field);
 
             return field;
         }
@@ -213,7 +211,9 @@ public partial class StageKitBuild : FalloutBuild
     {
         get
         {
-            field ??= GetMainProjectProperty("SoftwareName") ?? SolutionName;
+            field ??= GetMainProjectProperty("SoftwareName") ??
+                      GetMainProjectProperty("RepositoryName")
+                      ?? SolutionName;
             ThrowIfMissingProperty(field);
             return field;
         }
@@ -403,7 +403,29 @@ public partial class StageKitBuild : FalloutBuild
             .ToArray();
 
     /// <summary>
-    /// Gets the build runtime cache file name, which is retrieved from the main project's properties.
+    /// Gets the file-name stem of the executable published by the main project.
+    /// </summary>
+    /// <remarks>
+    /// The value is resolved from the main project's evaluated <c>AssemblyName</c> property and falls back to
+    /// the project name when that property is unavailable.
+    /// </remarks>
+    [field: AllowNull]
+    [field: MaybeNull]
+    public virtual string SoftwareExecutableFileNameWithoutExtension
+    {
+        get
+        {
+            field ??= GetMainProjectProperty("AssemblyName")!;
+            if (string.IsNullOrWhiteSpace(field))
+                field = MainProject.Name ?? string.Empty;
+
+            ThrowIfMissingProperty(field);
+            return field;
+        }
+    }
+
+    /// <summary>
+    /// Gets the build runtime manifest file name, which is retrieved from the main project's properties.
     /// </summary>
     [field: AllowNull]
     [field: MaybeNull]
@@ -560,14 +582,5 @@ public partial class StageKitBuild : FalloutBuild
             return $"[{string.Join(", ", collection.Cast<object?>().Select(FormatPrintValue))}]";
 
         return value.ToString() ?? string.Empty;
-    }
-
-    /// <summary>
-    /// Executes the build script. This is the entry point for the build process.
-    /// </summary>
-    /// <returns>The exit code of the build process.</returns>
-    public static int Main()
-    {
-        return Execute<StageKitBuild>(x => x.Compile);
     }
 }

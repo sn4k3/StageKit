@@ -1,5 +1,6 @@
 ﻿using System.Xml.Linq;
 using Fallout.Common.IO;
+using Serilog;
 using StageKit.Runtime;
 
 namespace StageKit.Fallout;
@@ -15,10 +16,9 @@ public partial class StageKitBuild
         if (!PublishBundles.HasFlag(ApplicationPackagingType.DotNetSingleFile))
             return;
 
-        var runtime = PublishRid.ParseRuntimeIdentifier(context.RuntimeIdentifier);
-        var executableName = runtime.Family is PublishRidFamily.Windows
-            ? $"{SoftwareName}.exe"
-            : SoftwareName;
+        Log.Information("Creating single-file application bundle for {Rid}", context.RuntimeIdentifier);
+
+        var executableName = GetPublishedExecutableName(context.RuntimeIdentifier);
         var sourcePath = context.PublishPath / executableName;
         if (!sourcePath.FileExists())
         {

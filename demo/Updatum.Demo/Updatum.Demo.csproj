@@ -5,8 +5,6 @@
         <TargetFramework>net10.0</TargetFramework>
         <InvariantGlobalization>true</InvariantGlobalization>
         <IsPackable>false</IsPackable>
-
-        <ProductName>Updatum.FakeApp</ProductName>
     </PropertyGroup>
 
     <ItemGroup>

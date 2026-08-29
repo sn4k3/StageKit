@@ -20,7 +20,7 @@
             <Directory Id="INSTALLFOLDER" Name="$(var.ApplicationName)">
                 <Component Id="MainExecutableComponent" Guid="*">
                     <File Id="MainExecutable"
-                          Source="!(bindpath.Publish)\$(var.ApplicationName).exe"
+                          Source="!(bindpath.Publish)\$(var.ApplicationExecutableName).exe"
                           KeyPath="yes">
                         <Shortcut Id="StartMenuShortcut"
                                   Directory="ApplicationProgramsFolder"
@@ -35,7 +35,7 @@
                 </Component>
 
                 <Files Include="!(bindpath.Publish)\**">
-                    <Exclude Files="!(bindpath.Publish)\$(var.ApplicationName).exe" />
+                    <Exclude Files="!(bindpath.Publish)\$(var.ApplicationExecutableName).exe" />
                 </Files>
             </Directory>
         </StandardDirectory>

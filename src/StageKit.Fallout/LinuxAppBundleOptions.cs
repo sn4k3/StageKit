@@ -23,6 +23,7 @@ public class LinuxAppBundleOptions
     {
         ApplicationId = build.SoftwareRDNS;
         ProductName = build.SoftwareName;
+        ExecutableName = build.SoftwareExecutableFileNameWithoutExtension;
         Summary = build.SoftwareSummary;
         Description = build.SoftwareDescription;
         License = build.SoftwareLicense;

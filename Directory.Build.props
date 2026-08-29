@@ -11,7 +11,7 @@
         <!-- Metadata -->
         <RepositoryName Condition="'$(RepositoryName)' == '' And $([System.IO.Directory]::GetFiles('$(MSBuildThisFileDirectory)', '*.sln').Length) &gt; 0">$([System.IO.Path]::GetFileNameWithoutExtension($([System.IO.Directory]::GetFiles('$(MSBuildThisFileDirectory)', '*.sln')[0])))</RepositoryName>
         <RepositoryName Condition="'$(RepositoryName)' == '' And $([System.IO.Directory]::GetFiles('$(MSBuildThisFileDirectory)', '*.slnx').Length) &gt; 0">$([System.IO.Path]::GetFileNameWithoutExtension($([System.IO.Directory]::GetFiles('$(MSBuildThisFileDirectory)', '*.slnx')[0])))</RepositoryName>
-        <RepositoryName Condition="'$(RepositoryName)' == ''">$([System.IO.Path]::GetFileNameWithoutExtension($(MSBuildProjectDirectory)))</RepositoryName>
+        <RepositoryName Condition="'$(RepositoryName)' == ''">$([System.IO.Path]::GetFileNameWithoutExtension($(MSBuildThisFileDirectory)))</RepositoryName>
 
         <Company>PTRTECH</Company>
         <CompanyRDNS>pt.ptrtech</CompanyRDNS>

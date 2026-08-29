@@ -1,5 +1,9 @@
 # Unreleased
 
+- Fix `StageKit.Fallout` CI regressions by restoring the default single-file bundle, overridable host capability checks,
+  and the runtime-manifest filename lookup seam.
+- Resolve published executables, bundle launchers, and WiX installer payloads from the main project's `AssemblyName`,
+  independently of product and artifact naming.
 - Add a schema version to Fallout runtime manifests for forward-compatible evolution.
 - Rename `ApplicationBundleType` to `ApplicationPackagingType` (now a `[Flags]` enum with `Portable`,
   `DotNetSingleFile`, `WindowsInstaller`, `LinuxAppImage`, `LinuxFlatpak`, `MacOSAppBundle`)

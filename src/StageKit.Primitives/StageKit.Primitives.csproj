@@ -2,7 +2,7 @@
 
     <PropertyGroup>
         <ProductName>StageKit.Primitives</ProductName>
-        <Description>Dependency-light .NET primitives for reusable library code, including disposable base types, GC handle helpers, atomic file writes, safe file streams, path helpers, and temporary file or directory utilities.</Description>
+        <Description>Dependency-light .NET primitives for reusable library code, including atomic file writes, path and shell helpers, temporary resources, disposable base types, GC handles, and unmanaged memory wrappers.</Description>
         <PackageTags>stagekit;primitives;disposable;safehandle;atomic-file;utilities</PackageTags>
         <GenerateDocumentationFile>True</GenerateDocumentationFile>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>

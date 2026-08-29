@@ -2,15 +2,21 @@
 
 [![Logo](https://raw.githubusercontent.com/sn4k3/StageKit/main/media/StageKit_landscape.svg)](#)
 
-[![License](https://img.shields.io/github/license/sn4k3/StageKit?style=for-the-badge)](https://github.com/sn4k3/StageKit/blob/master/LICENSE)
+[![License](https://img.shields.io/github/license/sn4k3/StageKit?style=for-the-badge)](https://github.com/sn4k3/StageKit/blob/main/LICENSE)
 [![GitHub repo size](https://img.shields.io/github/repo-size/sn4k3/StageKit?style=for-the-badge)](#)
 [![Code size](https://img.shields.io/github/languages/code-size/sn4k3/StageKit?style=for-the-badge)](#)
 [![Nuget](https://img.shields.io/nuget/v/StageKit?style=for-the-badge)](https://www.nuget.org/packages/StageKit)
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/sn4k3?color=red&style=for-the-badge)](https://github.com/sponsors/sn4k3)
 
-StageKit is a lightweight .NET application infrastructure library for JSON settings files, observable settings objects, crash report capture, application runtime metadata, and unhandled exception handling.
+StageKit is a lightweight .NET application infrastructure library for JSON settings files, observable settings objects,
+crash report capture, application runtime metadata, and unhandled exception handling.
 
-The repository also includes smaller packages for reusable building blocks: [`StageKit.Primitives`](src/StageKit.Primitives/README.md) for low-level primitives, [`StageKit.Runtime`](src/StageKit.Runtime/README.md) for entry-application/runtime inspection helpers, and [`StageKit.Updatum`](src/StageKit.Updatum/README.md) for GitHub release updates. [`StageKit.Fallout`](src/StageKit.Fallout/README.md) is the build-time pipeline library that publishes and bundles the applications those packages ship in.
+The repository also includes smaller packages for reusable building blocks:
+[`StageKit.Primitives`](src/StageKit.Primitives/README.md) for low-level primitives,
+[`StageKit.Runtime`](src/StageKit.Runtime/README.md) for entry-application/runtime inspection helpers, and
+[`StageKit.Updatum`](src/StageKit.Updatum/README.md) for GitHub release updates.
+[`StageKit.Fallout`](src/StageKit.Fallout/README.md) is the build-time pipeline library that publishes and bundles the
+applications those packages ship in.
 
 ## Features
 
@@ -38,15 +44,16 @@ The repository also includes smaller packages for reusable building blocks: [`St
 
 The repository keeps publishable libraries, tests, demos, and build tooling in separate top-level folders:
 
-| Folder | Purpose |
-|---|---|
-| `src/` | Publishable StageKit libraries and the Fallout build-pipeline library |
-| `tests/` | xUnit v3 test projects for the libraries |
-| `demo/` | Small runnable demonstration applications |
-| `builds/` | Fallout build entry point and WiX installer project |
+| Folder     | Purpose                                                                  |
+|------------|--------------------------------------------------------------------------|
+| `src/`     | Publishable StageKit libraries and the Fallout build-pipeline library    |
+| `tests/`   | xUnit v3 test projects for the libraries                                 |
+| `demo/`    | Small runnable demonstration applications                                |
+| `builds/`  | Fallout build entry point and WiX installer project                      |
 | `.github/` | Continuous integration, security scanning, and package release workflows |
 
-`StageKit.slnx` remains at the repository root and references projects from these folders. Generated output belongs in ignored directories such as `artifacts/` and `TestResults/`.
+`StageKit.slnx` remains at the repository root and references projects from these folders. Generated output belongs in
+ignored directories such as `artifacts/` and `TestResults/`.
 
 ## Install
 
@@ -79,17 +86,18 @@ dotnet add package StageKit.Updatum
 
 ## Packages
 
-| Package | NuGet | Docs | Description |
-|---|---|---|---|
-| `StageKit` | [![Nuget](https://img.shields.io/nuget/v/StageKit?style=flat-square)](https://www.nuget.org/packages/StageKit) | This file | Application infrastructure: settings, crash reports, retention, backups, support bundles, single-instance guards, and app metadata. |
-| `StageKit.Primitives` | [![Nuget](https://img.shields.io/nuget/v/StageKit.Primitives?style=flat-square)](https://www.nuget.org/packages/StageKit.Primitives) | [README](src/StageKit.Primitives/README.md) | Dependency-light primitives: `SafeFile`, `SafeFileStream`, `PathUtilities`, `TemporaryDirectory`, `TemporaryFile`, `DisposableObject`, `LeaveOpenDisposableObject`, and `GCSafeHandle`. |
-| `StageKit.Runtime` | [![Nuget](https://img.shields.io/nuget/v/StageKit.Runtime?style=flat-square)](https://www.nuget.org/packages/StageKit.Runtime) | [README](src/StageKit.Runtime/README.md) | Entry-application and runtime helpers: assembly metadata, process paths, bundle detection, relaunch utilities, and combined diagnostics through `RuntimeDiagnostics`. |
-| `StageKit.Updatum` | [![Nuget](https://img.shields.io/nuget/v/StageKit.Updatum?style=flat-square)](https://www.nuget.org/packages/StageKit.Updatum) | [README](src/StageKit.Updatum/README.md) | GitHub release discovery, optional SHA-256 and platform-signature verification, download progress, and staged Windows/Linux/macOS update installation. |
-| `StageKit.Fallout` | Not published | [README](src/StageKit.Fallout/README.md) | Build-time only: reusable Fallout build pipeline with restore/compile/run/publish targets and portable, single-file, WiX installer, macOS `.app`, and Linux AppImage bundling. |
+| Package               | NuGet                                                                                                                                | Docs                                        | Description                                                                                                                                                                             |
+|-----------------------|--------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `StageKit`            | [![Nuget](https://img.shields.io/nuget/v/StageKit?style=flat-square)](https://www.nuget.org/packages/StageKit)                       | This file                                   | Application infrastructure: settings, crash reports, retention, backups, support bundles, single-instance guards, and app metadata.                                                     |
+| `StageKit.Primitives` | [![Nuget](https://img.shields.io/nuget/v/StageKit.Primitives?style=flat-square)](https://www.nuget.org/packages/StageKit.Primitives) | [README](src/StageKit.Primitives/README.md) | Dependency-light primitives: atomic file writes, path and shell helpers, temporary resources, disposable base types, GC handles, and unmanaged memory wrappers. |
+| `StageKit.Runtime`    | [![Nuget](https://img.shields.io/nuget/v/StageKit.Runtime?style=flat-square)](https://www.nuget.org/packages/StageKit.Runtime)       | [README](src/StageKit.Runtime/README.md)    | Entry-application and runtime helpers: assembly metadata, process paths, bundle detection, relaunch utilities, and combined diagnostics through `RuntimeDiagnostics`.                   |
+| `StageKit.Updatum`    | [![Nuget](https://img.shields.io/nuget/v/StageKit.Updatum?style=flat-square)](https://www.nuget.org/packages/StageKit.Updatum)       | [README](src/StageKit.Updatum/README.md)    | GitHub release discovery, optional SHA-256 and platform-signature verification, download progress, and staged Windows/Linux/macOS update installation.                                  |
+| `StageKit.Fallout`    | Not published                                                                                                                        | [README](src/StageKit.Fallout/README.md)    | Build-time only: reusable Fallout build pipeline with restore/compile/run/publish targets and portable, single-file, WiX installer, macOS `.app`, and Linux AppImage bundling.          |
 
 ## Application Updates
 
-Use `StageKit.Updatum` to select a compatible GitHub release asset, download it into an isolated temporary workspace, and start a staged update:
+Use `StageKit.Updatum` to select a compatible GitHub release asset, download it into an isolated temporary workspace,
+and start a staged update:
 
 ```csharp
 using StageKit.Updatum;
@@ -111,7 +119,10 @@ if (await updater.CheckForUpdatesAsync(cancellationToken))
 }
 ```
 
-Checksum verification uses GitHub's native `sha256:` release-asset digest when available. For assets without native digest metadata, publish a fallback sidecar named exactly `<asset-name>.sha256`. Configure `AssetSignatureVerifier` when the application must also enforce a platform-specific trust policy such as Authenticode or macOS code signing. See the `StageKit.Updatum` package README for installation behavior and security details.
+Checksum verification uses GitHub's native `sha256:` release-asset digest when available. For assets without native
+digest metadata, publish a fallback sidecar named exactly `<asset-name>.sha256`. Configure `AssetSignatureVerifier` when
+the application must also enforce a platform-specific trust policy such as Authenticode or macOS code signing. See the
+`StageKit.Updatum` package README for installation behavior and security details.
 
 ## Quick Start
 
@@ -170,7 +181,8 @@ settings.AutoSave = true;
 settings.Theme = "Dark";
 ```
 
-`AutoSave` defaults to `false`. It starts reacting only after the settings object is loaded, so property changes caused by JSON hydration or `OnLoaded(...)` do not rewrite the file during startup.
+`AutoSave` defaults to `false`. It starts reacting only after the settings object is loaded, so property changes caused
+by JSON hydration or `OnLoaded(...)` do not rewrite the file during startup.
 
 Keep `AutoSave` disabled when you prefer manual control:
 
@@ -195,7 +207,8 @@ if (!saved)
 }
 ```
 
-`Save()` cancels any pending debounced save before writing. `SaveCount` tracks successful saves for the current in-memory instance and is ignored in JSON. `CancelDebouncedSave()` cancels a scheduled save without writing.
+`Save()` cancels any pending debounced save before writing. `SaveCount` tracks successful saves for the current
+in-memory instance and is ignored in JSON. `CancelDebouncedSave()` cancels a scheduled save without writing.
 
 Suspend AutoSave while applying several related changes:
 
@@ -212,7 +225,8 @@ using (settings.SuspendAutoSave(saveOnDispose: false))
 }
 ```
 
-`BatchUpdate(...)` and `SuspendAutoSave(...)` still mark the file dirty while AutoSave is suspended. When the outermost scope exits, StageKit schedules one debounced save if changes happened and saving on dispose is enabled.
+`BatchUpdate(...)` and `SuspendAutoSave(...)` still mark the file dirty while AutoSave is suspended. When the outermost
+scope exits, StageKit schedules one debounced save if changes happened and saving on dispose is enabled.
 
 By default, settings are stored under:
 
@@ -269,9 +283,12 @@ public sealed class AppSettings : RootSettingsFile<AppSettings>
 }
 ```
 
-`SettingsVersion` is serialized with each settings file. Older files are migrated to `CurrentSettingsVersion` and kept dirty so the upgraded schema can be persisted. If a file was written by a newer app version, StageKit renames it to `<file>.unsupported-version-<timestampUtc>` and falls back to a fresh instance.
+`SettingsVersion` is serialized with each settings file. Older files are migrated to `CurrentSettingsVersion` and kept
+dirty so the upgraded schema can be persisted. If a file was written by a newer app version, StageKit renames it to
+`<file>.unsupported-version-<timestampUtc>` and falls back to a fresh instance.
 
-If a settings file fails to deserialize on load (corrupt JSON), StageKit renames it to `<file>.corrupt-<timestampUtc>` and falls back to a fresh instance. Original data is preserved on disk for inspection or recovery.
+If a settings file fails to deserialize on load (corrupt JSON), StageKit renames it to `<file>.corrupt-<timestampUtc>`
+and falls back to a fresh instance. Original data is preserved on disk for inspection or recovery.
 
 ## Collection Settings
 
@@ -296,7 +313,10 @@ RecentFiles.Instance.Add(@"C:\work\project.txt");
 RecentFiles.SaveInstance();
 ```
 
-`RootCollectionFile<T, TO>` exposes `Items` as an `ObservableList<TO>` and `ItemsView` as a synchronized view for UI binding. Set `TrackItemsWithChangeNotification = true` in the constructor when collection items implement `INotifyPropertyChanged` and item property changes should mark the file dirty and trigger `AutoSave`; keep it disabled for immutable items or very large collections.
+`RootCollectionFile<T, TO>` exposes `Items` as an `ObservableList<TO>` and `ItemsView` as a synchronized view for UI
+binding. Set `TrackItemsWithChangeNotification = true` in the constructor when collection items implement
+`INotifyPropertyChanged` and item property changes should mark the file dirty and trigger `AutoSave`; keep it disabled
+for immutable items or very large collections.
 
 ## Observable Objects
 
@@ -317,7 +337,8 @@ public sealed class ViewState : SubSettings
 }
 ```
 
-Classes deriving from `SubSettings`, `RootSettingsFile<T>`, or `RootCollectionFile<T, TO>` can use CommunityToolkit's `[ObservableProperty]` generator:
+Classes deriving from `SubSettings`, `RootSettingsFile<T>`, or `RootCollectionFile<T, TO>` can use CommunityToolkit's
+`[ObservableProperty]` generator:
 
 ```csharp
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -335,7 +356,9 @@ public sealed partial class AppSettings : RootSettingsFile<AppSettings>
 }
 ```
 
-StageKit references `CommunityToolkit.Mvvm`, but if your app uses generator attributes such as `[ObservableProperty]`, reference `CommunityToolkit.Mvvm` directly in that app too so the analyzer/source generator runs in the consuming project.
+StageKit references `CommunityToolkit.Mvvm`, but if your app uses generator attributes such as `[ObservableProperty]`,
+reference `CommunityToolkit.Mvvm` directly in that app too so the analyzer/source generator runs in the consuming
+project.
 
 ## Crash Reports
 
@@ -375,7 +398,8 @@ Register settings that should be saved before StageKit forces process exit after
 UnhandledExceptions.SettingsFilesToSaveBeforeCrash.Add(AppSettings.Instance);
 ```
 
-`SettingsFilesToSaveBeforeCrash` is a `HashSet<StageKit.Interfaces.ISavable>`, so any type implementing `ISavable` can participate.
+`SettingsFilesToSaveBeforeCrash` is a `HashSet<StageKit.Interfaces.ISavable>`, so any type implementing `ISavable` can
+participate.
 
 ## Single Instance Guard
 
@@ -392,9 +416,11 @@ if (guard.IsSecondary)
 RunApplication();
 ```
 
-The guard uses a named mutex. Because .NET mutex ownership is thread-affine, dispose the guard on the same thread that acquired it. It does not forward activation arguments yet, but the API is shaped so named-pipe activation forwarding can be added later.
+The guard uses a named mutex, but disposal only closes its handle and may run on any thread. A still-owned mutex becomes
+abandoned, and the next `Acquire(...)` treats that state as primary. The guard does not forward activation arguments yet.
 
-If your app also launches a crash-report viewer with `ApplicationKit.CrashReportFlag`, check the crash-report mode before blocking secondary instances, or use a different instance name for the viewer process.
+If your app also launches a crash-report viewer with `ApplicationKit.CrashReportFlag`, check the crash-report mode
+before blocking secondary instances, or use a different instance name for the viewer process.
 
 ## Storage Utilities
 
@@ -524,7 +550,8 @@ Console.WriteLine(ApplicationKit.RuntimeElapsed);
 
 ## Runtime Helpers
 
-Use `StageKit.Runtime` when an app or library needs entry-application metadata, deployment shape detection, or a support-friendly diagnostics report without referencing the full `StageKit` package:
+Use `StageKit.Runtime` when an app or library needs entry-application metadata, deployment shape detection, or a
+support-friendly diagnostics report without referencing the full `StageKit` package:
 
 ```csharp
 using StageKit.Runtime;
@@ -553,7 +580,9 @@ var report = RuntimeDiagnostics.GetReport(includeLoadedAssemblies: true);
 
 ## Demo
 
-See [demo/StageKit.Demo/Program.cs](demo/StageKit.Demo/Program.cs) for a runnable console demo covering startup configuration, Serilog integration, AutoSave settings, collection settings, panic-save registration, crash report launch handling, and debounced save waiting.
+See [demo/StageKit.Demo/Program.cs](demo/StageKit.Demo/Program.cs) for a runnable console demo covering startup
+configuration, Serilog integration, AutoSave settings, collection settings, panic-save registration, crash report launch
+handling, and debounced save waiting.
 
 [demo/Updatum.Demo/Program.cs](demo/Updatum.Demo/Program.cs) is a "fake app" demo for the updater.
 
@@ -570,13 +599,17 @@ Restore, build, and test:
 
 ```powershell
 dotnet restore
-dotnet build .\StageKit.slnx -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true
-dotnet test .\tests\StageKit.Tests\StageKit.Tests.csproj -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true
+dotnet build .\StageKit.slnx --configuration Release -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true
+dotnet run --project .\tests\StageKit.Tests\StageKit.Tests.csproj --framework net10.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none
+dotnet run --project .\tests\StageKit.Updatum.Tests\StageKit.Updatum.Tests.csproj --framework net10.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none
+dotnet run --project .\tests\StageKit.Fallout.Tests\StageKit.Fallout.Tests.csproj --framework net10.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none
 ```
 
 ## Build Pipeline
 
-Release publishing is driven by [`StageKit.Fallout`](src/StageKit.Fallout/README.md), a reusable Fallout (NUKE-style) build library. `build.ps1` / `build.sh` bootstrap the .NET SDK when needed, restore the pinned `fallout` global tool, then run the build project in `builds/build`:
+Release publishing is driven by [`StageKit.Fallout`](src/StageKit.Fallout/README.md), a reusable Fallout (NUKE-style)
+build library. `build.ps1` / `build.sh` bootstrap the .NET SDK when needed, restore the pinned `fallout` global tool,
+then run the build project in `builds/build`:
 
 ```powershell
 ./build.ps1 Print
@@ -588,7 +621,11 @@ Release publishing is driven by [`StageKit.Fallout`](src/StageKit.Fallout/README
 ./build.sh Publish
 ```
 
-`Publish` builds every runtime identifier in `RIds` (`win`/`osx`/`linux` × `x64`/`arm64` by default) as self-contained ReadyToRun output, then creates the selected bundles - portable zip, .NET single-file, WiX installer, macOS `.app`, and Linux AppImage - into `artifacts/publish/`. Bundles whose host requirement is unmet are skipped with a warning. See the [`StageKit.Fallout` README](src/StageKit.Fallout/README.md) for targets, parameters, and customization points.
+`Publish` builds every runtime identifier in `RIds` (`win`/`osx`/`linux` × `x64`/`arm64` by default) as self-contained
+ReadyToRun output, then creates the selected bundles in `artifacts/publish/`. Portable zip, .NET single-file, WiX
+installer, macOS `.app`, and Linux AppImage are enabled by default. Bundles whose host requirement is unmet are skipped
+with a warning. See the
+[`StageKit.Fallout` README](src/StageKit.Fallout/README.md) for targets, parameters, and customization points.
 
 ## Security
 

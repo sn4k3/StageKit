@@ -2,7 +2,7 @@
 
 [![Logo](https://raw.githubusercontent.com/sn4k3/StageKit/main/media/StageKit_landscape.svg)](#)
 
-[![License](https://img.shields.io/github/license/sn4k3/StageKit?style=for-the-badge)](https://github.com/sn4k3/StageKit/blob/master/LICENSE)
+[![License](https://img.shields.io/github/license/sn4k3/StageKit?style=for-the-badge)](https://github.com/sn4k3/StageKit/blob/main/LICENSE)
 [![GitHub repo size](https://img.shields.io/github/repo-size/sn4k3/StageKit?style=for-the-badge)](#)
 [![Code size](https://img.shields.io/github/languages/code-size/sn4k3/StageKit?style=for-the-badge)](#)
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/sn4k3?color=red&style=for-the-badge)](https://github.com/sponsors/sn4k3)
@@ -22,7 +22,7 @@ entry project (`builds/build/build.csproj`).
 - Self-contained + ReadyToRun publish for every configured runtime identifier
 - Bundle creation: portable zip, .NET single-file, WiX installer, macOS `.app`, and Linux AppImage
 - Multi-architecture macOS bundles (`osx-x64` + `osx-arm64` in one `.app`)
-- Build runtime manifest emitted next to the published output for `StageKit.Runtime` packaging detection
+- Versioned build runtime manifest emitted with each distributable for diagnostics and release tooling
 - Release notes extracted from the top `CHANGELOG.md` section
 - `virtual` members and callbacks throughout so a derived build can override any step
 
@@ -98,8 +98,9 @@ already live in `Directory.Build.props` or the project file:
 | Build property | MSBuild source |
 |---|---|
 | `ArtifactsDirectory` | `ArtifactsPath` |
-| `SolutionName` | `SolutionName`, falling back to the solution name then `ProductName` |
-| `SoftwareName` | `SolutionName` (override to use a different product name) |
+| `SolutionName` | Solution name, falling back through `Product`, `AssemblyName`, and `SolutionName` |
+| `SoftwareName` | `SoftwareName`, then `RepositoryName`, then `SolutionName`; used for product and artifact naming |
+| `SoftwareExecutableName` | `AssemblyName`, falling back to the main project name; used to locate the published executable |
 | `SoftwareCompany` / `SoftwareCompanyRdns` | `Company` / `CompanyRDNS` |
 | `SoftwareRDNS` | `<CompanyRDNS>.<SoftwareName>` |
 | `SoftwareAuthors` | `Authors` |
@@ -127,6 +128,12 @@ asset name is:
 
 Override it through the `AssetName` callback. Bundles are then created from that output:
 
+`SoftwareName` does not need to match the executable file name. Fallout resolves the executable stem from the main
+project's evaluated `AssemblyName` through `SoftwareExecutableName`, adding `.exe` only for Windows RIDs. The
+default macOS and Linux bundle launchers use the same executable name while retaining `SoftwareName` for display and
+artifact names. Windows installer builds receive both values as `ApplicationName` and `ApplicationExecutableName`, so
+WiX metadata, shortcuts, and install folders remain product-named while the payload points to the actual executable.
+
 | Bundle | `ApplicationPackagingType` flag | Host requirement | Output |
 |---|---|---|---|
 | Portable zip | `Portable` | Any | `<asset>.zip` (skipped for macOS RIDs when `MacOSAppBundle` is also enabled) |
@@ -135,20 +142,37 @@ Override it through the `AssetName` callback. Bundles are then created from that
 | macOS app bundle | `MacOSAppBundle` | Unix host | `<SoftwareName>.app` |
 | Linux AppImage | `LinuxAppImage` | Linux host | `<asset>.AppImage` |
 
-`PublishBundles` defaults to `Portable | DotNetSingleFile | WindowsInstaller | MacOSAppBundle | LinuxAppImage`. Bundles
-whose host requirement is unmet are skipped with a warning rather than failing the build.
+`PublishBundles` defaults to
+`Portable | DotNetSingleFile | WindowsInstaller | MacOSAppBundle | LinuxAppImage`. Bundles whose host requirement is
+unmet are skipped with a warning rather than failing the build.
 
 Icons are read from `MediaDirectory` (`media/` by default): `<SoftwareName>.icns` for macOS and `<SoftwareName>.svg`
-for Linux. AppImage creation downloads and caches `appimagetool` for the host architecture; when FUSE 2 is unavailable
-the tool is extracted before use.
+for Linux. Override `LinuxIconFile` to use a `.png` icon; both SVG and PNG are accepted. SVG icons are installed in
+the scalable hicolor directory, while PNG icons are installed in `256x256/apps`. AppImage creation downloads and caches
+`appimagetool` for the host architecture; when FUSE 2 is unavailable the tool is extracted before use.
 
 `PublishCleanupExtensions` (default `wixpdb`) removes leftover files from the publish directory after a successful run.
 
 ### Build runtime manifest
 
-Non-single-file publishes and portable zips receive a `BuildRuntime` JSON manifest (named by
-`BuildRuntimeManifestFileName`) describing the runtime identifier, build version, packaging type, build timestamp, and
-host OS description. `StageKit.Runtime` uses it to report the packaging shape at run time.
+Each distributable receives a `BuildRuntime` JSON manifest named by `BuildRuntimeManifestFileName`. Portable archives,
+installer payloads, macOS bundles, and AppImages stage it beside the application payload; single-file publishing embeds
+it as bundled content. The manifest is intended for diagnostics and release tooling and is not read automatically by
+`StageKit.Runtime`.
+
+The schema is versioned independently through `SchemaVersion` so consumers can reject or migrate future layouts:
+
+```json
+{
+  "SchemaVersion": 1,
+  "Runtime": "linux-x64",
+  "IsBundle": true,
+  "PackagingType": "LinuxAppImage",
+  "BuildDateTimeUtc": "2026-08-28T12:34:56.789Z",
+  "BuildOSDescription": "Ubuntu 24.04 LTS",
+  "BuildVersion": "1.0.0"
+}
+```
 
 ### Release notes
 
@@ -192,12 +216,13 @@ internal class Build : StageKitBuild
 
 | Member | Purpose |
 |---|---|
-| `SoftwareName`, `SoftwareVersion`, `MainProject`, `Solution` | `virtual` — override when auto-detection is wrong |
+| `SoftwareName`, `SoftwareExecutableName`, `SoftwareVersion`, `MainProject`, `Solution` | `virtual` — override when auto-detection is wrong |
 | `ExcludedProjectNameTokens` | Mutable token list controlling `MainProject` detection |
 | `BeforePublishRid` / `AfterPublishRid` | `Action<PublishRidContext>` hooks around each runtime publish |
 | `AssetName` | `Func<PublishRidContext, string>` returning the base artifact name (simple file name, no directory or extension) |
 | `ConfigurePublishRid` | `Func<DotNetPublishSettings, PublishRidContext, DotNetPublishSettings>` to adjust publish settings per RID |
 | `CreateMacAppBundleOptions()` / `CreateLinuxAppBundleOptions()` | Lazily resolved bundle metadata (`Info.plist`, `.desktop`, AppStream, entitlements) |
+| `ConfigureWindowsInstallerBuildSettings(...)` | Adjusts the MSBuild settings passed to each WiX installer project |
 | `PublishBundles`, `PublishCleanupExtensions`, `RIds` | Protected setters for build-wide publish configuration |
 | `MediaDirectory`, `MacOSIconFile`, `LinuxIconFile`, `ChangelogFile`, `ReleaseNotesFile` | `virtual` path overrides |
 

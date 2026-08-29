@@ -426,7 +426,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
     /// <summary>
     /// Gets or sets the regex pattern to match with the asset name.
     /// </summary>
-    /// <remarks>Default to <see cref="EntryApplication.GenericRuntimeIdentifier"/>.</remarks>
+    /// <remarks>Defaults to <see cref="EntryApplication.GenericRuntimeIdentifier"/>.</remarks>
     public string AssetRegexPattern
     {
         get => _assetRegexPattern;
@@ -441,7 +441,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Gets or sets the asset required extension in case when there are multiple assets for the same platform.
+    /// Gets or sets the required asset extension when multiple assets target the same platform.
     /// </summary>
     /// <remarks>Use this option when you have multiple assets for same platform, ie: Windows in MSI and ZIP.</remarks>
     public string? AssetExtensionFilter
@@ -578,7 +578,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Gets or sets if the auto updater should locally codesign the macOS applications.
+    /// Gets or sets a value indicating whether the auto updater should locally code-sign macOS applications.
     /// </summary>
     public bool InstallUpdateCodesignMacOSApp
     {
@@ -820,11 +820,11 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Gets the formated changelog of the releases ahead of the current version.
+    /// Gets the formatted changelog of the releases ahead of the current version.
     /// </summary>
     /// <param name="maxReleases">The maximum number of releases to return. Use a value &lt;= 0 to return all updates.</param>
-    /// <param name="reverseDisplayOrder"><c>True</c> will reverse the output order, that is, the latest versions shows in end of the output instead of top.</param>
-    /// <returns>Formated changelog, otherwise <c>null</c> if no update available.</returns>
+    /// <param name="reverseDisplayOrder"><see langword="true"/> reverses the output order so the latest version appears at the end instead of the beginning.</param>
+    /// <returns>The formatted changelog, or <see langword="null"/> when no update is available.</returns>
     public string? GetChangelog(int maxReleases = -1, bool reverseDisplayOrder = false)
     {
         if (!IsUpdateAvailable) return null;
@@ -856,11 +856,11 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Gets the formated changelog of the releases ahead of the current version.
+    /// Gets the formatted changelog of the releases ahead of the current version.
     /// </summary>
-    /// <param name="reverseDisplayOrder"><c>True</c> will reverse the output order, that is, the latest versions shows in end of the output instead of top.</param>
+    /// <param name="reverseDisplayOrder"><see langword="true"/> reverses the output order so the latest version appears at the end instead of the beginning.</param>
     /// <param name="maxReleases">The maximum number of releases to return. Use a value &lt;= 0 to return all updates.</param>
-    /// <returns>Formated changelog, otherwise <c>null</c> if no update available.</returns>
+    /// <returns>The formatted changelog, or <see langword="null"/> when no update is available.</returns>
     public string? GetChangelog(bool reverseDisplayOrder, int maxReleases = -1)
     {
         return GetChangelog(maxReleases, reverseDisplayOrder);
