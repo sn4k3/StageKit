@@ -8,9 +8,9 @@ namespace Updatum.Demo;
 internal class Program
 {
     private const string RepositoryOwner = "sn4k3";
-    private const string RepositoryName = "UVtools";
+    private const string RepositoryName = "StageKit";
 
-    // https://github.com/sn4k3/UVtools/releases
+    // https://github.com/sn4k3/StageKit/releases
     internal static readonly UpdatumManager AppUpdater = new(RepositoryOwner, RepositoryName)
     {
         // All below are optional settings with recommended defaults

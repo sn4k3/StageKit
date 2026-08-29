@@ -1,7 +1,15 @@
 # Unreleased
 
-- Fix `StageKit.Fallout` CI regressions by restoring the default single-file bundle, overridable host capability checks,
-  and the runtime-manifest filename lookup seam.
+- Update the release workflow to build runtime assets for supported platforms, attach packages and assets to a GitHub
+  release, and omit Winget publishing.
+- Simplify `StageKitBuild` publish parameters: rename `PublishBundles` to `PackagingTypes`, rename cleanup and
+  installer options, remove `PublishNoBundles`, and use `PackagingTypes=None` to skip package creation.
+- Replace the original `StageKit.Demo` console sample with an Avalonia desktop workshop for runtime diagnostics,
+  settings, storage utilities, settings-directory access, crash/relaunch report recovery, and verified Updatum downloads
+  from `sn4k3/UVtools`; add live theme selection, profile-directory explorer access, and opt-in update installation;
+  retain the console sample as `StageKit.DemoCmd`.
+- Fix `StageKit.Fallout` CI regressions by aligning publish tests with the portable default and explicit single-file
+  selection, while retaining overridable host capability checks and the runtime-manifest filename lookup seam.
 - Resolve published executables, bundle launchers, and WiX installer payloads from the main project's `AssemblyName`,
   independently of product and artifact naming.
 - Add a schema version to Fallout runtime manifests for forward-compatible evolution.

@@ -55,6 +55,12 @@ jobs:
           --configuration Release --no-build --no-restore --
           -noLogo -noColor -parallelMode none -automated sync
 
+      - name: Test StageKit.Demo
+        run: >-
+          dotnet run --project tests/StageKit.Demo.Tests/StageKit.Demo.Tests.csproj
+          --configuration Release --no-build --no-restore --
+          -noLogo -noColor -parallelMode none -automated sync
+
       - name: Test StageKit.Updatum
         run: >-
           dotnet run --project tests/StageKit.Updatum.Tests/StageKit.Updatum.Tests.csproj

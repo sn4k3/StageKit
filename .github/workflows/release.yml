@@ -1,10 +1,10 @@
-name: 📦 NuGet package publish
+name: 🚀 Publish release
 
 on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: Perform a dry run (pack only, no push or release)
+        description: Build and upload artifacts without publishing packages or creating a release
         required: false
         default: true
         type: boolean
@@ -17,8 +17,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  publish_packages:
     name: Publish packages
+    outputs:
+      version: ${{ steps.metadata.outputs.version }}
+      tag: ${{ steps.metadata.outputs.tag }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -54,6 +57,12 @@ jobs:
       - name: Test StageKit
         run: >-
           dotnet run --project tests/StageKit.Tests/StageKit.Tests.csproj
+          --configuration Release --no-build --no-restore --
+          -noLogo -noColor -parallelMode none -automated sync
+
+      - name: Test StageKit.Demo
+        run: >-
+          dotnet run --project tests/StageKit.Demo.Tests/StageKit.Demo.Tests.csproj
           --configuration Release --no-build --no-restore --
           -noLogo -noColor -parallelMode none -automated sync
 
@@ -115,21 +124,6 @@ jobs:
           path: artifacts/packages/*.nupkg
           if-no-files-found: error
 
-      - name: Create release tag
-        if: ${{ !inputs.dry_run }}
-        env:
-          TAG: ${{ steps.metadata.outputs.tag }}
-        run: |
-          if git rev-parse --verify --quiet "refs/tags/$TAG"; then
-            echo "Tag $TAG already exists." >&2
-            exit 1
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag --annotate "$TAG" --message "Release $TAG"
-          git push origin "$TAG"
-
       - name: Publish to NuGet.org
         if: ${{ !inputs.dry_run }}
         env:
@@ -148,17 +142,120 @@ jobs:
           --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
           --api-key "$GITHUB_TOKEN" --skip-duplicate
 
-      - name: Create GitHub release
-        if: ${{ !inputs.dry_run }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.metadata.outputs.tag }}
-          name: ${{ steps.metadata.outputs.tag }}
-          body_path: release-notes.md
-          draft: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Report dry run
         if: ${{ inputs.dry_run }}
         run: echo "Dry run complete; packages were created and uploaded as an artifact."
+
+  publish_assets:
+    name: Publish asset (${{ matrix.rid }})
+    needs: publish_packages
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            os: windows-latest
+          - rid: linux-x64
+            os: ubuntu-latest
+          - rid: linux-arm64
+            os: ubuntu-latest
+          - rid: osx-x64
+            os: macos-latest
+          - rid: osx-arm64
+            os: macos-latest
+
+    env:
+      NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets', 'NuGet.Config', 'global.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore dependencies
+        run: dotnet restore StageKit.slnx -p:NuGetAudit=false
+
+      - name: Restore Fallout tool
+        run: dotnet tool restore
+
+      - name: Publish runtime asset
+        run: dotnet fallout Publish --rids ${{ matrix.rid }} --delete-publish-directories
+
+      - name: Upload release asset
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-assets-${{ matrix.rid }}
+          path: artifacts/publish/*
+          if-no-files-found: error
+
+  create_tag:
+    name: Create release tag
+    needs: [publish_packages, publish_assets]
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Create and push tag
+        env:
+          TAG: ${{ needs.publish_packages.outputs.tag }}
+        run: |
+          if git rev-parse --verify --quiet "refs/tags/$TAG"; then
+            echo "Tag $TAG already exists." >&2
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag --annotate "$TAG" --message "Release $TAG"
+          git push origin "$TAG"
+
+  create_release:
+    name: Create GitHub release
+    needs: [publish_packages, publish_assets, create_tag]
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: release-artifacts
+
+      - name: Prepare release notes
+        shell: bash
+        run: awk 'NR == 1 { next } /^# / { exit } { print }' CHANGELOG.md > release-notes.md
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.publish_packages.outputs.tag }}
+          name: ${{ needs.publish_packages.outputs.tag }}
+          body_path: release-notes.md
+          draft: false
+          files: release-artifacts/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

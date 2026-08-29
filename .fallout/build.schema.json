@@ -116,27 +116,27 @@
             "Debug",
             "Release"
           ],
-          "description": "Configuration to build - Default is 'Release'"
+          "description": "Build configuration (Debug or Release). Defaults to Release."
         },
-        "PublishDiscardNonBundles": {
-          "type": "boolean",
-          "description": "When publish set this variable(true) to keep only the bundles (zip, apps, installers), compilation folders will be removed. Default: False"
+        "PackagingTypes": {
+          "type": "string",
+          "description": "Packaging formats to create. Defaults to Portable."
         },
-        "PublishInstallerWithSingleFile": {
+        "DeletePublishDirectories": {
           "type": "boolean",
-          "description": "When single-file and Windows installer publishing are enabled, package the single-file executable in the installer. Default: False"
+          "description": "Delete raw publish directories after publishing. Defaults to false."
+        },
+        "UseSingleFileForInstaller": {
+          "type": "boolean",
+          "description": "Use the single-file executable as the Windows installer payload. Defaults to false."
         },
         "PublishMultiArch": {
           "type": "boolean",
-          "description": "When publish set this variable(true) to bundle all arch in a single bundle, eg: x64 and arm64 together, app will then run the required arch. Default: False"
-        },
-        "PublishNoBundles": {
-          "type": "boolean",
-          "description": "When publish set this variable(true) to not create the bundles (zip, apps, installers). Default: False"
+          "description": "Create one macOS app bundle containing both x64 and arm64 executables. Requires both macOS RIDs. Defaults to false."
         },
         "RIds": {
           "type": "array",
-          "description": "RIDs to publish separated by space, Default: 'win-x64 win-arm64 osx-x64 osx-arm64 linux-x64 linux-arm64'",
+          "description": "Runtime identifiers to publish. Defaults to win-x64, win-arm64, osx-x64, osx-arm64, linux-x64, and linux-arm64.",
           "items": {
             "type": "string"
           }

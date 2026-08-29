@@ -5,6 +5,7 @@ using System.Text.Json;
 using Fallout.Common;
 using Fallout.Common.IO;
 using Fallout.Solutions;
+using Serilog;
 
 namespace StageKit.Fallout;
 
@@ -29,36 +30,27 @@ public abstract partial class StageKitBuild : FalloutBuild
     /// <summary>
     /// The configuration parameter
     /// </summary>
-    [Parameter("Configuration to build - Default is 'Release'")]
+    [Parameter("Build configuration (Debug or Release). Defaults to Release.")]
     public BuildConfiguration Configuration { get; protected set; } = BuildConfiguration.Release;
 
     /// <summary>
-    /// Gets a value indicating whether every architecture of a platform is combined into one bundle, so the
-    /// resulting application selects the matching architecture at run time.
+    /// Gets a value indicating whether x64 and arm64 macOS executables are combined into one app bundle.
     /// </summary>
     [Parameter(
-        "When publish set this variable(true) to bundle all arch in a single bundle, eg: x64 and arm64 together, app will then run the required arch. Default: False")]
+        "Create one macOS app bundle containing both x64 and arm64 executables. Requires both macOS RIDs. Defaults to false.")]
     public bool PublishMultiArch { get; protected set; }
 
     /// <summary>
-    /// Gets a value indicating whether bundle creation (zip, apps, installers) is skipped after publishing.
+    /// Gets a value indicating whether raw publish directories are removed after publishing.
     /// </summary>
-    [Parameter(
-        "When publish set this variable(true) to not create the bundles (zip, apps, installers). Default: False")]
-    public bool PublishNoBundles { get; protected set; }
-
-    /// <summary>
-    /// Gets a value indicating whether the raw compilation folders are removed once the bundles are created.
-    /// </summary>
-    [Parameter(
-        "When publish set this variable(true) to keep only the bundles (zip, apps, installers), compilation folders will be removed. Default: False")]
-    public bool PublishDiscardNonBundles { get; protected set; }
+    [Parameter("Delete raw publish directories after publishing. Defaults to false.")]
+    public bool DeletePublishDirectories { get; protected set; }
 
     /// <summary>
     /// Gets the runtime identifiers to publish.
     /// </summary>
     [Parameter(
-        "RIDs to publish separated by space, Default: 'win-x64 win-arm64 osx-x64 osx-arm64 linux-x64 linux-arm64'")]
+        "Runtime identifiers to publish. Defaults to win-x64, win-arm64, osx-x64, osx-arm64, linux-x64, and linux-arm64.")]
     public string[] RIds { get; protected set; } =
     [
         "win-x64", "win-arm64",
@@ -137,11 +129,44 @@ public abstract partial class StageKitBuild : FalloutBuild
         get
         {
             var projects = Solution.AllProjects;
-            return field ??= projects.LastOrDefault(p =>
-                                 !IsExcludedByName(p) &&
-                                 IsRunnableProject(p))
-                             ?? throw new InvalidOperationException(
-                                 "No valid runnable project found in the solution that is not excluded by name. Please define MainProject directly.");
+            if (field is null)
+            {
+                var candidates = projects.Where(p => Convert.ToBoolean(GetProjectProperty(p, "FalloutMainProject"))).ToArray();
+                if (candidates.Length == 0)
+                {
+                    candidates = projects.Where(p => !IsExcludedByName(p) && IsRunnableProject(p)).ToArray();
+                    if (candidates.Length == 0)
+                    {
+                        throw new InvalidOperationException(
+                            "No valid runnable project found in the solution that is not excluded by name. Please define MainProject directly.");
+                    }
+                    else if (candidates.Length == 1)
+                    {
+                        field = candidates[0];
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException(
+                            $"Multiple runnable projects found in the solution that are not excluded by name. Please specify only one. Candidates: {string.Join(", ", candidates.Select(p => p.Name))}");
+                    }
+                }
+                else if (candidates.Length == 1)
+                {
+                    field = candidates[0];
+                }
+                else if (candidates.Length > 1)
+                {
+                    throw new InvalidOperationException(
+                        $"Multiple runnable projects found in the solution that are marked with 'FalloutMainProject=true'. Please specify only one. Candidates: {string.Join(", ", candidates.Select(p => p.Name))}");
+                }
+                else
+                {
+                    throw new InvalidOperationException(
+                        "No valid runnable project found in the solution that is marked with 'FalloutMainProject=true'. Please define MainProject directly.");
+                }
+            }
+
+            return field;
         }
     }
 

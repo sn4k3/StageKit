@@ -1,24 +1,27 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace StageKit.Demo;
+namespace StageKit.DemoCmd;
 
 public partial class GeneralAppSettings : SubSettings
 {
     [ObservableProperty]
-    public partial int MaxRecentDocuments { get; set; } = 10;
+    public partial int MaxThreads { get; set; } = -1;
 }
 
 public partial class AppSettings : RootSettingsFile<AppSettings>
 {
     [ObservableProperty]
-    public partial string DisplayName { get; set; } = "StageKit explorer";
-
-    [ObservableProperty]
     public partial string Theme { get; set; } = "System";
 
     [ObservableProperty]
+    public partial string ThemeColor { get; set; } = "Blue";
+
+    [ObservableProperty]
     public partial bool EnableCrashReporting { get; set; } = true;
+
+    [ObservableProperty]
+    public partial long LastRunTimestamp { get; set; }
 
     [ObservableProperty]
     public partial GeneralAppSettings General { get; set; } = new();
@@ -30,5 +33,11 @@ public partial class AppSettings : RootSettingsFile<AppSettings>
     {
         AutoSave = true;
         DirectoryPath = ApplicationKit.ConfigsPath;
+    }
+
+    public override string ToString()
+    {
+        return
+            $"{nameof(Theme)}: {Theme}, {nameof(ThemeColor)}: {ThemeColor}, {nameof(EnableCrashReporting)}: {EnableCrashReporting}, {nameof(LastRunTimestamp)}: {LastRunTimestamp}";
     }
 }

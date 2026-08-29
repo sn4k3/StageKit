@@ -14,8 +14,8 @@ internal class Build : StageKitBuild
         // In this case, remove these tokens to MainProject to detect
         ExcludedProjectNameTokens.Remove("demo");
 
-        // Set default publish bundles to
-        PublishBundles = ApplicationPackagingType.Portable
+        // Set default packaging formats to
+        PackagingTypes = ApplicationPackagingType.Portable
                          | ApplicationPackagingType.WindowsInstaller
                          | ApplicationPackagingType.LinuxAppImage
                          | ApplicationPackagingType.MacOSAppBundle;

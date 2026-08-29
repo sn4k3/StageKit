@@ -15,9 +15,8 @@ public partial class StageKitBuild
     /// <summary>
     /// Gets the application packaging types selected for publishing.
     /// </summary>
-    [Parameter(
-        "The application packaging types to create when publishing. Default: Portable")]
-    public ApplicationPackagingType PublishBundles { get; protected set; } = ApplicationPackagingType.Portable;
+    [Parameter("Packaging formats to create. Defaults to Portable.")]
+    public ApplicationPackagingType PackagingTypes { get; protected set; } = ApplicationPackagingType.Portable;
 
     /// <summary>
     /// Gets the file extensions removed directly from the publish directory after successful publishing.
@@ -26,13 +25,10 @@ public partial class StageKitBuild
     public string[] PublishCleanupExtensions { get; protected set; } = ["wixpdb"];
 
     /// <summary>
-    /// Gets or sets a value indicating whether Windows installers should package the single-file executable.
-    /// When <see langword="false"/>, installers use a separate normal publish while the standalone artifact
-    /// remains single-file.
+    /// Gets or sets a value indicating whether Windows installers use the single-file executable as their payload.
     /// </summary>
-    [Parameter(
-        "When single-file and Windows installer publishing are enabled, package the single-file executable in the installer. Default: False")]
-    public bool PublishInstallerWithSingleFile { get; protected set; }
+    [Parameter("Use the single-file executable as the Windows installer payload. Defaults to false.")]
+    public bool UseSingleFileForInstaller { get; protected set; }
 
     /// <summary>
     /// Gets the icon file used for macOS application bundles.
@@ -129,10 +125,10 @@ public partial class StageKitBuild
             .SetOutput(context.PublishPath)
             .EnableSelfContained()
             .EnablePublishReadyToRun()
-            .SetPublishSingleFile(PublishBundles.HasFlag(ApplicationPackagingType.DotNetSingleFile))
+            .SetPublishSingleFile(PackagingTypes.HasFlag(ApplicationPackagingType.DotNetSingleFile))
             .EnableNoRestore();
 
-        if (PublishBundles.HasFlag(ApplicationPackagingType.DotNetSingleFile))
+        if (PackagingTypes.HasFlag(ApplicationPackagingType.DotNetSingleFile))
         {
             settings = settings
                 .SetProperty("DebugType", "embedded")
@@ -184,7 +180,7 @@ public partial class StageKitBuild
             UnixSystem.SetUnix755Executable(executablePath);
         }
 
-        if (!PublishBundles.HasFlag(ApplicationPackagingType.DotNetSingleFile))
+        if (!PackagingTypes.HasFlag(ApplicationPackagingType.DotNetSingleFile))
         {
             PublishUtilities.WriteRuntimeManifest(context.PublishPath, BuildRuntimeManifestFileName,
                 new BuildRuntime(context.RuntimeIdentifier, SoftwareVersion, false, ApplicationPackagingType.Portable));
@@ -206,7 +202,7 @@ public partial class StageKitBuild
         try
         {
             var settings = CreatePublishSettings(context);
-            if (PublishBundles.HasFlag(ApplicationPackagingType.DotNetSingleFile))
+            if (PackagingTypes.HasFlag(ApplicationPackagingType.DotNetSingleFile))
             {
                 singleFileInputs = CreateSingleFilePublishInputs(context);
                 settings = settings
@@ -262,10 +258,16 @@ public partial class StageKitBuild
             CopySingleFileExecutable(context);
         }
 
-        if (!PublishNoBundles)
+        const ApplicationPackagingType packageTypes =
+            ApplicationPackagingType.Portable |
+            ApplicationPackagingType.WindowsInstaller |
+            ApplicationPackagingType.MacOSAppBundle |
+            ApplicationPackagingType.LinuxAppImage;
+
+        if ((PackagingTypes & packageTypes) != ApplicationPackagingType.None)
             CreateBundles(contexts);
 
-        if (PublishDiscardNonBundles)
+        if (DeletePublishDirectories)
         {
             foreach (var context in contexts)
                 context.PublishPath.DeleteDirectory();
@@ -369,7 +371,7 @@ public partial class StageKitBuild
         var bundleContexts = CreateBundlePayloads(contexts);
         try
         {
-            if (PublishBundles.HasFlag(ApplicationPackagingType.Portable))
+            if (PackagingTypes.HasFlag(ApplicationPackagingType.Portable))
             {
                 foreach (var context in bundleContexts)
                 {
@@ -387,17 +389,17 @@ public partial class StageKitBuild
             {
                 var runtime = PublishRid.ParseRuntimeIdentifier(context.RuntimeIdentifier);
 
-                if (PublishBundles.HasFlag(ApplicationPackagingType.WindowsInstaller) &&
+                if (PackagingTypes.HasFlag(ApplicationPackagingType.WindowsInstaller) &&
                     runtime.Family is PublishRidFamily.Windows)
                 {
                     CreateWindowsInstallers(context, runtime.InstallerPlatform!);
                 }
             }
 
-            if (PublishBundles.HasFlag(ApplicationPackagingType.MacOSAppBundle))
+            if (PackagingTypes.HasFlag(ApplicationPackagingType.MacOSAppBundle))
                 CreateMacOSApps(bundleContexts);
 
-            if (PublishBundles.HasFlag(ApplicationPackagingType.LinuxAppImage))
+            if (PackagingTypes.HasFlag(ApplicationPackagingType.LinuxAppImage))
                 CreateLinuxAppImages(bundleContexts);
         }
         finally
@@ -414,10 +416,10 @@ public partial class StageKitBuild
     protected virtual IReadOnlyCollection<PublishRidContext> CreateBundlePayloads(
         IReadOnlyCollection<PublishRidContext> contexts)
     {
-        if (!PublishBundles.HasFlag(ApplicationPackagingType.DotNetSingleFile) ||
-            (!PublishBundles.HasFlag(ApplicationPackagingType.Portable) &&
-             !PublishBundles.HasFlag(ApplicationPackagingType.MacOSAppBundle) &&
-             !PublishBundles.HasFlag(ApplicationPackagingType.LinuxAppImage)))
+        if (!PackagingTypes.HasFlag(ApplicationPackagingType.DotNetSingleFile) ||
+            (!PackagingTypes.HasFlag(ApplicationPackagingType.Portable) &&
+             !PackagingTypes.HasFlag(ApplicationPackagingType.MacOSAppBundle) &&
+             !PackagingTypes.HasFlag(ApplicationPackagingType.LinuxAppImage)))
         {
             return contexts;
         }
@@ -429,11 +431,11 @@ public partial class StageKitBuild
             {
                 var runtime = PublishRid.ParseRuntimeIdentifier(context.RuntimeIdentifier);
                 var requiresNormalPayload =
-                    PublishBundles.HasFlag(ApplicationPackagingType.Portable) ||
+                    PackagingTypes.HasFlag(ApplicationPackagingType.Portable) ||
                     (runtime.Family is PublishRidFamily.MacOS &&
-                     PublishBundles.HasFlag(ApplicationPackagingType.MacOSAppBundle)) ||
+                     PackagingTypes.HasFlag(ApplicationPackagingType.MacOSAppBundle)) ||
                     (runtime.Family is PublishRidFamily.Linux &&
-                     PublishBundles.HasFlag(ApplicationPackagingType.LinuxAppImage));
+                     PackagingTypes.HasFlag(ApplicationPackagingType.LinuxAppImage));
 
                 if (!requiresNormalPayload)
                 {

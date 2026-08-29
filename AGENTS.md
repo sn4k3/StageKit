@@ -16,7 +16,9 @@ Main projects:
 - `tests/StageKit.Tests/StageKit.Tests.csproj` - core, primitives, and runtime tests
 - `tests/StageKit.Updatum.Tests/StageKit.Updatum.Tests.csproj` - Updatum tests
 - `tests/StageKit.Fallout.Tests/StageKit.Fallout.Tests.csproj` - Fallout tests
-- `demo/StageKit.Demo/StageKit.Demo.csproj` - core demo app
+- `tests/StageKit.Demo.Tests/StageKit.Demo.Tests.csproj` - Avalonia demo presentation tests
+- `demo/StageKit.Demo/StageKit.Demo.csproj` - Avalonia workshop for core and Updatum features
+- `demo/StageKit.DemoCmd/StageKit.DemoCmd.csproj` - command-line core demo
 - `demo/Updatum.Demo/Updatum.Demo.csproj` - updater demo app
 - `builds/build/build.csproj` - Fallout build entry point
 - `builds/StageKit.Installer/StageKit.Installer.wixproj` - WiX installer project

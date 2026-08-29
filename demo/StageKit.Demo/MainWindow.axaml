@@ -1,0 +1,427 @@
+<Window
+    x:Class="StageKit.Demo.MainWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="{Binding WindowTitle}"
+    Width="1180"
+    Height="780"
+    MinWidth="940"
+    MinHeight="640"
+    Background="{DynamicResource DemoPageBackgroundBrush}"
+    Foreground="{DynamicResource DemoPrimaryTextBrush}"
+    WindowStartupLocation="CenterScreen">
+
+    <Window.Styles>
+        <Style Selector="Border.card">
+            <Setter Property="Background" Value="{DynamicResource DemoCardBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource DemoCardBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="Padding" Value="20" />
+            <Setter Property="BoxShadow" Value="0 6 20 0 #140B1530" />
+        </Style>
+        <Style Selector="TextBlock.title">
+            <Setter Property="FontSize" Value="24" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="TextBlock.section-title">
+            <Setter Property="FontSize" Value="17" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="TextBlock.muted">
+            <Setter Property="Foreground" Value="{DynamicResource DemoSecondaryTextBrush}" />
+        </Style>
+        <Style Selector="Button">
+            <Setter Property="Padding" Value="14,8" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Button.primary">
+            <Setter Property="Background" Value="{DynamicResource DemoPrimaryButtonBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource DemoPrimaryButtonBackgroundBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource DemoPrimaryButtonForegroundBrush}" />
+        </Style>
+        <Style Selector="Button.primary:pointerover">
+            <Setter Property="Background" Value="{DynamicResource DemoPrimaryButtonHoverBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource DemoPrimaryButtonHoverBrush}" />
+        </Style>
+        <Style Selector="Button.primary:pressed">
+            <Setter Property="Background" Value="{DynamicResource DemoPrimaryButtonPressedBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource DemoPrimaryButtonPressedBrush}" />
+        </Style>
+        <Style Selector="Button.primary:disabled">
+            <Setter Property="Background" Value="{DynamicResource DemoDisabledBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource DemoDisabledBackgroundBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource DemoDisabledForegroundBrush}" />
+        </Style>
+        <Style Selector="Button.danger">
+            <Setter Property="Background" Value="{DynamicResource DemoDangerButtonBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource DemoDangerButtonBackgroundBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource DemoDangerButtonForegroundBrush}" />
+        </Style>
+        <Style Selector="Button.danger:pointerover">
+            <Setter Property="Background" Value="{DynamicResource DemoDangerButtonHoverBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource DemoDangerButtonHoverBrush}" />
+        </Style>
+        <Style Selector="Button.danger:pressed">
+            <Setter Property="Background" Value="{DynamicResource DemoDangerButtonPressedBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource DemoDangerButtonPressedBrush}" />
+        </Style>
+        <Style Selector="Button.danger:disabled">
+            <Setter Property="Background" Value="{DynamicResource DemoDisabledBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource DemoDisabledBackgroundBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource DemoDisabledForegroundBrush}" />
+        </Style>
+        <Style Selector="TabItem">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="16,10" />
+        </Style>
+    </Window.Styles>
+
+    <Grid RowDefinitions="Auto,*,Auto">
+        <Border Grid.Row="0" Padding="28,22" Background="#111A33">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+                <Border Width="54" Height="54" CornerRadius="14" Background="#536DFE">
+                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                               FontSize="20" FontWeight="Bold" Foreground="White" Text="SK" />
+                </Border>
+                <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock FontSize="26" FontWeight="SemiBold" Foreground="White" Text="StageKit Workshop" />
+                    <TextBlock Foreground="#BFC9E3"
+                               Text="Application infrastructure you can see, change, break, and recover." />
+                </StackPanel>
+                <StackPanel Grid.Column="2" HorizontalAlignment="Right" Spacing="7">
+                    <Border Padding="12,6" CornerRadius="14" Background="#253555">
+                        <TextBlock Foreground="#E5EBFF" Text="net10.0 · Avalonia 12" />
+                    </Border>
+                    <Border Padding="12,6" CornerRadius="14" Background="#213D3B">
+                        <TextBlock Foreground="#9BE6D5" Text="Interactive local sandbox" />
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <TabControl x:Name="FeatureTabs" Grid.Row="1" Margin="22"
+                    SelectedIndex="{Binding SelectedFeatureIndex}">
+            <TabItem Header="◈  Runtime">
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="4,18" Spacing="16">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel>
+                                <TextBlock Classes="title" Text="Runtime &amp; diagnostics" />
+                                <TextBlock Classes="muted"
+                                           Text="See what StageKit knows about this process and its packaging shape." />
+                            </StackPanel>
+                            <Button Grid.Column="1" Command="{Binding RefreshRuntimeCommand}"
+                                    Content="Refresh diagnostics" />
+                        </Grid>
+
+                        <ItemsControl ItemsSource="{Binding RuntimeValues}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel ItemWidth="255" ItemHeight="92" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Classes="card" Margin="0,0,12,12">
+                                        <StackPanel Spacing="6">
+                                            <TextBlock Classes="muted" Text="{Binding Label}" />
+                                            <TextBlock FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding Value}" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <Border Classes="card">
+                            <StackPanel Spacing="10">
+                                <TextBlock Classes="section-title" Text="Feature map" />
+                                <ItemsControl ItemsSource="{Binding Features}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,5" ColumnDefinitions="130,*,300">
+                                                <TextBlock FontWeight="SemiBold" Text="{Binding Name}" />
+                                                <TextBlock Grid.Column="1" Margin="8,0" TextWrapping="Wrap"
+                                                           Text="{Binding Description}" />
+                                                <ItemsControl Grid.Column="2" ItemsSource="{Binding APIs}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <WrapPanel />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Margin="3,0" Padding="7,3" CornerRadius="6"
+                                                                    Background="{DynamicResource DemoChipBackgroundBrush}">
+                                                                <TextBlock FontSize="11"
+                                                                           Foreground="{DynamicResource DemoPrimaryTextBrush}"
+                                                                           Text="{Binding}" />
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel Spacing="10">
+                                <TextBlock Classes="section-title" Text="Full runtime report" />
+                                <TextBox MinHeight="260"
+                                         AcceptsReturn="True"
+                                         FontFamily="Consolas"
+                                         FontSize="12"
+                                         IsReadOnly="True"
+                                         Text="{Binding RuntimeReport}" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="⚙  Settings">
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="4,18" Spacing="16">
+                        <StackPanel>
+                            <TextBlock Classes="title" Text="Persistent settings" />
+                            <TextBlock Classes="muted"
+                                       Text="Edit values and watch atomic autosave and collection persistence in action." />
+                        </StackPanel>
+
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                            <Border Classes="card">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Classes="section-title" Text="AppSettings" />
+                                    <TextBlock Classes="muted" Text="Display name" />
+                                    <TextBox Text="{Binding Settings.DisplayName, Mode=TwoWay}" />
+                                    <TextBlock Classes="muted" Text="Theme preference" />
+                                    <ComboBox x:Name="ThemePreferenceComboBox"
+                                              ItemsSource="{Binding ThemeOptions}"
+                                              SelectedItem="{Binding Settings.Theme, Mode=TwoWay}" />
+                                    <TextBlock Classes="muted" Text="Maximum recent documents" />
+                                    <NumericUpDown Minimum="1" Maximum="100"
+                                                   Increment="1"
+                                                   FormatString="F0"
+                                                   Value="{Binding Settings.General.MaxRecentDocuments, Mode=TwoWay}" />
+                                    <ToggleSwitch Content="Enable crash reporting"
+                                                  IsChecked="{Binding Settings.EnableCrashReporting, Mode=TwoWay}" />
+                                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding SettingsFileStatus}" />
+                                    <WrapPanel>
+                                        <Button Classes="primary" Margin="0,0,8,0"
+                                                Command="{Binding SaveSettingsCommand}" Content="Save now" />
+                                        <Button Command="{Binding WaitForAutoSaveCommand}" Content="Wait for autosave" />
+                                    </WrapPanel>
+                                    <Button x:Name="OpenSettingsDirectoryButton"
+                                            HorizontalAlignment="Left"
+                                            Command="{Binding OpenSettingsDirectoryCommand}"
+                                            Content="Open settings directory" />
+                                    <TextBlock Classes="muted" TextWrapping="Wrap"
+                                               Text="{Binding SettingsDirectoryPath}" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="1" Classes="card">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Classes="section-title" Text="RecentDocuments" />
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                        <TextBox PlaceholderText="Example: roadmap.stagekit"
+                                                 Text="{Binding NewRecentDocument, Mode=TwoWay}" />
+                                        <Button Grid.Column="1" Classes="primary"
+                                                Command="{Binding AddRecentDocumentCommand}" Content="Add" />
+                                    </Grid>
+                                    <ListBox MinHeight="235" ItemsSource="{Binding RecentItems}" />
+                                    <Button HorizontalAlignment="Left"
+                                            Command="{Binding ClearRecentDocumentsCommand}"
+                                            Content="Clear recent documents" />
+                                    <TextBlock Classes="muted" TextWrapping="Wrap"
+                                               Text="Changes are debounced and saved through RootCollectionFile." />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="⬡  Storage &amp; safety">
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="4,18" Spacing="16">
+                        <StackPanel>
+                            <TextBlock Classes="title" Text="Storage, onboarding &amp; safety" />
+                            <TextBlock Classes="muted"
+                                       Text="Create real profile artifacts and exercise lifecycle helpers." />
+                        </StackPanel>
+
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                            <StackPanel Spacing="16">
+                                <Border Classes="card">
+                                    <StackPanel Spacing="12">
+                                        <TextBlock Classes="section-title" Text="Backups &amp; support" />
+                                        <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding ProfilePath}" />
+                                        <WrapPanel>
+                                            <Button Margin="0,0,8,8"
+                                                    x:Name="OpenProfileDirectoryButton"
+                                                    Command="{Binding OpenProfileDirectoryCommand}"
+                                                    Content="Open profile directory" />
+                                            <Button Classes="primary" Margin="0,0,8,8"
+                                                    Command="{Binding CreateBackupCommand}"
+                                                    Content="Create profile backup" />
+                                            <Button Margin="0,0,8,8"
+                                                    Command="{Binding ExportSupportBundleCommand}"
+                                                    Content="Export support bundle" />
+                                            <Button Margin="0,0,8,8"
+                                                    Command="{Binding ApplyRetentionCommand}" Content="Apply retention" />
+                                        </WrapPanel>
+                                        <TextBlock Classes="muted" TextWrapping="Wrap"
+                                                   Text="{Binding LastArtifactPath}" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Classes="card">
+                                    <StackPanel Spacing="12">
+                                        <TextBlock Classes="section-title" Text="Onboarding state" />
+                                        <TextBlock TextWrapping="Wrap" Text="{Binding OnboardingSummary}" />
+                                        <WrapPanel>
+                                            <Button Classes="primary" Margin="0,0,8,0"
+                                                    Command="{Binding CompleteOnboardingCommand}"
+                                                    Content="Complete onboarding" />
+                                            <Button Command="{Binding ResetOnboardingCommand}"
+                                                    Content="Reset onboarding" />
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <Border Grid.Column="1" Classes="card">
+                                <StackPanel Spacing="12">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="section-title" Text="Crash-report round trip" />
+                                        <Border Grid.Column="1" Padding="9,4" CornerRadius="10"
+                                                Background="{DynamicResource DemoDangerButtonBackgroundBrush}">
+                                            <TextBlock FontSize="11"
+                                                       Foreground="{DynamicResource DemoDangerButtonForegroundBrush}"
+                                                       Text="RECOVERY LAB" />
+                                        </Border>
+                                    </Grid>
+                                    <TextBlock TextWrapping="Wrap" Text="{Binding CrashReportSummary}" />
+                                    <TextBlock Classes="muted" TextWrapping="Wrap"
+                                               Text="AppSettings and RecentDocuments are registered for panic-save. Known Avalonia DBus noise is ignored." />
+                                    <Button HorizontalAlignment="Left"
+                                            Command="{Binding RecordSafeExceptionCommand}"
+                                            Content="Log a handled exception" />
+                                    <TextBlock Classes="muted" TextWrapping="Wrap"
+                                               Text="This button demonstrates safe exception logging without terminating the demo." />
+                                    <Border Padding="16" CornerRadius="10" BorderThickness="1"
+                                            BorderBrush="{DynamicResource DemoDangerButtonBackgroundBrush}"
+                                            Background="{DynamicResource DemoCardBackgroundBrush}">
+                                        <StackPanel Spacing="9">
+                                            <TextBlock FontWeight="SemiBold" Text="{Binding StartupCrashReportTitle}" />
+                                            <TextBox MinHeight="150" MaxHeight="260"
+                                                     AcceptsReturn="True" IsReadOnly="True"
+                                                     FontFamily="Consolas" FontSize="11"
+                                                     TextWrapping="Wrap" Text="{Binding StartupCrashReportText}" />
+                                            <TextBlock Classes="muted" TextWrapping="Wrap"
+                                                       Text="This intentionally terminates the process. StageKit saves the report, relaunches the demo, and returns to this tab." />
+                                            <Button x:Name="ThrowFatalExceptionButton"
+                                                    HorizontalAlignment="Left"
+                                                    Classes="danger"
+                                                    Command="{Binding ThrowFatalExceptionCommand}"
+                                                    Content="Throw fatal exception and reload" />
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="⇧  Updates">
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="4,18" Spacing="16">
+                        <StackPanel>
+                            <TextBlock Classes="title" Text="Updatum update workflow" />
+                            <TextBlock Classes="muted"
+                                       Text="Discover UVtools releases, select this runtime's asset, and download with checksum verification." />
+                        </StackPanel>
+
+                        <Grid ColumnDefinitions="340,*" ColumnSpacing="16">
+                            <StackPanel Spacing="16">
+                                <Border Classes="card">
+                                    <StackPanel Spacing="11">
+                                        <TextBlock Classes="section-title" Text="Release source" />
+                                        <TextBlock FontWeight="SemiBold" Text="{Binding UpdaterRepository}" />
+                                        <TextBlock Classes="muted" Text="Stable releases · SHA-256 required" />
+                                        <WrapPanel>
+                                            <Button Classes="primary" Margin="0,0,8,8"
+                                                    Command="{Binding CheckForUpdatesCommand}"
+                                                    Content="Check for updates" />
+                                            <Button Margin="0,0,8,8"
+                                                    IsEnabled="{Binding CanDownloadUpdate}"
+                                                    Command="{Binding DownloadUpdateCommand}"
+                                                    Content="Download verified asset" />
+                                            <Button Margin="0,0,8,8"
+                                                    Command="{Binding CancelUpdateOperationCommand}" Content="Cancel" />
+                                            <Button Margin="0,0,8,8"
+                                                    x:Name="InstallUpdateButton"
+                                                    IsEnabled="{Binding CanInstallUpdate}"
+                                                    Command="{Binding InstallDownloadedUpdateCommand}"
+                                                    Content="Install update" />
+                                        </WrapPanel>
+                                        <CheckBox x:Name="AutoInstallUpdatesCheckBox"
+                                                  Content="Automatically install after a verified download"
+                                                  IsChecked="{Binding AutoInstallUpdates, Mode=TwoWay}" />
+                                        <TextBlock Classes="muted" TextWrapping="Wrap"
+                                                   Text="Installation starts a platform-specific replacement script and restarts this app. Keep this opt-in while testing." />
+                                        <ProgressBar Minimum="0" Maximum="100" Value="{Binding DownloadPercentage}" />
+                                        <TextBlock Classes="muted" Text="{Binding DownloadProgress}" />
+                                        <Button HorizontalAlignment="Left"
+                                                IsEnabled="{Binding HasDownloadedAsset}"
+                                                Command="{Binding DeleteDownloadedAssetCommand}"
+                                                Content="Delete downloaded asset" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Classes="card">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Classes="section-title" Text="Selection" />
+                                        <TextBlock TextWrapping="Wrap" Text="{Binding ReleaseSummary}" />
+                                        <TextBlock Classes="muted" TextWrapping="Wrap"
+                                                   Text="{Binding CompatibleAssetName}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{Binding UpdaterStatus}" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <Border Grid.Column="1" Classes="card">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Classes="section-title" Text="Release notes" />
+                                    <TextBox MinHeight="430"
+                                             AcceptsReturn="True"
+                                             IsReadOnly="True"
+                                             TextWrapping="Wrap"
+                                             Text="{Binding ChangelogText}" />
+                                    <TextBlock Classes="muted" TextWrapping="Wrap"
+                                               Text="Installation is opt-in: the demo exercises the same verified replacement flow used by a production app." />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <Border Grid.Row="2" Padding="22,11" BorderThickness="0,1,0,0"
+                Background="{DynamicResource DemoCardBackgroundBrush}"
+                BorderBrush="{DynamicResource DemoCardBorderBrush}">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="9">
+                <Border Width="9" Height="9" CornerRadius="5" Background="#2FBF9B" />
+                <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" Text="{Binding StatusMessage}" />
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

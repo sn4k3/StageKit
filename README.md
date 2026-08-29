@@ -580,9 +580,19 @@ var report = RuntimeDiagnostics.GetReport(includeLoadedAssemblies: true);
 
 ## Demo
 
-See [demo/StageKit.Demo/Program.cs](demo/StageKit.Demo/Program.cs) for a runnable console demo covering startup
-configuration, Serilog integration, AutoSave settings, collection settings, panic-save registration, crash report launch
-handling, and debounced save waiting.
+The [StageKit.Demo Avalonia app](demo/StageKit.Demo/StageKit.Demo.csproj) is an interactive workshop with tabs for:
+
+- runtime and packaging diagnostics;
+- atomic autosave settings, a live System/Light/Dark theme selector, recent-document collection persistence, and direct access to the settings directory;
+- profile backups, support bundles, retention, onboarding state, and a fatal crash/relaunch/report-loading round trip;
+- Updatum release discovery against `sn4k3/UVtools`, checksum-verified downloads, and opt-in staged installation for the current runtime.
+
+Update installation is opt-in and clearly separated from download, so the demo can exercise the full replacement flow
+without installing anything accidentally.
+
+The original console sample is retained as
+[StageKit.DemoCmd](demo/StageKit.DemoCmd/StageKit.DemoCmd.csproj). It covers startup configuration, Serilog integration,
+settings persistence, panic-save registration, crash-report launch handling, and debounced saves.
 
 [demo/Updatum.Demo/Program.cs](demo/Updatum.Demo/Program.cs) is a "fake app" demo for the updater.
 
@@ -590,6 +600,7 @@ Run them with:
 
 ```bash
 dotnet run --project demo/StageKit.Demo/StageKit.Demo.csproj
+dotnet run --project demo/StageKit.DemoCmd/StageKit.DemoCmd.csproj
 dotnet run --project demo/Updatum.Demo/Updatum.Demo.csproj
 ```
 
@@ -601,6 +612,7 @@ Restore, build, and test:
 dotnet restore
 dotnet build .\StageKit.slnx --configuration Release -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true
 dotnet run --project .\tests\StageKit.Tests\StageKit.Tests.csproj --framework net10.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none
+dotnet run --project .\tests\StageKit.Demo.Tests\StageKit.Demo.Tests.csproj --framework net10.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none
 dotnet run --project .\tests\StageKit.Updatum.Tests\StageKit.Updatum.Tests.csproj --framework net10.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none
 dotnet run --project .\tests\StageKit.Fallout.Tests\StageKit.Fallout.Tests.csproj --framework net10.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none
 ```
@@ -608,8 +620,9 @@ dotnet run --project .\tests\StageKit.Fallout.Tests\StageKit.Fallout.Tests.cspro
 ## Build Pipeline
 
 Release publishing is driven by [`StageKit.Fallout`](src/StageKit.Fallout/README.md), a reusable Fallout (NUKE-style)
-build library. `build.ps1` / `build.sh` bootstrap the .NET SDK when needed, restore the pinned `fallout` global tool,
-then run the build project in `builds/build`:
+build library. The manual GitHub Actions release workflow packages the libraries, publishes runtime assets for each
+supported platform, and attaches both to a GitHub release. `build.ps1` / `build.sh` bootstrap the .NET SDK when needed,
+restore the pinned `fallout` global tool, then run the build project in `builds/build`:
 
 ```powershell
 ./build.ps1 Print

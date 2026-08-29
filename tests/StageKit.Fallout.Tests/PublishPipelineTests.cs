@@ -18,6 +18,23 @@ namespace StageKit.Fallout.Tests;
 public class PublishPipelineTests
 {
     /// <summary>
+    /// Verifies that publishing parameters expose the simplified public names.
+    /// </summary>
+    [Fact]
+    public void ParameterProperties_PublicSurface_UsesSimplifiedNames()
+    {
+        var buildType = typeof(StageKitBuild);
+
+        Assert.NotNull(buildType.GetProperty(nameof(StageKitBuild.PackagingTypes)));
+        Assert.NotNull(buildType.GetProperty(nameof(StageKitBuild.DeletePublishDirectories)));
+        Assert.NotNull(buildType.GetProperty(nameof(StageKitBuild.UseSingleFileForInstaller)));
+        Assert.Null(buildType.GetProperty("PublishBundles"));
+        Assert.Null(buildType.GetProperty("PublishNoBundles"));
+        Assert.Null(buildType.GetProperty("PublishDiscardNonBundles"));
+        Assert.Null(buildType.GetProperty("PublishInstallerWithSingleFile"));
+    }
+
+    /// <summary>
     /// Verifies that runnable-project detection survives the known in-process NuGet assembly conflict.
     /// </summary>
     [Fact]
@@ -76,7 +93,7 @@ public class PublishPipelineTests
         Assert.Contains(nameof(StageKitBuild.Configuration), variables.Keys);
         Assert.Contains(nameof(StageKitBuild.SoftwareName), variables.Keys);
         Assert.Contains(nameof(StageKitBuild.SoftwareExecutableFileNameWithoutExtension), variables.Keys);
-        Assert.Contains(nameof(StageKitBuild.PublishBundles), variables.Keys);
+        Assert.Contains(nameof(StageKitBuild.PackagingTypes), variables.Keys);
         Assert.Contains(nameof(StageKitBuild.PublishCleanupExtensions), variables.Keys);
         Assert.Contains(nameof(StageKitBuild.AssetName), variables.Keys);
         Assert.Contains(nameof(StageKitBuild.MacAppBundleOptions), variables.Keys);
@@ -216,7 +233,7 @@ public class PublishPipelineTests
                 TestSoftwareExecutableName = "PublishedExecutable",
                 UseDefaultPreparation = true
             };
-            build.SetPublishBundles(0);
+            build.SetPackagingTypes(0);
             var context = new PublishRidContext
             {
                 Build = build,
@@ -264,6 +281,7 @@ public class PublishPipelineTests
                 TestBuildRuntimeManifestFileName = "runtime.json",
                 UseDefaultPreparation = true
             };
+            build.SetPackagingTypes(ApplicationPackagingType.DotNetSingleFile);
             var context = CreateContext(build, "win-x64", publishDirectory);
 
             build.InvokePreparePublishedOutput(context);
@@ -277,16 +295,17 @@ public class PublishPipelineTests
     }
 
     /// <summary>
-    /// Verifies that default publish settings preserve the configured project, RID, output, and required flags.
+    /// Verifies that single-file publish settings preserve the configured project, RID, output, and required flags.
     /// </summary>
     [Fact]
-    public void CreatePublishSettings_Defaults_UseProjectRuntimeOutputAndRequiredFlags()
+    public void CreatePublishSettings_SingleFileSelection_UsesProjectRuntimeOutputAndRequiredFlags()
     {
         var build = new TestBuild
         {
             UseDefaultSettings = true,
             TestMainProject = CreateProject("Example.csproj")
         };
+        build.SetPackagingTypes(ApplicationPackagingType.DotNetSingleFile);
         var context = CreateContext(build);
 
         var settings = build.InvokeCreatePublishSettings(context);
@@ -301,7 +320,8 @@ public class PublishPipelineTests
         Assert.True(Assert.IsType<JsonElement>(settings.Properties["PublishSingleFile"]).GetBoolean());
         Assert.Equal("embedded", Assert.IsType<JsonElement>(settings.Properties["DebugType"]).GetString());
         Assert.False(Assert.IsType<JsonElement>(settings.Properties["PublishDocumentationFiles"]).GetBoolean());
-        //Assert.True(Assert.IsType<JsonElement>(settings.Properties["IncludeAllContentForSelfExtract"]).GetBoolean());
+        Assert.True(
+            Assert.IsType<JsonElement>(settings.Properties["IncludeAllContentForSelfExtract"]).GetBoolean());
         Assert.True(
             Assert.IsType<JsonElement>(settings.Properties["IncludeNativeLibrariesForSelfExtract"]).GetBoolean());
     }
@@ -318,6 +338,7 @@ public class PublishPipelineTests
             UseDefaultSettings = true,
             TestMainProject = CreateProject("Example.csproj")
         };
+        build.SetPackagingTypes(ApplicationPackagingType.DotNetSingleFile);
         var context = CreateContext(build, "win-x64");
 
         build.InvokePublishRuntime(context);
@@ -346,7 +367,7 @@ public class PublishPipelineTests
             UseDefaultSettings = true,
             TestMainProject = CreateProject("Example.csproj")
         };
-        build.SetPublishBundles(0);
+        build.SetPackagingTypes(0);
         var context = CreateContext(build);
 
         var settings = build.InvokeCreatePublishSettings(context);
@@ -365,7 +386,7 @@ public class PublishPipelineTests
             UseDefaultSettings = true,
             TestMainProject = CreateProject("Example.csproj")
         };
-        build.SetPublishBundles(ApplicationPackagingType.DotNetSingleFile | ApplicationPackagingType.WindowsInstaller);
+        build.SetPackagingTypes(ApplicationPackagingType.DotNetSingleFile | ApplicationPackagingType.WindowsInstaller);
         var context = CreateContext(build, "win-x64");
         var installerOutput = (AbsolutePath)Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}");
 
@@ -609,10 +630,10 @@ public class PublishPipelineTests
     }
 
     /// <summary>
-    /// Verifies that raw output is discarded only after all selected bundle work succeeds.
+    /// Verifies that raw output is deleted only after all selected bundle work succeeds.
     /// </summary>
     [Fact]
-    public void ExecutePublish_DiscardNonBundlesEnabled_DeletesRawOutputAfterBundles()
+    public void ExecutePublish_DeletePublishDirectoriesEnabled_DeletesRawOutputAfterBundles()
     {
         var rootDirectory = Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}");
         Directory.CreateDirectory(rootDirectory);
@@ -633,10 +654,10 @@ public class PublishPipelineTests
     }
 
     /// <summary>
-    /// Verifies that the global no-bundles option suppresses bundle dispatch.
+    /// Verifies that selecting no packaging formats suppresses bundle dispatch.
     /// </summary>
     [Fact]
-    public void ExecutePublish_NoBundlesEnabled_DoesNotCreateBundles()
+    public void ExecutePublish_NoPackagingTypes_DoesNotCreateBundles()
     {
         var rootDirectory = Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}");
         Directory.CreateDirectory(rootDirectory);
@@ -693,6 +714,7 @@ public class PublishPipelineTests
         {
             var build = CreateTargetBuild(rootDirectory, false, true, "win-x64");
             build.TestSoftwareExecutableName = "PublishedExecutable";
+            build.SetPackagingTypes(ApplicationPackagingType.DotNetSingleFile);
 
             build.InvokeExecutePublish();
 
@@ -717,6 +739,7 @@ public class PublishPipelineTests
         try
         {
             var build = CreateTargetBuild(rootDirectory, false, true, "linux-x64");
+            build.SetPackagingTypes(ApplicationPackagingType.DotNetSingleFile);
 
             build.InvokeExecutePublish();
 
@@ -753,6 +776,7 @@ public class PublishPipelineTests
         try
         {
             var build = CreateTargetBuild(rootDirectory, false, true, "win-x64");
+            build.SetPackagingTypes(ApplicationPackagingType.DotNetSingleFile);
             var invocationCount = 0;
             build.AssetName = context =>
             {
@@ -839,7 +863,7 @@ public class PublishPipelineTests
             UseDefaultBundlePipeline = true,
             RecordPortableZip = true
         };
-        build.SetPublishBundles(ApplicationPackagingType.DotNetSingleFile);
+        build.SetPackagingTypes(ApplicationPackagingType.DotNetSingleFile);
         var contexts = new[]
         {
             CreateContext(build, "win-x64"),
@@ -863,7 +887,7 @@ public class PublishPipelineTests
             UseDefaultBundlePipeline = true,
             RecordPortableZip = true
         };
-        build.SetPublishBundles(ApplicationPackagingType.Portable);
+        build.SetPackagingTypes(ApplicationPackagingType.Portable);
         var contexts = new[]
         {
             CreateContext(build, "win-x64"),
@@ -889,7 +913,7 @@ public class PublishPipelineTests
             RecordMacOSApp = true,
             TestUnixHost = true
         };
-        build.SetPublishBundles(ApplicationPackagingType.Portable |
+        build.SetPackagingTypes(ApplicationPackagingType.Portable |
                                 ApplicationPackagingType.MacOSAppBundle);
 
         build.InvokeCreateBundles([CreateContext(build, "osx-x64")]);
@@ -911,7 +935,7 @@ public class PublishPipelineTests
             RecordMacOSWarning = true,
             TestUnixHost = false
         };
-        build.SetPublishBundles(ApplicationPackagingType.Portable |
+        build.SetPackagingTypes(ApplicationPackagingType.Portable |
                                 ApplicationPackagingType.MacOSAppBundle);
 
         build.InvokeCreateBundles([CreateContext(build, "osx-x64")]);
@@ -937,7 +961,7 @@ public class PublishPipelineTests
                 RecordPortableZip = true,
                 TestMainProject = CreateProject("Example.csproj")
             };
-            build.SetPublishBundles(ApplicationPackagingType.Portable |
+            build.SetPackagingTypes(ApplicationPackagingType.Portable |
                                     ApplicationPackagingType.DotNetSingleFile);
 
             build.InvokeCreateBundles([CreateContext(build, "win-x64", publishPath)]);
@@ -973,7 +997,7 @@ public class PublishPipelineTests
                 TestUnixHost = true,
                 TestMainProject = CreateProject("Example.csproj")
             };
-            build.SetPublishBundles(ApplicationPackagingType.DotNetSingleFile |
+            build.SetPackagingTypes(ApplicationPackagingType.DotNetSingleFile |
                                     ApplicationPackagingType.MacOSAppBundle);
 
             build.InvokeCreateBundles([CreateContext(build, "osx-x64", publishPath)]);
@@ -1051,7 +1075,7 @@ public class PublishPipelineTests
         bool expected)
     {
         var build = new TestBuild();
-        build.SetPublishBundles(bundleTypes);
+        build.SetPackagingTypes(bundleTypes);
 
         Assert.Equal(expected, build.InvokeShouldCreatePortableZip(rid));
     }
@@ -1133,7 +1157,7 @@ public class PublishPipelineTests
                     CreateProject("Second.WIXPROJ")
                 ]
             };
-            build.SetPublishBundles(ApplicationPackagingType.WindowsInstaller);
+            build.SetPackagingTypes(ApplicationPackagingType.WindowsInstaller);
             var contexts = new[]
             {
                 CreateContext(build, "win-x64", CreateRawOutput(rootDirectory, "win-x64")),
@@ -1183,7 +1207,7 @@ public class PublishPipelineTests
             RecordLinuxAppImage = true,
             TestLinuxHost = true
         };
-        build.SetPublishBundles(ApplicationPackagingType.LinuxAppImage);
+        build.SetPackagingTypes(ApplicationPackagingType.LinuxAppImage);
         var contexts = new[]
         {
             CreateContext(build, "win-x64"),
@@ -1209,7 +1233,7 @@ public class PublishPipelineTests
             RecordLinuxAppImage = true,
             RecordLinuxWarning = true
         };
-        build.SetPublishBundles(ApplicationPackagingType.LinuxAppImage);
+        build.SetPackagingTypes(ApplicationPackagingType.LinuxAppImage);
 
         build.InvokeCreateBundles(
         [
@@ -2244,7 +2268,7 @@ public class PublishPipelineTests
             RecordMacOSApp = true,
             TestUnixHost = true
         };
-        build.SetPublishBundles(ApplicationPackagingType.MacOSAppBundle);
+        build.SetPackagingTypes(ApplicationPackagingType.MacOSAppBundle);
         var contexts = new[]
         {
             CreateContext(build, "linux-x64"),
@@ -2271,7 +2295,7 @@ public class PublishPipelineTests
             RecordMultiArchMacOSApp = true,
             TestUnixHost = true
         };
-        build.SetPublishBundles(ApplicationPackagingType.MacOSAppBundle);
+        build.SetPackagingTypes(ApplicationPackagingType.MacOSAppBundle);
         build.SetPublishMultiArch(true);
         var contexts = new[]
         {
@@ -2303,7 +2327,7 @@ public class PublishPipelineTests
             RecordMultiArchMacOSApp = true,
             TestUnixHost = true
         };
-        build.SetPublishBundles(ApplicationPackagingType.MacOSAppBundle);
+        build.SetPackagingTypes(ApplicationPackagingType.MacOSAppBundle);
         build.SetPublishMultiArch(true);
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
@@ -2326,7 +2350,7 @@ public class PublishPipelineTests
             RecordMultiArchMacOSApp = true,
             RecordMacOSWarning = true
         };
-        build.SetPublishBundles(ApplicationPackagingType.MacOSAppBundle);
+        build.SetPackagingTypes(ApplicationPackagingType.MacOSAppBundle);
 
         build.InvokeCreateBundles(
         [
@@ -2965,8 +2989,8 @@ public class PublishPipelineTests
 
     private static TestBuild CreateTargetBuild(
         string rootDirectory,
-        bool discardNonBundles = false,
-        bool publishNoBundles = false,
+        bool deletePublishDirectories = false,
+        bool noPackaging = false,
         params string[] runtimeIdentifiers)
     {
         var build = new TestBuild
@@ -2976,7 +3000,7 @@ public class PublishPipelineTests
             TestChangelogFile = Path.Combine(rootDirectory, "CHANGELOG.md"),
             TestReleaseNotesFile = Path.Combine(rootDirectory, "RELEASE_NOTES.md")
         };
-        build.ConfigurePublishTarget(runtimeIdentifiers, discardNonBundles, publishNoBundles);
+        build.ConfigurePublishTarget(runtimeIdentifiers, deletePublishDirectories, noPackaging);
 
         return build;
     }
@@ -3304,17 +3328,17 @@ public class PublishPipelineTests
 
         internal void ConfigurePublishTarget(
             string[] runtimeIdentifiers,
-            bool discardNonBundles,
-            bool publishNoBundles)
+            bool deletePublishDirectories,
+            bool noPackaging)
         {
             RIds = runtimeIdentifiers;
-            PublishDiscardNonBundles = discardNonBundles;
-            PublishNoBundles = publishNoBundles;
+            DeletePublishDirectories = deletePublishDirectories;
+            PackagingTypes = noPackaging ? ApplicationPackagingType.None : ApplicationPackagingType.Portable;
         }
 
-        internal void SetPublishBundles(ApplicationPackagingType publishBundles)
+        internal void SetPackagingTypes(ApplicationPackagingType packagingTypes)
         {
-            PublishBundles = publishBundles;
+            PackagingTypes = packagingTypes;
         }
 
         internal void SetPublishCleanupExtensions(params string[] extensions)
@@ -3409,7 +3433,7 @@ public class PublishPipelineTests
             Assert.False(File.Exists(Path.Combine(context.PublishPath, "stale.txt")));
             Directory.CreateDirectory(context.PublishPath);
             File.WriteAllText(Path.Combine(context.PublishPath, "raw.txt"), context.RuntimeIdentifier);
-            if (PublishBundles.HasFlag(ApplicationPackagingType.DotNetSingleFile))
+            if (PackagingTypes.HasFlag(ApplicationPackagingType.DotNetSingleFile))
             {
                 var runtime = PublishRid.ParseRuntimeIdentifier(context.RuntimeIdentifier);
                 var executableName = runtime.Family is PublishRidFamily.Windows

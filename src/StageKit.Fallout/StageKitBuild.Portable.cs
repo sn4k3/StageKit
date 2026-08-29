@@ -16,7 +16,7 @@ public partial class StageKitBuild
     protected virtual bool ShouldCreatePortableZip(string runtimeIdentifier)
     {
         return PublishRid.ParseRuntimeIdentifier(runtimeIdentifier).Family is not PublishRidFamily.MacOS ||
-               !PublishBundles.HasFlag(ApplicationPackagingType.MacOSAppBundle);
+               !PackagingTypes.HasFlag(ApplicationPackagingType.MacOSAppBundle);
     }
 
     /// <summary>

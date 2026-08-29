@@ -1,0 +1,50 @@
+<Application
+    x:Class="StageKit.Demo.App"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Default">
+                    <SolidColorBrush x:Key="DemoPageBackgroundBrush" Color="#F4F7FB" />
+                    <SolidColorBrush x:Key="DemoCardBackgroundBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="DemoCardBorderBrush" Color="#D8DEEA" />
+                    <SolidColorBrush x:Key="DemoPrimaryTextBrush" Color="#172038" />
+                    <SolidColorBrush x:Key="DemoSecondaryTextBrush" Color="#59647A" />
+                    <SolidColorBrush x:Key="DemoChipBackgroundBrush" Color="#E7EBFF" />
+                    <SolidColorBrush x:Key="DemoPrimaryButtonBackgroundBrush" Color="#4355D8" />
+                    <SolidColorBrush x:Key="DemoPrimaryButtonHoverBrush" Color="#3547C8" />
+                    <SolidColorBrush x:Key="DemoPrimaryButtonPressedBrush" Color="#2B3AAF" />
+                    <SolidColorBrush x:Key="DemoPrimaryButtonForegroundBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="DemoDangerButtonBackgroundBrush" Color="#BF3347" />
+                    <SolidColorBrush x:Key="DemoDangerButtonHoverBrush" Color="#A92A3D" />
+                    <SolidColorBrush x:Key="DemoDangerButtonPressedBrush" Color="#912234" />
+                    <SolidColorBrush x:Key="DemoDangerButtonForegroundBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="DemoDisabledBackgroundBrush" Color="#E2E6EF" />
+                    <SolidColorBrush x:Key="DemoDisabledForegroundBrush" Color="#7B8496" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="DemoPageBackgroundBrush" Color="#0E1424" />
+                    <SolidColorBrush x:Key="DemoCardBackgroundBrush" Color="#182136" />
+                    <SolidColorBrush x:Key="DemoCardBorderBrush" Color="#34415D" />
+                    <SolidColorBrush x:Key="DemoPrimaryTextBrush" Color="#F2F5FC" />
+                    <SolidColorBrush x:Key="DemoSecondaryTextBrush" Color="#B5C0D5" />
+                    <SolidColorBrush x:Key="DemoChipBackgroundBrush" Color="#2B3760" />
+                    <SolidColorBrush x:Key="DemoPrimaryButtonBackgroundBrush" Color="#91A0FF" />
+                    <SolidColorBrush x:Key="DemoPrimaryButtonHoverBrush" Color="#A7B2FF" />
+                    <SolidColorBrush x:Key="DemoPrimaryButtonPressedBrush" Color="#C0C8FF" />
+                    <SolidColorBrush x:Key="DemoPrimaryButtonForegroundBrush" Color="#10162A" />
+                    <SolidColorBrush x:Key="DemoDangerButtonBackgroundBrush" Color="#FF8290" />
+                    <SolidColorBrush x:Key="DemoDangerButtonHoverBrush" Color="#FF9AA5" />
+                    <SolidColorBrush x:Key="DemoDangerButtonPressedBrush" Color="#FFB4BC" />
+                    <SolidColorBrush x:Key="DemoDangerButtonForegroundBrush" Color="#260A0F" />
+                    <SolidColorBrush x:Key="DemoDisabledBackgroundBrush" Color="#30394D" />
+                    <SolidColorBrush x:Key="DemoDisabledForegroundBrush" Color="#929DB2" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+    <Application.Styles>
+        <FluentTheme />
+    </Application.Styles>
+</Application>

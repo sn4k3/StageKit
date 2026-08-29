@@ -1,204 +1,68 @@
-﻿using System.Diagnostics;
+using Avalonia;
+using Avalonia.Threading;
 using Serilog;
 using Serilog.Extensions.Logging;
 using StageKit;
-using StageKit.Demo;
 
-Console.WriteLine("Hello from StageKit Demo");
-Console.WriteLine(args.Length > 0
-    ? $"Application started with {args.Length} argument(s): {string.Join(" ", args)}"
-    : "Application started with no arguments.");
+namespace StageKit.Demo;
 
-///////////////////
-// Configuration //
-///////////////////
-Log.Logger = new LoggerConfiguration()
-    .WriteTo.Console()
-    .WriteTo.Debug()
-    .CreateLogger();
-
-var loggerFactory = new SerilogLoggerFactory(Log.Logger);
-
-ApplicationKit.ApplicationArgs = args;
-ApplicationKit.Logger = loggerFactory.CreateLogger("StageKitDemo");
-ApplicationKit.UiFrameworkInfo = "Console";
-ApplicationKit.ProfilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "StageKitDemo");
-ApplicationKit.ParseProfilePathFromArgs();
-ApplicationKit.Birth = DateTime.UtcNow;
-
-UnhandledExceptions.RegisterAppDomainUnhandledException();
-UnhandledExceptions.RegisterTaskSchedulerUnobservedTaskException();
-// Example of custom event handler for unhandled exceptions in a UI framework like WPF or Avalonia:
-// Dispatcher.UIThread.UnhandledException += (sender, e) => UnhandledExceptions.HandleUnhandledException(e.Exception, "Dispatcher");
-UnhandledExceptions.SettingsFilesToSaveBeforeCrash.Add(AppSettings.Instance);
-UnhandledExceptions.SettingsFilesToSaveBeforeCrash.Add(RecentDocuments.Instance);
-UnhandledExceptions.ExceptionThrown += (_, e) =>
+internal static class Program
 {
-    e.CustomData = new Dictionary<string, object?>
+    [STAThread]
+    public static int Main(string[] args)
     {
-        ["OnboardingState"] = OnboardingStateFile.Instance,
-        ["OnboardingStateString"] = OnboardingStateFile.Instance.ToString()
-    };
-};
+        Log.Logger = new LoggerConfiguration()
+            .WriteTo.Debug()
+            .CreateLogger();
 
-CrashReportsFile.IsEnabled = AppSettings.Instance.EnableCrashReporting;
+        using var loggerFactory = new SerilogLoggerFactory(Log.Logger);
+        ApplicationKit.ApplicationName = "StageKit.Demo";
+        ApplicationKit.ApplicationArgs = args;
+        ApplicationKit.Logger = loggerFactory.CreateLogger("StageKit.Demo");
+        ApplicationKit.UiFrameworkInfo = "Avalonia 12";
+        ApplicationKit.ParseProfilePathFromArgs();
+        ApplicationKit.Birth = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
-var onboardingState = OnboardingStateFile.Instance;
-Console.WriteLine(onboardingState);
-onboardingState.RecordLaunch();
-onboardingState.CompleteOnboarding();
-///////////////////////
-// End configuration //
-///////////////////////
-
-
-///////////////////////
-//    Crash Report   //
-///////////////////////
-if (ApplicationKit.HasCrashReportFlag && ApplicationKit.CrashReportIndex > 0)
-{
-    Console.WriteLine($"Crash report: {ApplicationKit.CrashReportIndex}");
-    Console.WriteLine(ApplicationKit.CrashReport);
-    ApplicationKit.LaunchNewInstanceKeepApplicationArgs();
-    Console.WriteLine("Press any key to exit...");
-    Console.ReadLine();
-    return;
-}
-
-
-using var appGuard = ApplicationInstanceGuard.AcquireGlobal();
-if (appGuard.IsSecondary)
-{
-    Console.WriteLine(
-        $"The app {appGuard.PrimaryProcess?.ProcessName} is already running on another window. PID: {appGuard.PrimaryProcess?.Id}");
-    Console.WriteLine("Exiting now.");
-    return;
-}
-
-///////////////////////
-//     Main Logic    //
-///////////////////////
-CrashReportsFile.IsEnabled = AppSettings.Instance.EnableCrashReporting;
-AppSettings.Instance.Theme = Random.Shared.Next(0, 3) switch
-{
-    0 => "System",
-    1 => "Light",
-    2 => "Dark",
-    _ => AppSettings.Instance.Theme
-};
-AppSettings.Instance.LastRunTimestamp = Stopwatch.GetTimestamp();
-
-while (!AppSettings.Instance.FileExists)
-{
-    Console.WriteLine($"{AppSettings.Instance.FileName} does not exists, waiting 300ms...");
-    await Task.Delay(300);
-}
-
-Console.WriteLine(AppSettings.Instance.ToString());
-
-RecentDocuments.Instance.Clear();
-RecentDocuments.Instance.Add("document1.docx");
-RecentDocuments.Instance.Add("document2.docx");
-RecentDocuments.Instance.Add("document3.docx");
-RecentDocuments.Instance.Add("document4.docx");
-RecentDocuments.Instance.Add("document5.docx");
-RecentDocuments.Instance.Add("document6.docx");
-RecentDocuments.Instance.Add("document7.docx");
-
-Console.WriteLine("Choose an option:");
-Console.WriteLine("1. Throw divide by zero exception");
-Console.WriteLine("2. Throw overflow exception");
-Console.WriteLine("3. Throw divide by zero and overflow exception in parallel");
-Console.WriteLine("4. Test SubSetting change with save");
-Console.WriteLine("b. Backup configs");
-Console.WriteLine("e. Export logs");
-Console.WriteLine("q/quit/exit = Quit application");
-
-
-while (true)
-{
-    Console.Write("Option: ");
-    var line = Console.ReadLine()?.Trim();
-    if (string.IsNullOrWhiteSpace(line)) continue;
-
-    if (line.Equals("1", StringComparison.OrdinalIgnoreCase))
-    {
-        var zero = 0;
-        var overflow = int.MaxValue;
-        overflow *= 2;
-        // ReSharper disable once UnusedVariable
-        var cantDivideByZero = overflow / zero;
-    }
-    else if (line.Equals("2", StringComparison.OrdinalIgnoreCase))
-    {
-        // ReSharper disable once NotAccessedVariable
-        var overflow = int.MaxValue;
-        checked
+        UnhandledExceptions.IgnoreAvaloniaSafeExceptions();
+        UnhandledExceptions.RegisterAppDomainUnhandledException();
+        UnhandledExceptions.RegisterTaskSchedulerUnobservedTaskException();
+        Dispatcher.UIThread.UnhandledException += (_, eventArgs) =>
         {
-            // ReSharper disable once RedundantAssignment
-            overflow *= 2;
+            eventArgs.Handled = true;
+            UnhandledExceptions.HandleUnhandledException(
+                eventArgs.Exception,
+                "[AvaloniaDispatcherUnhandledException]");
+        };
+
+        ApplicationInstanceGuard? instanceGuard = null;
+        if (!ApplicationKit.HasCrashReportFlag)
+        {
+            instanceGuard = ApplicationInstanceGuard.AcquirePerUser();
+            if (instanceGuard.IsSecondary)
+            {
+                Log.Information("StageKit.Demo is already running in process {ProcessId}",
+                    instanceGuard.PrimaryProcess?.Id);
+                instanceGuard.Dispose();
+                return 0;
+            }
+        }
+
+        try
+        {
+            return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        }
+        finally
+        {
+            instanceGuard?.Dispose();
+            Log.CloseAndFlush();
         }
     }
-    else if (line.Equals("3", StringComparison.OrdinalIgnoreCase))
+
+    public static AppBuilder BuildAvaloniaApp()
     {
-        Parallel.For(0, 20, i =>
-        {
-            if (i % 2 == 0)
-            {
-                var zero = 0;
-                var overflow = int.MaxValue;
-                // ReSharper disable once IntVariableOverflowInUncheckedContext
-                overflow *= 2;
-                // ReSharper disable once UnusedVariable
-                // ReSharper disable once IntDivisionByZero
-                var cantDivideByZero = overflow / zero;
-            }
-            else
-            {
-                // ReSharper disable once NotAccessedVariable
-                var overflow = int.MaxValue;
-                checked
-                {
-                    // ReSharper disable once IntVariableOverflowInCheckedContext
-                    // ReSharper disable once RedundantAssignment
-                    overflow *= 2;
-                }
-            }
-        });
-    }
-    else if (line.Equals("4", StringComparison.OrdinalIgnoreCase))
-    {
-        Console.WriteLine(
-            $"{nameof(AppSettings.Instance.HasUnsavedChanges)}: {AppSettings.Instance.HasUnsavedChanges}");
-        AppSettings.Instance.General.MaxThreads = Random.Shared.Next(1, 101);
-        Console.WriteLine(
-            $"{nameof(AppSettings.Instance.HasUnsavedChanges)}: {AppSettings.Instance.HasUnsavedChanges}");
-        if (AppSettings.Instance.HasUnsavedChanges)
-        {
-            Console.WriteLine($"Waiting for save: {AppSettings.Instance.CanSave}");
-            await AppSettings.Instance.WaitForDebouncedSaveAsync(TimeSpan.FromSeconds(5));
-            Console.WriteLine(
-                $"Saved, {nameof(AppSettings.Instance.HasUnsavedChanges)}: {AppSettings.Instance.HasUnsavedChanges}");
-        }
-    }
-    else if (line.Equals("b", StringComparison.OrdinalIgnoreCase))
-    {
-        var backup = ApplicationBackup.Create();
-        Console.WriteLine($"Backup created: {backup}");
-    }
-    else if (line.Equals("e", StringComparison.OrdinalIgnoreCase))
-    {
-        var backup = SupportBundleExporter.Export();
-        Console.WriteLine($"Export created: {backup}");
-    }
-    else if (line.Equals("exit", StringComparison.OrdinalIgnoreCase)
-             || line.Equals("quit", StringComparison.OrdinalIgnoreCase)
-             || line.Equals("q", StringComparison.OrdinalIgnoreCase))
-    {
-        break;
+        return AppBuilder.Configure<App>()
+            .UsePlatformDetect()
+            .WithInterFont()
+            .LogToTrace();
     }
 }
-
-
-Console.WriteLine("Awaiting debounced save...");
-await RecentDocuments.Instance.WaitForDebouncedSaveAsync(TimeSpan.FromSeconds(5));

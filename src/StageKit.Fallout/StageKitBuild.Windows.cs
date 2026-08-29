@@ -71,8 +71,8 @@ public partial class StageKitBuild
         try
         {
             var installerSourcePath = context.PublishPath;
-            if (PublishBundles.HasFlag(ApplicationPackagingType.DotNetSingleFile) &&
-                !PublishInstallerWithSingleFile)
+            if (PackagingTypes.HasFlag(ApplicationPackagingType.DotNetSingleFile) &&
+                !UseSingleFileForInstaller)
             {
                 var installerPublishPath = InstallerPayloadDirectory / Guid.NewGuid().ToString("N");
                 normalPublishPath = installerPublishPath;

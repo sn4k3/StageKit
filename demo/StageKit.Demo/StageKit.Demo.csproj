@@ -1,20 +1,28 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <OutputType>Exe</OutputType>
-        <Description>Console demo for StageKit startup configuration, settings persistence, crash reporting, support utilities, and logging integration.</Description>
+        <OutputType>WinExe</OutputType>
+        <Description>Avalonia desktop showcase for StageKit application infrastructure and Updatum.</Description>
         <TargetFrameworks></TargetFrameworks>
         <TargetFramework>net10.0</TargetFramework>
         <IsPackable>false</IsPackable>
+        <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+
+        <FalloutMainProject>true</FalloutMainProject>
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="Avalonia" Version="12.1.1"/>
+        <PackageReference Include="Avalonia.Desktop" Version="12.1.1"/>
+        <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.1"/>
+        <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.1"/>
+        <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2"/>
         <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0"/>
-        <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1"/>
         <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0"/>
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\..\src\StageKit.Updatum\StageKit.Updatum.csproj"/>
         <ProjectReference Include="..\..\src\StageKit\StageKit.csproj"/>
     </ItemGroup>
 

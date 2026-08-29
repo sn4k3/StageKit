@@ -73,7 +73,7 @@ Run a target:
 | `Restore` | — | `dotnet restore` on `MainProject`. |
 | `Compile` | `Restore` | `dotnet build` on `MainProject`. Default target. |
 | `Run` | `Compile` | `dotnet run` on `MainProject` with `--no-build --no-restore`. |
-| `Publish` | `Restore` | Publishes every runtime identifier in `RIds` and creates the bundles selected by `PublishBundles`. |
+| `Publish` | `Restore` | Publishes every runtime identifier in `RIds` and creates the packaging formats selected by `PackagingTypes`. |
 
 `DependOnTargets` lets a derived build inject extra targets into `Compile`, `Run`, and `Publish`.
 
@@ -84,11 +84,11 @@ Declared with Fallout's `[Parameter]` attribute, so each can be supplied on the 
 | Parameter | Default | Description |
 |---|---|---|
 | `Configuration` | `Release` | `Debug` or `Release`. |
+| `PackagingTypes` | `Portable` | Packaging formats to create. |
 | `RIds` | `win-x64 win-arm64 osx-x64 osx-arm64 linux-x64 linux-arm64` | Runtime identifiers to publish. |
-| `PublishMultiArch` | `false` | Combine every architecture of a platform into one bundle. macOS requires both `osx-x64` and `osx-arm64`. |
-| `PublishNoBundles` | `false` | Publish only; skip zip/app/installer creation. |
-| `PublishDiscardNonBundles` | `false` | Delete the raw publish folders once bundles are created. |
-| `PublishInstallerWithSingleFile` | `false` | Package the single-file executable inside the Windows installer instead of a separate normal publish. |
+| `PublishMultiArch` | `false` | Create one macOS app bundle containing both x64 and arm64 executables. Requires both macOS RIDs. |
+| `DeletePublishDirectories` | `false` | Delete raw publish directories after publishing. |
+| `UseSingleFileForInstaller` | `false` | Use the single-file executable as the Windows installer payload. |
 
 ## Software metadata
 
@@ -142,9 +142,9 @@ WiX metadata, shortcuts, and install folders remain product-named while the payl
 | macOS app bundle | `MacOSAppBundle` | Unix host | `<SoftwareName>.app` |
 | Linux AppImage | `LinuxAppImage` | Linux host | `<asset>.AppImage` |
 
-`PublishBundles` defaults to
-`Portable | DotNetSingleFile | WindowsInstaller | MacOSAppBundle | LinuxAppImage`. Bundles whose host requirement is
-unmet are skipped with a warning rather than failing the build.
+`PackagingTypes` defaults to `Portable` in `StageKitBuild`. Derived builds can select multiple formats with the
+`ApplicationPackagingType` flags. Formats whose host requirement is unmet are skipped with a warning rather than
+failing the build. Set `PackagingTypes` to `None` to publish runtime outputs without creating packages.
 
 Icons are read from `MediaDirectory` (`media/` by default): `<SoftwareName>.icns` for macOS and `<SoftwareName>.svg`
 for Linux. Override `LinuxIconFile` to use a `.png` icon; both SVG and PNG are accepted. SVG icons are installed in
@@ -223,7 +223,7 @@ internal class Build : StageKitBuild
 | `ConfigurePublishRid` | `Func<DotNetPublishSettings, PublishRidContext, DotNetPublishSettings>` to adjust publish settings per RID |
 | `CreateMacAppBundleOptions()` / `CreateLinuxAppBundleOptions()` | Lazily resolved bundle metadata (`Info.plist`, `.desktop`, AppStream, entitlements) |
 | `ConfigureWindowsInstallerBuildSettings(...)` | Adjusts the MSBuild settings passed to each WiX installer project |
-| `PublishBundles`, `PublishCleanupExtensions`, `RIds` | Protected setters for build-wide publish configuration |
+| `PackagingTypes`, `PublishCleanupExtensions`, `RIds` | Protected setters for build-wide publish configuration |
 | `MediaDirectory`, `MacOSIconFile`, `LinuxIconFile`, `ChangelogFile`, `ReleaseNotesFile` | `virtual` path overrides |
 
 Nearly every publish and bundle step (`CreatePublishSettings`, `PublishRuntime`, `CreateBundles`, `CreatePortableZip`,

@@ -18,7 +18,8 @@ CI runs the test assemblies directly (matches `.github/workflows/dotnet.yml`):
 dotnet run --project .\tests\StageKit.Tests\StageKit.Tests.csproj --framework net10.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none -automated sync
 ```
 
-Test projects: `tests/StageKit.Tests` (core + Primitives + Runtime), `tests/StageKit.Updatum.Tests`, `tests/StageKit.Fallout.Tests`.
+Test projects: `tests/StageKit.Tests` (core + Primitives + Runtime), `tests/StageKit.Demo.Tests`,
+`tests/StageKit.Updatum.Tests`, `tests/StageKit.Fallout.Tests`.
 
 Run a single test:
 
@@ -30,6 +31,7 @@ Run a demo:
 
 ```powershell
 dotnet run --project .\demo\StageKit.Demo\StageKit.Demo.csproj
+dotnet run --project .\demo\StageKit.DemoCmd\StageKit.DemoCmd.csproj
 dotnet run --project .\demo\Updatum.Demo\Updatum.Demo.csproj
 ```
 
@@ -53,7 +55,8 @@ src/StageKit.Primitives   dependency-light reusable helpers (packed)
 src/StageKit.Runtime      runtime / entry-application helpers (packed)
 src/StageKit.Updatum      GitHub release updater (packed)
 src/StageKit.Fallout      build-pipeline library (not packed; Fallout-based)
-demo/StageKit.Demo        console demo for core StageKit
+demo/StageKit.Demo        Avalonia workshop for StageKit and Updatum
+demo/StageKit.DemoCmd     command-line demo for core StageKit
 demo/Updatum.Demo         console "fake app" demo for the updater (ProductName Updatum.FakeApp)
 builds/build              Fallout build entry point (builds/build/Build.cs)
 builds/StageKit.Installer WiX installer project (.wixproj)

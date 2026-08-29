@@ -19,6 +19,7 @@
     </Folder>
     <Folder Name="/demo/">
         <Project Path="demo/StageKit.Demo/StageKit.Demo.csproj" />
+        <Project Path="demo/StageKit.DemoCmd/StageKit.DemoCmd.csproj" />
         <Project Path="demo/Updatum.Demo/Updatum.Demo.csproj" />
     </Folder>
     <Folder Name="/builds/">
@@ -26,6 +27,7 @@
         <Project Path="builds/StageKit.Installer/StageKit.Installer.wixproj" />
     </Folder>
     <Folder Name="/tests/">
+        <Project Path="tests/StageKit.Demo.Tests/StageKit.Demo.Tests.csproj" />
         <Project Path="tests/StageKit.Tests/StageKit.Tests.csproj" />
         <Project Path="tests/StageKit.Fallout.Tests/StageKit.Fallout.Tests.csproj" />
         <Project Path="tests/StageKit.Updatum.Tests/StageKit.Updatum.Tests.csproj" />
