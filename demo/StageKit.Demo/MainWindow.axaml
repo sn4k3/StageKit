@@ -169,6 +169,33 @@
                         </Border>
 
                         <Border Classes="card">
+                            <Grid ColumnDefinitions="300,*" ColumnSpacing="18">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Classes="section-title" Text="Privileged process output" />
+                                    <TextBlock Classes="muted" TextWrapping="Wrap"
+                                               Text="Resolves whoami on Windows or id on Unix with HostSystem, runs it with requireElevation enabled, then displays the exit code and both output streams." />
+                                    <Button x:Name="RunPrivilegedProcessOutputButton"
+                                            Classes="primary"
+                                            HorizontalAlignment="Left"
+                                            Command="{Binding RunPrivilegedProcessOutputCommand}"
+                                            Content="Run with elevation" />
+                                    <TextBlock Classes="muted" TextWrapping="Wrap"
+                                               Text="Linux uses pkexec and macOS uses osascript. Windows runas cannot redirect output unless the demo is already running as administrator." />
+                                </StackPanel>
+
+                                <TextBox x:Name="PrivilegedProcessOutputTextBox"
+                                         Grid.Column="1"
+                                         MinHeight="180"
+                                         AcceptsReturn="True"
+                                         FontFamily="Consolas"
+                                         FontSize="12"
+                                         IsReadOnly="True"
+                                         TextWrapping="Wrap"
+                                         Text="{Binding PrivilegedProcessOutput}" />
+                            </Grid>
+                        </Border>
+
+                        <Border Classes="card">
                             <StackPanel Spacing="10">
                                 <TextBlock Classes="section-title" Text="Full runtime report" />
                                 <TextBox MinHeight="260"

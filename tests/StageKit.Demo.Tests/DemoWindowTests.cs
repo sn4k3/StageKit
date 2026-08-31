@@ -46,6 +46,8 @@ public class DemoWindowTests
             Assert.NotNull(window.FindControl<CheckBox>("AutoInstallUpdatesCheckBox"));
             Assert.NotNull(window.FindControl<Button>("InstallUpdateButton"));
             Assert.NotNull(window.FindControl<Button>("ThrowFatalExceptionButton"));
+            Assert.NotNull(window.FindControl<Button>("RunPrivilegedProcessOutputButton"));
+            Assert.NotNull(window.FindControl<TextBox>("PrivilegedProcessOutputTextBox"));
         }
         finally
         {

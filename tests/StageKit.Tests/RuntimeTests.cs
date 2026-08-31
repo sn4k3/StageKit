@@ -110,7 +110,9 @@ public sealed class RuntimeTests
 
         try
         {
-            File.WriteAllText(directory + "\\build-runtime.json", "{\"PackagingType\":\"" + expected + "\"}");
+            File.WriteAllText(
+                Path.Combine(directory, "build-runtime.json"),
+                "{\"PackagingType\":\"" + expected + "\"}");
 
             var detected = EntryApplication.DetectRuntimeManifestPackagingType(directory, null, null);
 

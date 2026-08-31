@@ -605,7 +605,7 @@ var report = RuntimeDiagnostics.GetReport(includeLoadedAssemblies: true);
 
 The [StageKit.Demo Avalonia app](demo/StageKit.Demo/StageKit.Demo.csproj) is an interactive workshop with tabs for:
 
-- runtime and packaging diagnostics;
+- runtime and packaging diagnostics, including a privileged process-output sample;
 - atomic autosave settings, a live System/Light/Dark theme selector, recent-document collection persistence, and direct access to the settings directory;
 - profile backups, support bundles, retention, onboarding state, and a fatal crash/relaunch/report-loading round trip;
 - Updatum release discovery against `sn4k3/UVtools`, checksum-verified downloads, and opt-in staged installation for the current runtime.

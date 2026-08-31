@@ -3,6 +3,7 @@ using System.ComponentModel;
 using Avalonia;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StageKit.Primitives.System;
 using StageKit.Runtime;
 using StageKit.Updatum;
 
@@ -22,6 +23,10 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     public partial string RuntimeReport { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string PrivilegedProcessOutput { get; set; } =
+        "Run the sample to request elevation and capture the completed process output.";
 
     [ObservableProperty]
     public partial string NewRecentDocument { get; set; } = string.Empty;
@@ -129,6 +134,47 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(RuntimeValues));
         OnPropertyChanged(nameof(ProfilePath));
         StatusMessage = "Runtime diagnostics refreshed.";
+    }
+
+    [RelayCommand]
+    private async Task RunPrivilegedProcessOutputAsync()
+    {
+        PrivilegedProcessOutput = "Waiting for administrator approval…";
+        StatusMessage = "Running the privileged process output sample…";
+
+        try
+        {
+            var executableName = OperatingSystem.IsWindows() ? "whoami" : "id";
+            if (!HostSystem.TryFindExecutable(executableName, out var executablePath))
+            {
+                PrivilegedProcessOutput = $"Could not find the '{executableName}' executable.";
+                StatusMessage = "The privileged process sample executable was not found.";
+                return;
+            }
+
+            var output = await ProcessHelper.GetProcessOutputAsync(executablePath, requireElevation: true);
+
+            PrivilegedProcessOutput = $"Executable: {executablePath}\n\n{FormatProcessOutput(output)}";
+
+            if (OperatingSystem.IsWindows() &&
+                !Environment.IsPrivilegedProcess &&
+                output.ExitCode == -1)
+            {
+                PrivilegedProcessOutput +=
+                    "\n\nWindows note: runas cannot redirect an elevated child's output. " +
+                    "Start the demo as administrator to exercise output capture on Windows.";
+            }
+
+            StatusMessage = output.Succeeded
+                ? "Privileged process output captured."
+                : $"The privileged process completed with exit code {output.ExitCode}.";
+        }
+        catch (Exception exception)
+        {
+            PrivilegedProcessOutput = $"The privileged process could not be run.\n\n{exception}";
+            StatusMessage = $"Privileged process failed: {exception.Message}";
+            UnhandledExceptions.HandleSafeException(exception, "[StageKit.Demo.PrivilegedProcess]");
+        }
     }
 
     [RelayCommand]
@@ -487,6 +533,18 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(SettingsFileStatus));
         OnPropertyChanged(nameof(OnboardingSummary));
         OnPropertyChanged(nameof(CrashReportSummary));
+    }
+
+    private static string FormatProcessOutput(ProcessOutput output)
+    {
+        var standardOutput = string.IsNullOrWhiteSpace(output.StandardOutput)
+            ? "(empty)"
+            : output.StandardOutput.TrimEnd();
+        var standardError = string.IsNullOrWhiteSpace(output.StandardError)
+            ? "(empty)"
+            : output.StandardError.TrimEnd();
+
+        return $"Exit code: {output.ExitCode}\n\nStandard output:\n{standardOutput}\n\nStandard error:\n{standardError}";
     }
 
     public void Dispose()

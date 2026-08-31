@@ -32,7 +32,10 @@ public static class RuntimeDiagnostics
 
         foreach (var kvp in EntryApplication.GetApplicationInfoDict())
         {
-            info[$"EntryApplication.{kvp.Key}"] = kvp.Value;
+            if (kvp.Key.Contains('.'))
+                info[$"{kvp.Key}"] = kvp.Value;
+            else
+                info[$"EntryApplication.{kvp.Key}"] = kvp.Value;
         }
 
         return info;

@@ -13,7 +13,12 @@ public class DemoPresentationTests
         var modules = DemoFeatureCatalog.All;
 
         Assert.Collection(modules,
-            module => Assert.Equal("Runtime", module.Name),
+            module =>
+            {
+                Assert.Equal("Runtime", module.Name);
+                Assert.Contains("HostSystem", module.APIs);
+                Assert.Contains("ProcessHelper", module.APIs);
+            },
             module => Assert.Equal("Settings", module.Name),
             module => Assert.Equal("Storage", module.Name),
             module => Assert.Equal("Updates", module.Name));
