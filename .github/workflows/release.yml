@@ -25,8 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
-      contents: write
-      packages: write
+      contents: read
 
     env:
       NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
@@ -124,33 +123,15 @@ jobs:
           path: artifacts/packages/*.nupkg
           if-no-files-found: error
 
-      - name: Publish to NuGet.org
-        if: ${{ !inputs.dry_run }}
-        env:
-          NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
-        run: >-
-          dotnet nuget push artifacts/packages/*.nupkg
-          --source https://api.nuget.org/v3/index.json
-          --api-key "$NUGET_TOKEN" --skip-duplicate
-
-      - name: Publish to GitHub Packages
-        if: ${{ !inputs.dry_run }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: >-
-          dotnet nuget push artifacts/packages/*.nupkg
-          --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
-          --api-key "$GITHUB_TOKEN" --skip-duplicate
-
       - name: Report dry run
         if: ${{ inputs.dry_run }}
-        run: echo "Dry run complete; packages were created and uploaded as an artifact."
+        run: echo "Dry run package preparation complete; packages were uploaded as an artifact."
 
   publish_assets:
     name: Publish asset (${{ matrix.rid }})
     needs: publish_packages
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -159,8 +140,10 @@ jobs:
             os: windows-latest
           - rid: linux-x64
             os: ubuntu-latest
+            flatpak_arch: x86_64
           - rid: linux-arm64
             os: ubuntu-latest
+            flatpak_arch: aarch64
           - rid: osx-x64
             os: macos-latest
           - rid: osx-arm64
@@ -177,6 +160,19 @@ jobs:
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
+
+      - name: Install Linux packaging tools
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes flatpak flatpak-builder dpkg-dev makepkg fakeroot zstd snapd
+          sudo snap install snapcraft --classic
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user --yes --arch=${{ matrix.flatpak_arch }} flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08
+          command -v flatpak-builder
+          command -v dpkg-deb
+          command -v makepkg
+          command -v snapcraft
 
       - name: Cache NuGet packages
         uses: actions/cache@v6
@@ -202,9 +198,47 @@ jobs:
           path: artifacts/publish/*
           if-no-files-found: error
 
+  publish_registries:
+    name: Publish package registries
+    needs: [publish_packages, publish_assets]
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Download packages
+        uses: actions/download-artifact@v8
+        with:
+          name: nuget-packages
+          path: artifacts/packages
+
+      - name: Publish to GitHub Packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          dotnet nuget push artifacts/packages/*.nupkg
+          --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+          --api-key "$GITHUB_TOKEN" --skip-duplicate
+
+      - name: Publish to NuGet.org
+        env:
+          NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
+        run: >-
+          dotnet nuget push artifacts/packages/*.nupkg
+          --source https://api.nuget.org/v3/index.json
+          --api-key "$NUGET_TOKEN" --skip-duplicate
+
   create_tag:
     name: Create release tag
-    needs: [publish_packages, publish_assets]
+    needs: [publish_packages, publish_assets, publish_registries]
     if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
     permissions:

@@ -2,8 +2,8 @@
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
-        <Description>Reusable .NET build pipeline for self-contained publishing, runtime manifests, portable archives, WiX installers, macOS app bundles, and Linux AppImages.</Description>
-        <PackageTags>stagekit;build;publishing;bundling;fallout;appimage;wix;macos</PackageTags>
+        <Description>Reusable .NET build pipeline for self-contained publishing, runtime manifests, portable archives, installers, macOS bundles, and Linux distribution packages.</Description>
+        <PackageTags>stagekit;build;publishing;bundling;fallout;appimage;flatpak;debian;rpm;archlinux;snap;dmg;pkg;wix;macos</PackageTags>
         <GenerateDocumentationFile>True</GenerateDocumentationFile>
 
         <Version>1.0.0</Version>

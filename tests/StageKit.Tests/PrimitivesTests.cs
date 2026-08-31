@@ -1,5 +1,6 @@
 using StageKit.Primitives;
 using StageKit.Primitives.Extensions;
+using StageKit.Primitives.System;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -8,6 +9,276 @@ namespace StageKit.Tests;
 
 public sealed class PrimitivesTests
 {
+    [Fact]
+    public void HostSystem_TryFindExecutable_FindsHostShell()
+    {
+        var executable = OperatingSystem.IsWindows() ? "cmd" : "sh";
+
+        Assert.True(HostSystem.TryFindExecutable(executable, out var result));
+        Assert.True(Path.IsPathFullyQualified(result));
+        Assert.True(File.Exists(result));
+    }
+
+    [Fact]
+    public void HostSystem_TryFindExecutable_ValidatesExplicitPathForHost()
+    {
+        var directoryPath = CreateTempDirectory();
+
+        try
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                var pathExtensions = Environment.GetEnvironmentVariable("PATHEXT");
+                var executableExtension = pathExtensions?.Split(
+                        Path.PathSeparator,
+                        StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .FirstOrDefault() ?? ".EXE";
+
+                if (!executableExtension.StartsWith('.'))
+                    executableExtension = string.Concat('.', executableExtension);
+
+                var pathWithoutExtension = Path.Combine(directoryPath, "stagekit-tool");
+                var executablePath = string.Concat(pathWithoutExtension, executableExtension);
+                File.WriteAllText(executablePath, string.Empty);
+
+                Assert.True(HostSystem.TryFindExecutable(pathWithoutExtension, out var result));
+                Assert.Equal(Path.GetFullPath(executablePath), result);
+            }
+            else
+            {
+                var executablePath = Path.Combine(directoryPath, "stagekit-tool");
+                File.WriteAllText(executablePath, "#!/bin/sh\nexit 0\n");
+                File.SetUnixFileMode(executablePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+
+                Assert.False(HostSystem.TryFindExecutable(executablePath, out var nonExecutableResult));
+                Assert.Null(nonExecutableResult);
+
+                File.SetUnixFileMode(
+                    executablePath,
+                    UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+
+                Assert.True(HostSystem.TryFindExecutable(executablePath, out var result));
+                Assert.Equal(Path.GetFullPath(executablePath), result);
+            }
+        }
+        finally
+        {
+            Directory.Delete(directoryPath, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void HostSystem_TryFindExecutable_RejectsEmptyName(string executable)
+    {
+        Assert.False(HostSystem.TryFindExecutable(executable, out var result));
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void ProcessHelper_StartProcess_ReturnsExitCodeWhenWaitingForCompletion()
+    {
+        var (name, arguments) = OperatingSystem.IsWindows()
+            ? ("cmd.exe", new[] { "/d", "/c", "exit 7" })
+            : ("/bin/sh", new[] { "-c", "exit 7" });
+
+        var exitCode = ProcessHelper.StartProcess(name, arguments, waitForCompletion: true);
+
+        Assert.Equal(7, exitCode);
+    }
+
+    [Fact]
+    public async Task ProcessHelper_StartProcessAsync_ReturnsExitCodeWhenWaitingForCompletion()
+    {
+        var (name, arguments) = OperatingSystem.IsWindows()
+            ? ("cmd.exe", new[] { "/d", "/c", "exit 7" })
+            : ("/bin/sh", new[] { "-c", "exit 7" });
+
+        var exitCode = await ProcessHelper.StartProcessAsync(
+            name,
+            arguments,
+            waitForCompletion: true,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(7, exitCode);
+    }
+
+    [Fact]
+    public void ProcessHelper_StartShell_ReturnsShellExitCodeWhenWaitingForCompletion()
+    {
+        var command = OperatingSystem.IsWindows() ? "exit /b 6" : "exit 6";
+
+        var exitCode = ProcessHelper.StartShell(command, waitForCompletion: true);
+
+        Assert.Equal(6, exitCode);
+    }
+
+    [Fact]
+    public async Task ProcessHelper_StartShellAsync_ReturnsShellExitCodeWhenWaitingForCompletion()
+    {
+        var command = OperatingSystem.IsWindows() ? "exit /b 6" : "exit 6";
+
+        var exitCode = await ProcessHelper.StartShellAsync(
+            command,
+            waitForCompletion: true,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(6, exitCode);
+    }
+
+    [Fact]
+    public async Task ProcessHelper_StartShellAsync_PropagatesCancellation()
+    {
+        using var cancellationSource = new CancellationTokenSource();
+        await cancellationSource.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            ProcessHelper.StartShellAsync(
+                "ignored",
+                waitForCompletion: true,
+                cancellationToken: cancellationSource.Token));
+    }
+
+    [Fact]
+    public void ProcessHelper_GetShellOutput_CapturesBothStreamsAndExitCode()
+    {
+        var command = OperatingSystem.IsWindows()
+            ? "echo standard&echo error 1>&2&exit /b 5"
+            : "printf standard; printf error >&2; exit 5";
+
+        var output = ProcessHelper.GetShellOutput(command);
+
+        Assert.Equal(5, output.ExitCode);
+        Assert.Equal("standard", output.StandardOutput.Trim());
+        Assert.Equal("error", output.StandardError.Trim());
+        Assert.False(output.Succeeded);
+    }
+
+    [Fact]
+    public async Task ProcessHelper_GetShellOutputAsync_CapturesBothStreamsAndExitCode()
+    {
+        var command = OperatingSystem.IsWindows()
+            ? "echo standard&echo error 1>&2&exit /b 5"
+            : "printf standard; printf error >&2; exit 5";
+
+        var output = await ProcessHelper.GetShellOutputAsync(
+            command,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(5, output.ExitCode);
+        Assert.Equal("standard", output.StandardOutput.Trim());
+        Assert.Equal("error", output.StandardError.Trim());
+        Assert.False(output.Succeeded);
+    }
+
+    [Fact]
+    public void ProcessHelper_CreateProcessStartInfo_PreservesArgumentListWithoutElevation()
+    {
+        var startInfo = ProcessHelper.CreateProcessStartInfo("tool", ["first", "two words"], requireElevation: false);
+
+        Assert.Equal("tool", startInfo.FileName);
+        Assert.Equal(["first", "two words"], startInfo.ArgumentList);
+        Assert.True(startInfo.UseShellExecute);
+        Assert.Empty(startInfo.Verbs);
+    }
+
+    [Fact]
+    public void ProcessHelper_CreateProcessStartInfo_UsesHostElevationMechanism()
+    {
+        var startInfo = ProcessHelper.CreateProcessStartInfo(
+            "tool",
+            ["first", "two words"],
+            requireElevation: true,
+            isPrivilegedProcess: false);
+
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Equal("tool", startInfo.FileName);
+            Assert.Equal("runas", startInfo.Verb);
+            Assert.Equal(["first", "two words"], startInfo.ArgumentList);
+        }
+        else if (OperatingSystem.IsLinux())
+        {
+            Assert.Equal("pkexec", startInfo.FileName);
+            Assert.Equal(["tool", "first", "two words"], startInfo.ArgumentList);
+        }
+        else if (OperatingSystem.IsMacOS())
+        {
+            Assert.Equal("osascript", startInfo.FileName);
+            Assert.Equal("-e", startInfo.ArgumentList[0]);
+            Assert.Equal(
+                "do shell script \"'tool' 'first' 'two words'\" with administrator privileges",
+                startInfo.ArgumentList[1]);
+        }
+    }
+
+    [Fact]
+    public void ProcessHelper_CreateProcessStartInfo_DisablesElevationForPrivilegedProcess()
+    {
+        var startInfo = ProcessHelper.CreateProcessStartInfo(
+            "tool",
+            ["first", "two words"],
+            requireElevation: true,
+            isPrivilegedProcess: true);
+
+        Assert.Equal("tool", startInfo.FileName);
+        Assert.Equal(["first", "two words"], startInfo.ArgumentList);
+        Assert.Empty(startInfo.Verb);
+    }
+
+    [Fact]
+    public void ProcessHelper_ConfigureOutputCapture_HandlesHostElevationMechanism()
+    {
+        var startInfo = ProcessHelper.CreateProcessStartInfo(
+            "tool",
+            ["first"],
+            requireElevation: true,
+            isPrivilegedProcess: false);
+
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Throws<InvalidOperationException>(() => ProcessHelper.ConfigureOutputCapture(startInfo));
+            return;
+        }
+
+        ProcessHelper.ConfigureOutputCapture(startInfo);
+
+        Assert.True(startInfo.RedirectStandardOutput);
+        Assert.True(startInfo.RedirectStandardError);
+        Assert.False(startInfo.UseShellExecute);
+    }
+
+    [Fact]
+    public void ProcessHelper_CreateProcessStartInfo_PreservesRawArgumentsWithHostElevationMechanism()
+    {
+        var startInfo = ProcessHelper.CreateProcessStartInfo(
+            "tool",
+            "--first \"two words\"",
+            requireElevation: true,
+            isPrivilegedProcess: false);
+
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Equal("tool", startInfo.FileName);
+            Assert.Equal("runas", startInfo.Verb);
+            Assert.Equal("--first \"two words\"", startInfo.Arguments);
+        }
+        else if (OperatingSystem.IsLinux())
+        {
+            Assert.Equal("pkexec", startInfo.FileName);
+            Assert.Equal("\"tool\" --first \"two words\"", startInfo.Arguments);
+        }
+        else if (OperatingSystem.IsMacOS())
+        {
+            Assert.Equal("osascript", startInfo.FileName);
+            Assert.Equal("-e", startInfo.ArgumentList[0]);
+            Assert.Equal(
+                "do shell script \"'tool' --first \\\"two words\\\"\" with administrator privileges",
+                startInfo.ArgumentList[1]);
+        }
+    }
+
     [Fact]
     public void Dispose_WhenManagedDisposeThrows_StillDisposesUnmanagedResources()
     {

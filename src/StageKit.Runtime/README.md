@@ -102,11 +102,18 @@ and let the process launcher handle quoting.
 - `WindowsInstaller`
 - `LinuxAppImage`
 - `LinuxFlatpak`
+- `LinuxDeb`
+- `LinuxRpm`
+- `LinuxArchPackage`
+- `LinuxSnap`
 - `MacOSAppBundle`
+- `MacOSDmg`
+- `MacOSPkg`
 
-Runtime detection returns `Portable` when no supported bundle marker is found. `None` and `WindowsInstaller` are shared
-metadata values for build and update workflows; an application installed by a Windows installer normally reports
-`Portable` because the installer itself is not observable after launch.
+Runtime detection checks the standard AppImage, Flatpak, Snap, and macOS bundle markers first, then reads the
+`build-runtime.json` manifest emitted by Fallout when it is available. This manifest enables detection of DEB, RPM,
+Arch Linux, Snap, Windows Installer, DMG, and PKG packaging. Applications without a marker or manifest report
+`Portable`; an ordinary macOS `.app` without a manifest reports `MacOSAppBundle`.
 
 Convenience properties are also available:
 

@@ -13,7 +13,7 @@ public partial class StageKitBuild
     /// <param name="context">The successfully published runtime context.</param>
     protected virtual void CopySingleFileExecutable(PublishRidContext context)
     {
-        if (!PackagingTypes.HasFlag(ApplicationPackagingType.DotNetSingleFile))
+        if (!HasPackagingType(ApplicationPackagingType.DotNetSingleFile))
             return;
 
         Log.Information("Creating single-file application bundle for {Rid}", context.RuntimeIdentifier);

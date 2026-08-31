@@ -461,6 +461,29 @@ using var directory = new TemporaryDirectory(prefix: "stagekit");
 using var file = new TemporaryFile(extension: "json");
 ```
 
+Launch external tools with optional administrator elevation through Windows `runas`, Linux `pkexec`, or macOS
+`osascript`. Already-privileged processes skip the elevation wrapper:
+
+```csharp
+using StageKit.Primitives.System;
+
+if (!HostSystem.TryFindExecutable("system-tool", out string? toolPath))
+    throw new FileNotFoundException("system-tool was not found.");
+
+int exitCode = ProcessHelper.StartProcess(
+    toolPath,
+    ["--configure", "value with spaces"],
+    requireElevation: true,
+    waitForCompletion: true);
+
+ProcessOutput output = ProcessHelper.GetShellOutput("system-tool --status", requireElevation: true);
+Console.Write(output.StandardOutput);
+
+ProcessOutput asyncOutput = await ProcessHelper.GetShellOutputAsync(
+    "system-tool --status",
+    cancellationToken: cancellationToken);
+```
+
 Create and restore profile backups:
 
 ```csharp

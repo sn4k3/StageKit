@@ -64,6 +64,62 @@ public partial class StageKitBuild
     }
 
     /// <summary>
+    /// Selects and creates the configured native macOS distribution packages.
+    /// </summary>
+    /// <param name="contexts">The successfully published runtime contexts.</param>
+    protected virtual void CreateMacOSPackages(IReadOnlyCollection<PublishRidContext> contexts)
+    {
+        var macContexts = contexts
+            .Where(context => PublishRid.ParseRuntimeIdentifier(context.RuntimeIdentifier).Family
+                is PublishRidFamily.MacOS)
+            .ToArray();
+        if (macContexts.Length == 0)
+            return;
+
+        if (!IsMacOSHost)
+        {
+            WarnMacOSPackagesUnsupportedHost();
+            return;
+        }
+
+        if (!PublishMultiArch)
+        {
+            foreach (var context in macContexts)
+            {
+                if (HasPackagingType(ApplicationPackagingType.MacOSDmg))
+                    CreateMacOSDmg(context);
+                if (HasPackagingType(ApplicationPackagingType.MacOSPkg))
+                    CreateMacOSPkg(context);
+            }
+
+            return;
+        }
+
+        var x64Context = macContexts.FirstOrDefault(context =>
+            context.RuntimeIdentifier.Equals("osx-x64", StringComparison.OrdinalIgnoreCase));
+        var arm64Context = macContexts.FirstOrDefault(context =>
+            context.RuntimeIdentifier.Equals("osx-arm64", StringComparison.OrdinalIgnoreCase));
+        if (x64Context is null || arm64Context is null)
+        {
+            throw new InvalidOperationException(
+                "A multi-architecture macOS package requires both 'osx-x64' and 'osx-arm64' publish outputs.");
+        }
+
+        if (HasPackagingType(ApplicationPackagingType.MacOSDmg))
+            CreateMultiArchMacOSDmg(x64Context, arm64Context);
+        if (HasPackagingType(ApplicationPackagingType.MacOSPkg))
+            CreateMultiArchMacOSPkg(x64Context, arm64Context);
+    }
+
+    /// <summary>
+    /// Logs that native macOS packages cannot be created on the current host.
+    /// </summary>
+    protected virtual void WarnMacOSPackagesUnsupportedHost()
+    {
+        Log.Warning("Skipping macOS DMG and PKG packages on a non-macOS host.");
+    }
+
+    /// <summary>
     /// Creates the common macOS application directory structure and metadata.
     /// </summary>
     /// <param name="stagingPath">The isolated staging directory.</param>
@@ -112,17 +168,7 @@ public partial class StageKitBuild
         try
         {
             stagingPath.DeleteDirectory();
-            var appPath = CreateMacOSAppLayout(stagingPath);
-            var executablePath = appPath / "Contents" / "MacOS";
-            ValidateMacOSPayload(context, MacAppBundleOptions.ExecutableName!);
-            context.PublishPath.Copy(executablePath, ExistsPolicy.MergeAndOverwrite);
-            PublishUtilities.WriteRuntimeManifest(executablePath, BuildRuntimeManifestFileName,
-                new BuildRuntime(context.RuntimeIdentifier, SoftwareVersion, true,
-                    ApplicationPackagingType.MacOSAppBundle));
-
-            if (IsMacOSHost)
-                SignMacOSApp(appPath);
-
+            StageMacOSApp(context, stagingPath, ApplicationPackagingType.MacOSAppBundle);
             archivePath.DeleteFile();
             PublishUtilities.CreateZip(stagingPath, archivePath);
         }
@@ -150,37 +196,8 @@ public partial class StageKitBuild
         try
         {
             stagingPath.DeleteDirectory();
-            var appPath = CreateMacOSAppLayout(stagingPath);
-            var executablePath = appPath / "Contents" / "MacOS";
-            var options = MacAppBundleOptions;
-            var executableName = options.ExecutableName!;
-            var runtimePayloads = new[]
-            {
-                (Context: x64Context, DirectoryName: options.X64RuntimeIdentifier),
-                (Context: arm64Context, DirectoryName: options.Arm64RuntimeIdentifier)
-            };
-
-            foreach (var payload in runtimePayloads)
-            {
-                ValidateMacOSPayload(payload.Context, executableName);
-            }
-
-            foreach (var payload in runtimePayloads)
-            {
-                var runtimePath = executablePath / payload.DirectoryName;
-                payload.Context.PublishPath.Copy(runtimePath, ExistsPolicy.MergeAndOverwrite);
-                PublishUtilities.WriteRuntimeManifest(runtimePath, BuildRuntimeManifestFileName,
-                    new BuildRuntime("osx-multiarch", SoftwareVersion, true, ApplicationPackagingType.MacOSAppBundle));
-            }
-
-            var launcherPath = executablePath / executableName;
-            launcherPath.WriteAllText(
-                MacAppBundle.GetMultiArchEntryScript(options).ReplaceLineEndings("\n"));
-            UnixSystem.SetUnix755Executable(launcherPath);
-
-            if (IsMacOSHost)
-                SignMacOSApp(appPath);
-
+            StageMultiArchMacOSApp(x64Context, arm64Context, stagingPath,
+                ApplicationPackagingType.MacOSAppBundle);
             archivePath.DeleteFile();
             PublishUtilities.CreateZip(stagingPath, archivePath);
         }
@@ -188,6 +205,146 @@ public partial class StageKitBuild
         {
             stagingPath.DeleteDirectory();
         }
+    }
+
+    /// <summary>Creates one compressed macOS disk image.</summary>
+    protected virtual void CreateMacOSDmg(PublishRidContext context)
+    {
+        CreateMacOSPackage(context, ApplicationPackagingType.MacOSDmg, ".dmg",
+            (appPath, outputPath) => MacPackage.GetDmgCommand(SoftwareName, appPath, outputPath));
+    }
+
+    /// <summary>Creates one macOS component installer package.</summary>
+    protected virtual void CreateMacOSPkg(PublishRidContext context)
+    {
+        CreateMacOSPackage(context, ApplicationPackagingType.MacOSPkg, ".pkg",
+            (appPath, outputPath) => MacPackage.GetPkgCommand(appPath, MacAppBundleOptions.BundleIdentifier,
+                SoftwareVersion, outputPath));
+    }
+
+    /// <summary>Creates one multi-architecture compressed macOS disk image.</summary>
+    protected virtual void CreateMultiArchMacOSDmg(PublishRidContext x64Context,
+        PublishRidContext arm64Context)
+    {
+        CreateMultiArchMacOSPackage(x64Context, arm64Context, ApplicationPackagingType.MacOSDmg, ".dmg",
+            (appPath, outputPath) => MacPackage.GetDmgCommand(SoftwareName, appPath, outputPath));
+    }
+
+    /// <summary>Creates one multi-architecture macOS component installer package.</summary>
+    protected virtual void CreateMultiArchMacOSPkg(PublishRidContext x64Context,
+        PublishRidContext arm64Context)
+    {
+        CreateMultiArchMacOSPackage(x64Context, arm64Context, ApplicationPackagingType.MacOSPkg, ".pkg",
+            (appPath, outputPath) => MacPackage.GetPkgCommand(appPath, MacAppBundleOptions.BundleIdentifier,
+                SoftwareVersion, outputPath));
+    }
+
+    private void CreateMacOSPackage(PublishRidContext context, ApplicationPackagingType packagingType,
+        string extension, Func<string, string, string> createCommand)
+    {
+        var stagingPath = PublishStagingDirectory / Guid.NewGuid().ToString("N");
+        var outputPath = (AbsolutePath)$"{context.BundleOutputPath}{extension}";
+        var temporaryOutputPath = CreateTemporaryMacOSPackageOutputPath(outputPath, extension);
+        try
+        {
+            stagingPath.DeleteDirectory();
+            var appPath = StageMacOSApp(context, stagingPath, packagingType);
+            ExecuteShell(createCommand(appPath, temporaryOutputPath), stagingPath);
+            MoveMacOSPackageOutput(temporaryOutputPath, outputPath, extension);
+        }
+        finally
+        {
+            temporaryOutputPath.DeleteFile();
+            stagingPath.DeleteDirectory();
+        }
+    }
+
+    private void CreateMultiArchMacOSPackage(PublishRidContext x64Context, PublishRidContext arm64Context,
+        ApplicationPackagingType packagingType, string extension, Func<string, string, string> createCommand)
+    {
+        var stagingPath = PublishStagingDirectory / Guid.NewGuid().ToString("N");
+        var outputPath = (AbsolutePath)$"{GetMultiArchMacOSBundleOutputPath(x64Context)}{extension}";
+        var temporaryOutputPath = CreateTemporaryMacOSPackageOutputPath(outputPath, extension);
+        try
+        {
+            stagingPath.DeleteDirectory();
+            var appPath = StageMultiArchMacOSApp(x64Context, arm64Context, stagingPath, packagingType);
+            ExecuteShell(createCommand(appPath, temporaryOutputPath), stagingPath);
+            MoveMacOSPackageOutput(temporaryOutputPath, outputPath, extension);
+        }
+        finally
+        {
+            temporaryOutputPath.DeleteFile();
+            stagingPath.DeleteDirectory();
+        }
+    }
+
+    private AbsolutePath StageMacOSApp(PublishRidContext context, AbsolutePath stagingPath,
+        ApplicationPackagingType packagingType)
+    {
+        var appPath = CreateMacOSAppLayout(stagingPath);
+        var executablePath = appPath / "Contents" / "MacOS";
+        var executableName = MacAppBundleOptions.ExecutableName!;
+        ValidateMacOSPayload(context, executableName);
+        context.PublishPath.Copy(executablePath, ExistsPolicy.MergeAndOverwrite);
+        UnixSystem.SetUnix755Executable(executablePath / executableName);
+        PublishUtilities.WriteRuntimeManifest(executablePath, BuildRuntimeManifestFileName,
+            new BuildRuntime(context.RuntimeIdentifier, SoftwareVersion, true, packagingType));
+
+        if (IsMacOSHost)
+            SignMacOSApp(appPath);
+
+        return appPath;
+    }
+
+    private AbsolutePath StageMultiArchMacOSApp(PublishRidContext x64Context, PublishRidContext arm64Context,
+        AbsolutePath stagingPath, ApplicationPackagingType packagingType)
+    {
+        var appPath = CreateMacOSAppLayout(stagingPath);
+        var executablePath = appPath / "Contents" / "MacOS";
+        var options = MacAppBundleOptions;
+        var executableName = options.ExecutableName!;
+        var runtimePayloads = new[]
+        {
+            (Context: x64Context, DirectoryName: options.X64RuntimeIdentifier),
+            (Context: arm64Context, DirectoryName: options.Arm64RuntimeIdentifier)
+        };
+
+        foreach (var payload in runtimePayloads)
+            ValidateMacOSPayload(payload.Context, executableName);
+
+        foreach (var payload in runtimePayloads)
+        {
+            var runtimePath = executablePath / payload.DirectoryName;
+            payload.Context.PublishPath.Copy(runtimePath, ExistsPolicy.MergeAndOverwrite);
+            UnixSystem.SetUnix755Executable(runtimePath / executableName);
+            PublishUtilities.WriteRuntimeManifest(runtimePath, BuildRuntimeManifestFileName,
+                new BuildRuntime(MultiArchMacOSRuntimeIdentifier, SoftwareVersion, true, packagingType));
+        }
+
+        var launcherPath = executablePath / executableName;
+        launcherPath.WriteAllText(MacAppBundle.GetMultiArchEntryScript(options).ReplaceLineEndings("\n"));
+        UnixSystem.SetUnix755Executable(launcherPath);
+
+        if (IsMacOSHost)
+            SignMacOSApp(appPath);
+
+        return appPath;
+    }
+
+    private static AbsolutePath CreateTemporaryMacOSPackageOutputPath(AbsolutePath outputPath, string extension) =>
+        outputPath.Parent / $".{outputPath.Name}.{Guid.NewGuid():N}{extension}";
+
+    private static void MoveMacOSPackageOutput(AbsolutePath temporaryOutputPath, AbsolutePath outputPath,
+        string extension)
+    {
+        if (!temporaryOutputPath.FileExists())
+        {
+            throw new FileNotFoundException(
+                $"macOS {extension} packaging did not produce '{temporaryOutputPath}'.", temporaryOutputPath);
+        }
+
+        temporaryOutputPath.Move(outputPath, ExistsPolicy.FileOverwrite);
     }
 
     /// <summary>

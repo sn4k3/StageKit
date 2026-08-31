@@ -24,9 +24,15 @@ public static partial class LinuxAppBundle
     /// <exception cref="ArgumentException">A required option or list item is empty.</exception>
     public static string GetDesktopEntry(LinuxAppBundleOptions options)
     {
+        return GetDesktopEntry(options, null, null);
+    }
+
+    internal static string GetDesktopEntry(LinuxAppBundleOptions options, string? executableName,
+        string? iconName)
+    {
         ValidateOptions(options);
-        var executableName = GetExecutableName(options);
-        var iconName = options.IconName ?? options.ProductName;
+        executableName ??= GetExecutableName(options);
+        iconName ??= options.IconName ?? options.ProductName;
 
         ArgumentException.ThrowIfNullOrWhiteSpace(iconName);
 
@@ -175,9 +181,11 @@ public static partial class LinuxAppBundle
                      buildsystem: simple
                      build-commands:
                        - {{"mkdir -p /app/bin".SingleQuoteYaml()}}
+                       - {{"mkdir -p /app/share".SingleQuoteYaml()}}
                        - {{"mv ./app-sources /app/bin/app-sources".SingleQuoteYaml()}}
                        - {{$"chmod +x {executablePath.QuoteShell()}".SingleQuoteYaml()}}
                        - {{$"ln -s {executablePath.QuoteShell()} {$"/app/bin/{executableName}".QuoteShell()}".SingleQuoteYaml()}}
+                       - {{"if [ -d /app/bin/app-sources/share ]; then mv /app/bin/app-sources/share/* /app/share/; fi".SingleQuoteYaml()}}
                      sources:
                        - type: dir
                          path: {{sourceDirectory.SingleQuoteYaml()}}

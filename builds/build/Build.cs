@@ -15,10 +15,19 @@ internal class Build : StageKitBuild
         ExcludedProjectNameTokens.Remove("demo");
 
         // Set default packaging formats to
-        PackagingTypes = ApplicationPackagingType.Portable
-                         | ApplicationPackagingType.WindowsInstaller
-                         | ApplicationPackagingType.LinuxAppImage
-                         | ApplicationPackagingType.MacOSAppBundle;
+        PackagingTypes =
+        [
+            ApplicationPackagingType.Portable,
+            ApplicationPackagingType.WindowsInstaller,
+            ApplicationPackagingType.LinuxAppImage,
+            ApplicationPackagingType.LinuxFlatpak,
+            ApplicationPackagingType.LinuxDeb,
+            ApplicationPackagingType.LinuxArchPackage,
+            ApplicationPackagingType.LinuxSnap,
+            ApplicationPackagingType.MacOSAppBundle,
+            ApplicationPackagingType.MacOSDmg,
+            ApplicationPackagingType.MacOSPkg
+        ];
     }
 
     /// <summary>

@@ -29,6 +29,7 @@ public class LinuxAppBundleOptions
         License = build.SoftwareLicense;
         RepositoryUrl = build.SoftwareRepositoryUrl;
         Authors = build.SoftwareAuthors;
+        DebPackageMaintainer = build.SoftwarePackageMaintainersRFC822;
         Keywords = build.SoftwarePackageTagsList.ToList();
     }
 
@@ -158,7 +159,7 @@ public class LinuxAppBundleOptions
     /// <summary>
     /// Gets the Flatpak runtime version.
     /// </summary>
-    public string FlatpakRuntimeVersion { get; set; } = "23.08";
+    public string FlatpakRuntimeVersion { get; set; } = "25.08";
 
     /// <summary>
     /// Gets the Flatpak SDK identifier.
@@ -170,4 +171,26 @@ public class LinuxAppBundleOptions
     /// </summary>
     public List<string> FlatpakFinishArguments { get; set; } =
         ["--socket=x11", "--share=ipc", "--device=dri", "--share=network"];
+
+    /// <summary>
+    /// Gets the Debian package maintainer in RFC 822 form.
+    /// </summary>
+    /// <example><c>Jane Doe &lt;jane@example.com&gt;</c></example>
+    public string DebPackageMaintainer { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets the Snap base used to build and run the application.
+    /// </summary>
+    public string SnapBase { get; set; } = "core24";
+
+    /// <summary>
+    /// Gets the Snap confinement mode.
+    /// </summary>
+    public string SnapConfinement { get; set; } = "strict";
+
+    /// <summary>
+    /// Gets the interfaces connected to the Snap application.
+    /// </summary>
+    public List<string> SnapPlugs { get; set; } =
+        ["desktop", "desktop-legacy", "opengl", "wayland", "x11", "network"];
 }

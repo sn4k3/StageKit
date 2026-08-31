@@ -94,4 +94,31 @@ public sealed class RuntimeTests
         Assert.True(EntryApplication.IsSingleFileBundle(ApplicationPackagingType.DotNetSingleFile));
         Assert.True(EntryApplication.IsSingleFileBundle(ApplicationPackagingType.LinuxAppImage));
     }
+
+    [Theory]
+    [InlineData(ApplicationPackagingType.WindowsInstaller)]
+    [InlineData(ApplicationPackagingType.LinuxDeb)]
+    [InlineData(ApplicationPackagingType.LinuxRpm)]
+    [InlineData(ApplicationPackagingType.LinuxArchPackage)]
+    [InlineData(ApplicationPackagingType.LinuxSnap)]
+    [InlineData(ApplicationPackagingType.MacOSDmg)]
+    [InlineData(ApplicationPackagingType.MacOSPkg)]
+    public void RuntimeManifestDetection_ReturnsManifestPackagingType(ApplicationPackagingType expected)
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            File.WriteAllText(directory + "\\build-runtime.json", "{\"PackagingType\":\"" + expected + "\"}");
+
+            var detected = EntryApplication.DetectRuntimeManifestPackagingType(directory, null, null);
+
+            Assert.Equal(expected, detected);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
 }

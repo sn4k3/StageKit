@@ -103,6 +103,18 @@ public static class PathUtilities
     }
 
     /// <summary>
+    /// Determines whether the specified path contains a directory separator character.
+    /// </summary>
+    /// <param name="path">The path to check.</param>
+    /// <returns>True if the path contains a directory separator character; otherwise, false.</returns>
+    public static bool ContainsDirectorySeparator(string path)
+    {
+        return path.IndexOfAny(
+            Path.DirectorySeparatorChar,
+            Path.AltDirectorySeparatorChar) >= 0;
+    }
+
+    /// <summary>
     /// Tries to get a valid full directory path from the specified directory path.
     /// </summary>
     /// <param name="directoryPath">The directory path to validate.</param>

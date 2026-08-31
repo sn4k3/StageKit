@@ -9,6 +9,7 @@ using Fallout.Solutions;
 using StageKit.Primitives.System;
 using StageKit.Runtime;
 using Xunit;
+using ParameterAttribute = Fallout.Common.ParameterAttribute;
 
 namespace StageKit.Fallout.Tests;
 
@@ -25,13 +26,42 @@ public class PublishPipelineTests
     {
         var buildType = typeof(StageKitBuild);
 
-        Assert.NotNull(buildType.GetProperty(nameof(StageKitBuild.PackagingTypes)));
+        var packagingTypes = buildType.GetProperty(nameof(StageKitBuild.PackagingTypes));
+        Assert.NotNull(packagingTypes);
+        Assert.Equal(typeof(ApplicationPackagingType[]), packagingTypes.PropertyType);
+        var frameworkDependent = buildType.GetProperty(nameof(StageKitBuild.FrameworkDependent));
+        Assert.NotNull(frameworkDependent);
+        Assert.NotNull(frameworkDependent.GetCustomAttribute<ParameterAttribute>());
         Assert.NotNull(buildType.GetProperty(nameof(StageKitBuild.DeletePublishDirectories)));
         Assert.NotNull(buildType.GetProperty(nameof(StageKitBuild.UseSingleFileForInstaller)));
         Assert.Null(buildType.GetProperty("PublishBundles"));
         Assert.Null(buildType.GetProperty("PublishNoBundles"));
         Assert.Null(buildType.GetProperty("PublishDiscardNonBundles"));
         Assert.Null(buildType.GetProperty("PublishInstallerWithSingleFile"));
+    }
+
+    /// <summary>
+    /// Verifies that packaging selections discard None and duplicate values while preserving order.
+    /// </summary>
+    [Fact]
+    public void PackagingTypes_DuplicatesAndNone_NormalizesToUniqueSelection()
+    {
+        var build = new TestBuild();
+
+        build.SetPackagingTypes(
+            ApplicationPackagingType.Portable,
+            ApplicationPackagingType.None,
+            ApplicationPackagingType.LinuxSnap,
+            ApplicationPackagingType.Portable);
+
+        Assert.Equal([
+            ApplicationPackagingType.Portable,
+            ApplicationPackagingType.LinuxSnap
+        ], build.PackagingTypes);
+
+        var returnedSelection = build.PackagingTypes;
+        returnedSelection[0] = ApplicationPackagingType.LinuxDeb;
+        Assert.Equal(ApplicationPackagingType.LinuxDeb, build.PackagingTypes[0]);
     }
 
     /// <summary>
@@ -233,7 +263,7 @@ public class PublishPipelineTests
                 TestSoftwareExecutableName = "PublishedExecutable",
                 UseDefaultPreparation = true
             };
-            build.SetPackagingTypes(0);
+            build.SetPackagingTypes();
             var context = new PublishRidContext
             {
                 Build = build,
@@ -327,6 +357,27 @@ public class PublishPipelineTests
     }
 
     /// <summary>
+    /// Verifies framework-dependent publishing is opt-in and disables self-contained output when selected.
+    /// </summary>
+    [Fact]
+    public void CreatePublishSettings_FrameworkDependentEnabled_DisablesSelfContained()
+    {
+        var build = new TestBuild
+        {
+            UseDefaultSettings = true,
+            TestMainProject = CreateProject("Example.csproj")
+        };
+        Assert.False(build.FrameworkDependent);
+        build.SetFrameworkDependent(true);
+        var context = CreateContext(build);
+
+        var settings = build.InvokeCreatePublishSettings(context);
+
+        Assert.False(settings.SelfContained);
+        Assert.True(Assert.IsType<JsonElement>(settings.Properties["PublishReadyToRun"]).GetBoolean());
+    }
+
+    /// <summary>
     /// Verifies that single-file publishing injects the runtime manifest into the SDK bundle and cleans temporary inputs.
     /// </summary>
     [Fact]
@@ -367,7 +418,7 @@ public class PublishPipelineTests
             UseDefaultSettings = true,
             TestMainProject = CreateProject("Example.csproj")
         };
-        build.SetPackagingTypes(0);
+        build.SetPackagingTypes();
         var context = CreateContext(build);
 
         var settings = build.InvokeCreatePublishSettings(context);
@@ -386,7 +437,9 @@ public class PublishPipelineTests
             UseDefaultSettings = true,
             TestMainProject = CreateProject("Example.csproj")
         };
-        build.SetPackagingTypes(ApplicationPackagingType.DotNetSingleFile | ApplicationPackagingType.WindowsInstaller);
+        build.SetPackagingTypes(
+            ApplicationPackagingType.DotNetSingleFile,
+            ApplicationPackagingType.WindowsInstaller);
         var context = CreateContext(build, "win-x64");
         var installerOutput = (AbsolutePath)Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}");
 
@@ -913,8 +966,9 @@ public class PublishPipelineTests
             RecordMacOSApp = true,
             TestUnixHost = true
         };
-        build.SetPackagingTypes(ApplicationPackagingType.Portable |
-                                ApplicationPackagingType.MacOSAppBundle);
+        build.SetPackagingTypes(
+            ApplicationPackagingType.Portable,
+            ApplicationPackagingType.MacOSAppBundle);
 
         build.InvokeCreateBundles([CreateContext(build, "osx-x64")]);
 
@@ -935,8 +989,9 @@ public class PublishPipelineTests
             RecordMacOSWarning = true,
             TestUnixHost = false
         };
-        build.SetPackagingTypes(ApplicationPackagingType.Portable |
-                                ApplicationPackagingType.MacOSAppBundle);
+        build.SetPackagingTypes(
+            ApplicationPackagingType.Portable,
+            ApplicationPackagingType.MacOSAppBundle);
 
         build.InvokeCreateBundles([CreateContext(build, "osx-x64")]);
 
@@ -961,8 +1016,9 @@ public class PublishPipelineTests
                 RecordPortableZip = true,
                 TestMainProject = CreateProject("Example.csproj")
             };
-            build.SetPackagingTypes(ApplicationPackagingType.Portable |
-                                    ApplicationPackagingType.DotNetSingleFile);
+            build.SetPackagingTypes(
+                ApplicationPackagingType.Portable,
+                ApplicationPackagingType.DotNetSingleFile);
 
             build.InvokeCreateBundles([CreateContext(build, "win-x64", publishPath)]);
 
@@ -997,8 +1053,9 @@ public class PublishPipelineTests
                 TestUnixHost = true,
                 TestMainProject = CreateProject("Example.csproj")
             };
-            build.SetPackagingTypes(ApplicationPackagingType.DotNetSingleFile |
-                                    ApplicationPackagingType.MacOSAppBundle);
+            build.SetPackagingTypes(
+                ApplicationPackagingType.DotNetSingleFile,
+                ApplicationPackagingType.MacOSAppBundle);
 
             build.InvokeCreateBundles([CreateContext(build, "osx-x64", publishPath)]);
 
@@ -1312,6 +1369,17 @@ public class PublishPipelineTests
     }
 
     /// <summary>
+    /// Verifies Snap packages use the non-interactive provider supported by hosted Linux runners.
+    /// </summary>
+    [Fact]
+    public void CreateSnapBuildCommand_UsesDestructiveMode()
+    {
+        var build = new TestBuild();
+
+        Assert.Equal("snapcraft pack --destructive-mode", build.InvokeCreateSnapBuildCommand());
+    }
+
+    /// <summary>
     /// Verifies both AppImage shell commands single-quote every hostile path character.
     /// </summary>
     [Fact]
@@ -1336,6 +1404,18 @@ public class PublishPipelineTests
         Assert.Equal(
             $"ARCH=x86_64 {expectedToolPath} {expectedAppDirPath} {expectedOutputPath}",
             buildCommand);
+    }
+
+    /// <summary>
+    /// Verifies that Arch packaging requests a binary Zstandard-compressed package instead of a source archive.
+    /// </summary>
+    [Fact]
+    public void CreateArchPackageBuildCommand_Defaults_CreatesBinaryPkgTarZst()
+    {
+        var command = new TestBuild().InvokeCreateArchPackageBuildCommand();
+
+        Assert.Equal("PKGEXT=.pkg.tar.zst makepkg --force --noconfirm --ignorearch", command);
+        Assert.DoesNotContain("--source", command, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -2257,6 +2337,61 @@ public class PublishPipelineTests
     }
 
     /// <summary>
+    /// Verifies Debian packaging uses dedicated native staging and applies the permissions required by dpkg-deb.
+    /// </summary>
+    [Fact]
+    public void CreateLinuxDeb_DefaultPipeline_UsesDedicatedStagingAndValidControlPermissions()
+    {
+        var rootDirectory = Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}");
+        var publishDirectory = CreateRawOutput(rootDirectory, "linux-x64");
+        var iconPath = Path.Combine(rootDirectory, "source.svg");
+        var debianStagingDirectory = Path.Combine(rootDirectory, "debian-staging");
+        var publishStagingDirectory = Path.Combine(rootDirectory, "workspace-staging");
+        File.WriteAllText(iconPath, "icon");
+
+        try
+        {
+            var build = new TestBuild
+            {
+                CreateDebianOutput = true,
+                TestDebianPackageStagingDirectory = debianStagingDirectory,
+                TestLinuxIconFile = iconPath,
+                TestPublishStagingDirectory = publishStagingDirectory
+            };
+            ConfigureLinuxOptions(build);
+            build.LinuxAppBundleOptions.DebPackageMaintainer = "Test Maintainer <test@example.com>";
+
+            build.InvokeCreateLinuxDeb(CreateContext(build, "linux-x64", publishDirectory), "x64");
+
+            var workingDirectory = Assert.Single(build.ShellWorkingDirectories);
+            Assert.StartsWith(Path.GetFullPath(debianStagingDirectory), workingDirectory, StringComparison.Ordinal);
+            Assert.DoesNotContain(Path.GetFullPath(publishStagingDirectory), workingDirectory,
+                StringComparison.Ordinal);
+            Assert.Contains("Maintainer: Test Maintainer <test@example.com>",
+                build.DebianControlDuringBuild, StringComparison.Ordinal);
+            Assert.True(File.Exists($"{publishDirectory}.deb"));
+            Assert.False(Directory.Exists(workingDirectory));
+
+            if (!OperatingSystem.IsWindows())
+            {
+                Assert.Equal(
+                    UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                    UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
+                    UnixFileMode.OtherRead | UnixFileMode.OtherExecute,
+                    build.DebianControlDirectoryModeDuringBuild);
+                Assert.Equal(
+                    UnixFileMode.UserRead | UnixFileMode.UserWrite |
+                    UnixFileMode.GroupRead | UnixFileMode.OtherRead,
+                    build.DebianControlFileModeDuringBuild);
+            }
+        }
+        finally
+        {
+            Directory.Delete(rootDirectory, true);
+        }
+    }
+
+    /// <summary>
     /// Verifies single-architecture macOS bundle selection preserves macOS RID order and ignores other families.
     /// </summary>
     [Fact]
@@ -2307,6 +2442,91 @@ public class PublishPipelineTests
         build.InvokeCreateBundles(contexts);
 
         Assert.Equal(["mac-multi:OSX-X64:OsX-ArM64"], build.Calls);
+    }
+
+    /// <summary>
+    /// Verifies native macOS packages are dispatched for each macOS runtime and never for another platform.
+    /// </summary>
+    [Fact]
+    public void CreateBundles_MacOSPackagesSelected_DispatchesDmgAndPkgForEveryMacContext()
+    {
+        var build = new TestBuild
+        {
+            UseDefaultBundlePipeline = true,
+            RecordMacOSPackages = true,
+            TestMacOSHost = true
+        };
+        build.SetPackagingTypes(ApplicationPackagingType.MacOSDmg, ApplicationPackagingType.MacOSPkg);
+        var contexts = new[]
+        {
+            CreateContext(build, "linux-x64"),
+            CreateContext(build, "osx-arm64"),
+            CreateContext(build, "win-x64"),
+            CreateContext(build, "osx-x64")
+        };
+
+        build.InvokeCreateBundles(contexts);
+
+        Assert.Equal(["dmg:osx-arm64", "pkg:osx-arm64", "dmg:osx-x64", "pkg:osx-x64"], build.Calls);
+    }
+
+    /// <summary>
+    /// Verifies multi-architecture native macOS packages combine the Intel and Apple Silicon payloads once.
+    /// </summary>
+    [Fact]
+    public void CreateBundles_MacOSMultiArchitecturePackagesSelected_DispatchesCombinedDmgAndPkg()
+    {
+        var build = new TestBuild
+        {
+            UseDefaultBundlePipeline = true,
+            RecordMacOSPackages = true,
+            TestMacOSHost = true
+        };
+        build.SetPackagingTypes(ApplicationPackagingType.MacOSDmg, ApplicationPackagingType.MacOSPkg);
+        build.SetPublishMultiArch(true);
+        var contexts = new[]
+        {
+            CreateContext(build, "OSX-X64"),
+            CreateContext(build, "linux-x64"),
+            CreateContext(build, "OsX-ArM64")
+        };
+
+        build.InvokeCreateBundles(contexts);
+
+        Assert.Equal(["dmg-multi:OSX-X64:OsX-ArM64", "pkg-multi:OSX-X64:OsX-ArM64"], build.Calls);
+    }
+
+    /// <summary>
+    /// Verifies every selected Linux distribution format is dispatched only for Linux runtimes.
+    /// </summary>
+    [Fact]
+    public void CreateBundles_LinuxDistributionPackagesSelected_DispatchesEveryFormatForLinuxContexts()
+    {
+        var build = new TestBuild
+        {
+            UseDefaultBundlePipeline = true,
+            RecordLinuxPackages = true,
+            TestLinuxHost = true
+        };
+        build.SetPackagingTypes(
+            ApplicationPackagingType.LinuxFlatpak,
+            ApplicationPackagingType.LinuxDeb,
+            ApplicationPackagingType.LinuxRpm,
+            ApplicationPackagingType.LinuxArchPackage,
+            ApplicationPackagingType.LinuxSnap);
+        var contexts = new[]
+        {
+            CreateContext(build, "win-x64"),
+            CreateContext(build, "linux-arm64"),
+            CreateContext(build, "osx-x64")
+        };
+
+        build.InvokeCreateBundles(contexts);
+
+        Assert.Equal([
+            "flatpak:linux-arm64:arm64", "deb:linux-arm64:arm64", "rpm:linux-arm64:arm64",
+            "arch:linux-arm64:arm64", "snap:linux-arm64:arm64"
+        ], build.Calls);
     }
 
     /// <summary>
@@ -3085,7 +3305,11 @@ public class PublishPipelineTests
 
         internal bool RecordMultiArchMacOSApp { get; set; }
 
+        internal bool RecordMacOSPackages { get; set; }
+
         internal bool RecordLinuxAppImage { get; set; }
+
+        internal bool RecordLinuxPackages { get; set; }
 
         internal bool RecordMacOSWarning { get; set; }
 
@@ -3109,6 +3333,8 @@ public class PublishPipelineTests
 
         internal bool CreateAppImageOutputDirectory { get; set; }
 
+        internal bool CreateDebianOutput { get; set; }
+
         internal bool ThrowAfterAppImageBuild { get; set; }
 
         internal bool UseConfiguredTemporaryAppImageOutputPath { get; set; }
@@ -3129,6 +3355,12 @@ public class PublishPipelineTests
 
         internal string AppDirPathDuringBuild { get; private set; } = string.Empty;
 
+        internal string DebianControlDuringBuild { get; private set; } = string.Empty;
+
+        internal UnixFileMode? DebianControlDirectoryModeDuringBuild { get; private set; }
+
+        internal UnixFileMode? DebianControlFileModeDuringBuild { get; private set; }
+
         internal Architecture TestHostArchitecture { get; set; } = Architecture.X64;
 
         internal IReadOnlyCollection<Project> TestInstallerProjects { get; set; } = [];
@@ -3148,6 +3380,12 @@ public class PublishPipelineTests
 
         internal AbsolutePath TestAppImageStagingDirectory { get; set; } =
             Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}-appdir");
+
+        internal AbsolutePath TestDebianPackageStagingDirectory { get; set; } =
+            Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}-debian");
+
+        internal AbsolutePath TestPublishStagingDirectory { get; set; } =
+            Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}-publish-staging");
 
         internal AbsolutePath TestAppImageOutputPath { get; set; } =
             Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}.AppImage");
@@ -3205,6 +3443,10 @@ public class PublishPipelineTests
         protected override AbsolutePath AppImageToolCacheDirectory => TestAppImageToolCacheDirectory;
 
         protected override AbsolutePath AppImageStagingDirectory => TestAppImageStagingDirectory;
+
+        protected override AbsolutePath DebianPackageStagingDirectory => TestDebianPackageStagingDirectory;
+
+        protected override AbsolutePath PublishStagingDirectory => TestPublishStagingDirectory;
 
         protected override string? GetMainProjectProperty(string propertyName)
         {
@@ -3300,6 +3542,11 @@ public class PublishPipelineTests
             return PrepareAppImageTool();
         }
 
+        internal string InvokeCreateSnapBuildCommand()
+        {
+            return CreateSnapBuildCommand();
+        }
+
         internal string InvokeCreateAppImageToolExtractionCommand(AbsolutePath downloadedPath)
         {
             return CreateAppImageToolExtractionCommand(downloadedPath);
@@ -3311,6 +3558,11 @@ public class PublishPipelineTests
             return CreateAppImageBuildCommand(architecture, appImageTool, appDirPath, outputPath);
         }
 
+        internal string InvokeCreateArchPackageBuildCommand()
+        {
+            return CreateArchPackageBuildCommand();
+        }
+
         internal void InvokeCreateLinuxAppDir(PublishRidContext context, AbsolutePath appDirPath)
         {
             CreateLinuxAppDir(context, appDirPath);
@@ -3319,6 +3571,11 @@ public class PublishPipelineTests
         internal void InvokeCreateLinuxAppImage(PublishRidContext context, string architecture)
         {
             CreateLinuxAppImage(context, architecture);
+        }
+
+        internal void InvokeCreateLinuxDeb(PublishRidContext context, string architecture)
+        {
+            CreateLinuxDeb(context, architecture);
         }
 
         internal AbsolutePath InvokeCreateTemporaryAppImageOutputPath(AbsolutePath outputPath)
@@ -3333,12 +3590,17 @@ public class PublishPipelineTests
         {
             RIds = runtimeIdentifiers;
             DeletePublishDirectories = deletePublishDirectories;
-            PackagingTypes = noPackaging ? ApplicationPackagingType.None : ApplicationPackagingType.Portable;
+            PackagingTypes = noPackaging ? [] : [ApplicationPackagingType.Portable];
         }
 
-        internal void SetPackagingTypes(ApplicationPackagingType packagingTypes)
+        internal void SetPackagingTypes(params ApplicationPackagingType[] packagingTypes)
         {
             PackagingTypes = packagingTypes;
+        }
+
+        internal void SetFrameworkDependent(bool frameworkDependent)
+        {
+            FrameworkDependent = frameworkDependent;
         }
 
         internal void SetPublishCleanupExtensions(params string[] extensions)
@@ -3433,7 +3695,7 @@ public class PublishPipelineTests
             Assert.False(File.Exists(Path.Combine(context.PublishPath, "stale.txt")));
             Directory.CreateDirectory(context.PublishPath);
             File.WriteAllText(Path.Combine(context.PublishPath, "raw.txt"), context.RuntimeIdentifier);
-            if (PackagingTypes.HasFlag(ApplicationPackagingType.DotNetSingleFile))
+            if (PackagingTypes.Contains(ApplicationPackagingType.DotNetSingleFile))
             {
                 var runtime = PublishRid.ParseRuntimeIdentifier(context.RuntimeIdentifier);
                 var executableName = runtime.Family is PublishRidFamily.Windows
@@ -3496,6 +3758,52 @@ public class PublishPipelineTests
             base.CreateMultiArchMacOSApp(x64Context, arm64Context);
         }
 
+        protected override void CreateMacOSDmg(PublishRidContext context)
+        {
+            if (RecordMacOSPackages)
+            {
+                Calls.Add($"dmg:{context.RuntimeIdentifier}");
+                return;
+            }
+
+            base.CreateMacOSDmg(context);
+        }
+
+        protected override void CreateMacOSPkg(PublishRidContext context)
+        {
+            if (RecordMacOSPackages)
+            {
+                Calls.Add($"pkg:{context.RuntimeIdentifier}");
+                return;
+            }
+
+            base.CreateMacOSPkg(context);
+        }
+
+        protected override void CreateMultiArchMacOSDmg(PublishRidContext x64Context,
+            PublishRidContext arm64Context)
+        {
+            if (RecordMacOSPackages)
+            {
+                Calls.Add($"dmg-multi:{x64Context.RuntimeIdentifier}:{arm64Context.RuntimeIdentifier}");
+                return;
+            }
+
+            base.CreateMultiArchMacOSDmg(x64Context, arm64Context);
+        }
+
+        protected override void CreateMultiArchMacOSPkg(PublishRidContext x64Context,
+            PublishRidContext arm64Context)
+        {
+            if (RecordMacOSPackages)
+            {
+                Calls.Add($"pkg-multi:{x64Context.RuntimeIdentifier}:{arm64Context.RuntimeIdentifier}");
+                return;
+            }
+
+            base.CreateMultiArchMacOSPkg(x64Context, arm64Context);
+        }
+
         protected override void WarnMacOSAppsUnsupportedHost()
         {
             if (RecordMacOSWarning)
@@ -3516,6 +3824,61 @@ public class PublishPipelineTests
             }
 
             base.CreateLinuxAppImage(context, architecture);
+        }
+
+        protected override void CreateLinuxFlatpak(PublishRidContext context, string architecture)
+        {
+            if (RecordLinuxPackages)
+            {
+                Calls.Add($"flatpak:{context.RuntimeIdentifier}:{architecture}");
+                return;
+            }
+
+            base.CreateLinuxFlatpak(context, architecture);
+        }
+
+        protected override void CreateLinuxDeb(PublishRidContext context, string architecture)
+        {
+            if (RecordLinuxPackages)
+            {
+                Calls.Add($"deb:{context.RuntimeIdentifier}:{architecture}");
+                return;
+            }
+
+            base.CreateLinuxDeb(context, architecture);
+        }
+
+        protected override void CreateLinuxRpm(PublishRidContext context, string architecture)
+        {
+            if (RecordLinuxPackages)
+            {
+                Calls.Add($"rpm:{context.RuntimeIdentifier}:{architecture}");
+                return;
+            }
+
+            base.CreateLinuxRpm(context, architecture);
+        }
+
+        protected override void CreateLinuxArchPackage(PublishRidContext context, string architecture)
+        {
+            if (RecordLinuxPackages)
+            {
+                Calls.Add($"arch:{context.RuntimeIdentifier}:{architecture}");
+                return;
+            }
+
+            base.CreateLinuxArchPackage(context, architecture);
+        }
+
+        protected override void CreateLinuxSnap(PublishRidContext context, string architecture)
+        {
+            if (RecordLinuxPackages)
+            {
+                Calls.Add($"snap:{context.RuntimeIdentifier}:{architecture}");
+                return;
+            }
+
+            base.CreateLinuxSnap(context, architecture);
         }
 
         protected override void WarnLinuxAppImagesUnsupportedHost()
@@ -3554,6 +3917,24 @@ public class PublishPipelineTests
         {
             ShellCommands.Add(command);
             ShellWorkingDirectories.Add(workingDirectory);
+            if (command.StartsWith("dpkg-deb --build ", StringComparison.Ordinal))
+            {
+                var controlDirectory = workingDirectory / "root" / "DEBIAN";
+                var controlFile = controlDirectory / "control";
+                DebianControlDuringBuild = File.ReadAllText(controlFile);
+                if (!OperatingSystem.IsWindows())
+                {
+                    DebianControlDirectoryModeDuringBuild = File.GetUnixFileMode(controlDirectory);
+                    DebianControlFileModeDuringBuild = File.GetUnixFileMode(controlFile);
+                }
+
+                if (CreateDebianOutput)
+                {
+                    var quotedArguments = command.Split('\'');
+                    File.WriteAllText(quotedArguments[^2], "deb");
+                }
+            }
+
             if (command.EndsWith(" --appimage-extract", StringComparison.Ordinal) &&
                 (CreateExtractionDirectory || CreateExtractedAppRun))
             {

@@ -1,9 +1,22 @@
 # Unreleased
 
+- Add `HostSystem.TryFindExecutable` for subprocess-free executable lookup with Windows `PATHEXT` support and Unix
+  execute-permission validation.
+- Add `ProcessHelper` with privileged-process-aware administrator elevation through Windows `runas`, Linux `pkexec`,
+  and macOS `osascript`, synchronous and asynchronous captured stdout/stderr results, and cross-platform process and
+  shell helpers with cancellation support.
+- Fix Debian package creation from Windows-mounted WSL repositories by staging control files on the native temporary
+  filesystem with the permissions required by `dpkg-deb`.
+- Add the opt-in `FrameworkDependent` Fallout parameter while retaining self-contained publishing by default.
+- Add Linux `PackagingTypes` for Flatpak, Debian, RPM, Arch Linux binary, and Snap packages, plus macOS DMG and PKG output.
+  Package creation uses the platform-native `flatpak-builder`, `dpkg-deb`, `rpmbuild`, `makepkg`, `snapcraft`,
+  `hdiutil`, and `pkgbuild` tools.
 - Update the release workflow to build runtime assets for supported platforms, attach packages and assets to a GitHub
   release, and omit Winget publishing.
-- Simplify `StageKitBuild` publish parameters: rename `PublishBundles` to `PackagingTypes`, rename cleanup and
-  installer options, remove `PublishNoBundles`, and use `PackagingTypes=None` to skip package creation.
+- Simplify `StageKitBuild` publish parameters: rename `PublishBundles` to the duplicate-free `PackagingTypes` array,
+  rename cleanup and installer options, remove `PublishNoBundles`, and use `PackagingTypes=[]` to skip package creation.
+- Remove `[Flags]` from `ApplicationPackagingType` and replace `LinuxAur` source archives with
+  `LinuxArchPackage` binary `.pkg.tar.zst` packages.
 - Replace the original `StageKit.Demo` console sample with an Avalonia desktop workshop for runtime diagnostics,
   settings, storage utilities, settings-directory access, crash/relaunch report recovery, and verified Updatum downloads
   from `sn4k3/UVtools`; add live theme selection, profile-directory explorer access, and opt-in update installation;
@@ -13,7 +26,7 @@
 - Resolve published executables, bundle launchers, and WiX installer payloads from the main project's `AssemblyName`,
   independently of product and artifact naming.
 - Add a schema version to Fallout runtime manifests for forward-compatible evolution.
-- Rename `ApplicationBundleType` to `ApplicationPackagingType` (now a `[Flags]` enum with `Portable`,
+- Rename `ApplicationBundleType` to `ApplicationPackagingType` (with `Portable`,
   `DotNetSingleFile`, `WindowsInstaller`, `LinuxAppImage`, `LinuxFlatpak`, `MacOSAppBundle`)
 - Replace `EntryApplication.BundleType` with `PackagingType`
 - Add `FileUtilities` and `StringExtensions` (quoting helpers) to `StageKit.Primitives`

@@ -166,11 +166,48 @@ using StageKit.Primitives.System;
 bool samePath = string.Equals(leftPath, rightPath, HostSystem.HostStringComparison);
 ```
 
+Use `HostSystem.TryFindExecutable(...)` to resolve an executable without starting a lookup process. It honors `PATHEXT`
+on Windows and requires an execute permission bit on Unix:
+
+```csharp
+if (HostSystem.TryFindExecutable("git", out string? gitPath))
+    Console.WriteLine(gitPath);
+```
+
 Use `UnixSystem.SetUnix755Executable(...)` to grant owner write/execute and group/other execute permissions to a Unix
 launcher. The method is a no-op on Windows.
 
 ```csharp
 UnixSystem.SetUnix755Executable(scriptPath);
+```
+
+Use `ProcessHelper.StartProcess(...)` to launch a command, optionally waiting for its exit code. Set
+`requireElevation: true` to show the platform administrator prompt through Windows `runas`, Linux `pkexec`, or macOS
+`osascript`. Elevation is skipped when `Environment.IsPrivilegedProcess` is already `true`:
+
+```csharp
+int exitCode = ProcessHelper.StartProcess(
+    "system-tool",
+    ["--configure", "value with spaces"],
+    requireElevation: true,
+    waitForCompletion: true);
+```
+
+Run shell syntax through `cmd /c` on Windows or `bash -c` elsewhere, and use the output helpers when the exit code and
+both redirected streams are needed. Output helpers also accept `requireElevation`; Linux and macOS capture through their
+elevation wrappers, while non-privileged Windows `runas` capture returns exit code `-1` because that API cannot redirect
+the elevated child streams:
+
+```csharp
+int shellExitCode = ProcessHelper.StartShell("system-tool --configure", waitForCompletion: true);
+
+ProcessOutput output = ProcessHelper.GetShellOutput("system-tool --status", requireElevation: true);
+Console.Write(output.StandardOutput);
+Console.Error.Write(output.StandardError);
+
+ProcessOutput asyncOutput = await ProcessHelper.GetShellOutputAsync(
+    "system-tool --status",
+    cancellationToken: cancellationToken);
 ```
 
 ## DisposableObject

@@ -31,6 +31,16 @@ public partial class StageKitBuild
     protected virtual AbsolutePath AppImageStagingDirectory => PublishStagingDirectory;
 
     /// <summary>
+    /// Gets the parent directory for Debian package staging directories.
+    /// </summary>
+    /// <remarks>
+    /// Debian staging uses the operating system's temporary filesystem so Unix permissions remain effective when the
+    /// repository is located on a mounted Windows filesystem under WSL.
+    /// </remarks>
+    protected virtual AbsolutePath DebianPackageStagingDirectory =>
+        Path.Combine(Path.GetTempPath(), "stagekit-fallout", "debian");
+
+    /// <summary>
     /// Composes the shell command that extracts one downloaded appimagetool AppImage.
     /// </summary>
     /// <param name="downloadedPath">The downloaded AppImage path.</param>
@@ -109,6 +119,380 @@ public partial class StageKitBuild
                 DeleteFileSystemEntry(appDirPath);
             }
         }
+    }
+
+    /// <summary>
+    /// Creates the requested Linux distribution packages for each Linux runtime.
+    /// </summary>
+    protected virtual void CreateLinuxPackages(IReadOnlyCollection<PublishRidContext> contexts)
+    {
+        var linuxContexts = contexts
+            .Select(context =>
+                (Context: context, Runtime: PublishRid.ParseRuntimeIdentifier(context.RuntimeIdentifier)))
+            .Where(item => item.Runtime.Family is PublishRidFamily.Linux)
+            .ToArray();
+        if (linuxContexts.Length == 0)
+            return;
+
+        if (!IsLinuxHost)
+        {
+            Log.Warning("Skipping Linux distribution packages on a non-Linux host.");
+            return;
+        }
+
+        foreach (var item in linuxContexts)
+        {
+            if (HasPackagingType(ApplicationPackagingType.LinuxFlatpak))
+                CreateLinuxFlatpak(item.Context, item.Runtime.Architecture);
+            if (HasPackagingType(ApplicationPackagingType.LinuxDeb))
+                CreateLinuxDeb(item.Context, item.Runtime.Architecture);
+            if (HasPackagingType(ApplicationPackagingType.LinuxRpm))
+                CreateLinuxRpm(item.Context, item.Runtime.Architecture);
+            if (HasPackagingType(ApplicationPackagingType.LinuxArchPackage))
+                CreateLinuxArchPackage(item.Context, item.Runtime.Architecture);
+            if (HasPackagingType(ApplicationPackagingType.LinuxSnap))
+                CreateLinuxSnap(item.Context, item.Runtime.Architecture);
+        }
+    }
+
+    /// <summary>Creates one Flatpak bundle using <c>flatpak-builder</c>.</summary>
+    protected virtual void CreateLinuxFlatpak(PublishRidContext context, string architecture)
+    {
+        var options = LinuxAppBundleOptions;
+        ResolveLinuxPathOptions(options);
+        var staging = PublishStagingDirectory / Guid.NewGuid().ToString("N");
+        var source = staging / options.ProductName;
+        var buildDirectory = staging / "build";
+        var repository = staging / "repo";
+        var manifest = staging / $"{options.ApplicationId}.yml";
+        var output = (AbsolutePath)$"{context.BundleOutputPath}.flatpak";
+        var temporaryOutput = CreateTemporaryPackageOutputPath(output);
+        try
+        {
+            staging.CreateOrCleanDirectory();
+            source.CreateDirectory();
+            context.PublishPath.Copy(source, ExistsPolicy.MergeAndOverwrite);
+            PublishUtilities.WriteRuntimeManifest(source, BuildRuntimeManifestFileName,
+                new BuildRuntime(context.RuntimeIdentifier, SoftwareVersion, true,
+                    ApplicationPackagingType.LinuxFlatpak));
+            var share = source / "share";
+            (share / "applications").CreateDirectory();
+            (share / "applications" / $"{options.ApplicationId}.desktop").WriteAllText(
+                LinuxAppBundle.GetDesktopEntry(options, options.ExecutableName, options.ApplicationId));
+            (share / "metainfo").CreateDirectory();
+            (share / "metainfo" / $"{options.ApplicationId}.appdata.xml").WriteAllText(
+                LinuxAppBundle.GetAppStreamMetadata(options));
+            var icon = LinuxIconFile;
+            ValidateLinuxIcon(icon);
+            var iconDirectory = share / "icons" / "hicolor" /
+                                (icon.Extension.Equals(".svg", StringComparison.OrdinalIgnoreCase)
+                                    ? "scalable"
+                                    : "256x256") / "apps";
+            iconDirectory.CreateDirectory();
+            icon.Copy(iconDirectory / $"{options.ApplicationId}{icon.Extension}", ExistsPolicy.FileOverwrite);
+            manifest.WriteAllText(LinuxAppBundle.GetFlatpakManifest(options));
+            var flatpakArchitecture = GetFlatpakArchitecture(architecture);
+            ExecuteShell(CreateFlatpakBuilderCommand(flatpakArchitecture, repository, buildDirectory, manifest),
+                staging);
+            ExecuteShell(CreateFlatpakBundleCommand(flatpakArchitecture, repository, temporaryOutput,
+                options.ApplicationId), staging);
+            MovePackageOutput(temporaryOutput, output, "Flatpak");
+        }
+        finally
+        {
+            temporaryOutput.DeleteFile();
+            DeleteFileSystemEntry(staging);
+        }
+    }
+
+    /// <summary>Creates one Debian package using <c>dpkg-deb</c>.</summary>
+    protected virtual void CreateLinuxDeb(PublishRidContext context, string architecture)
+    {
+        var options = LinuxAppBundleOptions;
+        ResolveLinuxPathOptions(options);
+        var packageName = GetLinuxPackageName();
+        var staging = DebianPackageStagingDirectory / Guid.NewGuid().ToString("N");
+        var output = (AbsolutePath)$"{context.BundleOutputPath}.deb";
+        var temporaryOutput = CreateTemporaryPackageOutputPath(output);
+        try
+        {
+            var root = staging / "root";
+            CreateLinuxPackageRoot(context, options, root, ApplicationPackagingType.LinuxDeb);
+            var control = root / "DEBIAN";
+            control.CreateDirectory();
+            var controlFile = control / "control";
+            controlFile.WriteAllText(LinuxPackage.GetDebianControl(packageName,
+                LinuxPackage.GetDebianVersion(SoftwareVersion), GetDebArchitecture(architecture),
+                options.DebPackageMaintainer, options.Summary, options.Description));
+            SetDebianControlPermissions(control, controlFile);
+            ExecuteShell($"dpkg-deb --build {root.ToString().QuoteShell()} {temporaryOutput.ToString().QuoteShell()}",
+                staging);
+            MovePackageOutput(temporaryOutput, output, "Debian");
+        }
+        finally
+        {
+            temporaryOutput.DeleteFile();
+            DeleteFileSystemEntry(staging);
+        }
+    }
+
+    /// <summary>Creates one RPM package using <c>rpmbuild</c>.</summary>
+    protected virtual void CreateLinuxRpm(PublishRidContext context, string architecture)
+    {
+        var options = LinuxAppBundleOptions;
+        ResolveLinuxPathOptions(options);
+        var packageName = GetLinuxPackageName();
+        var staging = PublishStagingDirectory / Guid.NewGuid().ToString("N");
+        var top = staging / "rpmbuild";
+        var payload = staging / "payload";
+        var spec = top / "SPECS" / $"{packageName}.spec";
+        var output = (AbsolutePath)$"{context.BundleOutputPath}.rpm";
+        var temporaryOutput = CreateTemporaryPackageOutputPath(output);
+        try
+        {
+            CreateLinuxPackageRoot(context, options, payload, ApplicationPackagingType.LinuxRpm);
+            (top / "SPECS").CreateDirectory();
+            (top / "RPMS").CreateDirectory();
+            var rpmVersion = LinuxPackage.GetRpmVersion(SoftwareVersion);
+            spec.WriteAllText(LinuxPackage.GetRpmSpec(packageName, rpmVersion,
+                GetRpmArchitecture(architecture), options.License, options.Summary, options.Description, payload));
+            ExecuteShell(CreateRpmBuildCommand(top, spec), staging);
+            var rpm = Directory.GetFiles(top, "*.rpm", SearchOption.AllDirectories).SingleOrDefault()
+                      ?? throw new FileNotFoundException("rpmbuild did not produce exactly one RPM package.");
+            ((AbsolutePath)rpm).Move(temporaryOutput, ExistsPolicy.FileOverwrite);
+            MovePackageOutput(temporaryOutput, output, "RPM");
+        }
+        finally
+        {
+            temporaryOutput.DeleteFile();
+            DeleteFileSystemEntry(staging);
+        }
+    }
+
+    /// <summary>Creates one Arch Linux binary package using <c>makepkg</c>.</summary>
+    protected virtual void CreateLinuxArchPackage(PublishRidContext context, string architecture)
+    {
+        var options = LinuxAppBundleOptions;
+        ResolveLinuxPathOptions(options);
+        var packageName = GetLinuxPackageName();
+        var archVersion = LinuxPackage.GetArchVersion(SoftwareVersion);
+        var staging = PublishStagingDirectory / Guid.NewGuid().ToString("N");
+        var source = staging / $"{packageName}-{archVersion}";
+        var output = (AbsolutePath)$"{context.BundleOutputPath}.pkg.tar.zst";
+        var temporaryOutput = CreateTemporaryPackageOutputPath(output);
+        try
+        {
+            source.CreateDirectory();
+            CreateLinuxPackageRoot(context, options, source, ApplicationPackagingType.LinuxArchPackage);
+            var sourceArchive = staging / $"{source.Name}.tar.gz";
+            ExecuteShell($"tar -czf {sourceArchive.ToString().QuoteShell()} -C {staging.ToString().QuoteShell()} " +
+                         source.Name.QuoteShell(), staging);
+            (staging / "PKGBUILD").WriteAllText(LinuxPackage.GetArchPkgBuild(packageName, archVersion,
+                GetArchArchitecture(architecture), options.License, options.Summary, source.Name));
+            ExecuteShell(CreateArchPackageBuildCommand(), staging);
+            var package = Directory.GetFiles(staging, "*.pkg.tar.zst", SearchOption.TopDirectoryOnly)
+                .SingleOrDefault();
+            if (package is null)
+                throw new FileNotFoundException("makepkg did not produce exactly one Arch Linux package.");
+            ((AbsolutePath)package).Move(temporaryOutput, ExistsPolicy.FileOverwrite);
+            MovePackageOutput(temporaryOutput, output, "Arch Linux");
+        }
+        finally
+        {
+            temporaryOutput.DeleteFile();
+            DeleteFileSystemEntry(staging);
+        }
+    }
+
+    /// <summary>Creates one Snap package using <c>snapcraft pack</c>.</summary>
+    protected virtual void CreateLinuxSnap(PublishRidContext context, string architecture)
+    {
+        var options = LinuxAppBundleOptions;
+        ResolveLinuxPathOptions(options);
+        var packageName = LinuxPackage.GetSnapName(SoftwareName);
+        var staging = PublishStagingDirectory / Guid.NewGuid().ToString("N");
+        var payload = staging / "payload";
+        var output = (AbsolutePath)$"{context.BundleOutputPath}.snap";
+        var temporaryOutput = CreateTemporaryPackageOutputPath(output);
+        try
+        {
+            payload.CreateDirectory();
+            context.PublishPath.Copy(payload, ExistsPolicy.MergeAndOverwrite);
+            UnixSystem.SetUnix755Executable(payload / options.ExecutableName!);
+            PublishUtilities.WriteRuntimeManifest(payload, BuildRuntimeManifestFileName,
+                new BuildRuntime(context.RuntimeIdentifier, SoftwareVersion, true,
+                    ApplicationPackagingType.LinuxSnap));
+            var gui = payload / "meta" / "gui";
+            gui.CreateDirectory();
+            (gui / $"{packageName}.desktop").WriteAllText(
+                LinuxAppBundle.GetDesktopEntry(options, packageName,
+                    $"${{SNAP}}/meta/gui/icon{LinuxIconFile.Extension}"));
+            ValidateLinuxIcon(LinuxIconFile);
+            LinuxIconFile.Copy(gui / $"icon{LinuxIconFile.Extension}", ExistsPolicy.FileOverwrite);
+            var snapDirectory = staging / "snap";
+            snapDirectory.CreateDirectory();
+            (snapDirectory / "snapcraft.yaml").WriteAllText(LinuxPackage.GetSnapcraftManifest(packageName,
+                SoftwareVersion, GetSnapArchitecture(HostArchitecture), GetSnapArchitecture(architecture),
+                options.ExecutableName!, options.Summary, options.Description, options.SnapBase,
+                options.SnapConfinement, options.SnapPlugs));
+            ExecuteShell(CreateSnapBuildCommand(), staging);
+            var snap = Directory.GetFiles(staging, "*.snap", SearchOption.TopDirectoryOnly).SingleOrDefault()
+                       ?? throw new FileNotFoundException("snapcraft did not produce exactly one Snap package.");
+            ((AbsolutePath)snap).Move(temporaryOutput, ExistsPolicy.FileOverwrite);
+            MovePackageOutput(temporaryOutput, output, "Snap");
+        }
+        finally
+        {
+            temporaryOutput.DeleteFile();
+            DeleteFileSystemEntry(staging);
+        }
+    }
+
+    private void CreateLinuxPackageRoot(PublishRidContext context, LinuxAppBundleOptions options, AbsolutePath root,
+        ApplicationPackagingType packagingType)
+    {
+        var packageName = GetLinuxPackageName();
+        var executable = options.ExecutableName!;
+        var application = root / "usr" / "lib" / packageName;
+        application.CreateDirectory();
+        context.PublishPath.Copy(application, ExistsPolicy.MergeAndOverwrite);
+        UnixSystem.SetUnix755Executable(application / executable);
+        var bin = root / "usr" / "bin";
+        bin.CreateDirectory();
+        var launcher = bin / packageName;
+        launcher.WriteAllText($"#!/bin/sh\nexec {$"/usr/lib/{packageName}/{executable}".QuoteShell()} \"$@\"\n");
+        UnixSystem.SetUnix755Executable(launcher);
+        var applications = root / "usr" / "share" / "applications";
+        applications.CreateDirectory();
+        (applications / $"{options.ApplicationId}.desktop").WriteAllText(
+            LinuxAppBundle.GetDesktopEntry(options, packageName, options.IconName));
+        var metainfo = root / "usr" / "share" / "metainfo";
+        metainfo.CreateDirectory();
+        (metainfo / $"{options.ApplicationId}.appdata.xml").WriteAllText(LinuxAppBundle.GetAppStreamMetadata(options));
+        var icon = LinuxIconFile;
+        ValidateLinuxIcon(icon);
+        var icons = root / "usr" / "share" / "icons" / "hicolor" /
+                    (icon.Extension.Equals(".svg", StringComparison.OrdinalIgnoreCase) ? "scalable" : "256x256") /
+                    "apps";
+        icons.CreateDirectory();
+        icon.Copy(icons / $"{options.IconName}{icon.Extension}", ExistsPolicy.FileOverwrite);
+        PublishUtilities.WriteRuntimeManifest(application, BuildRuntimeManifestFileName,
+            new BuildRuntime(context.RuntimeIdentifier, SoftwareVersion, true, packagingType));
+    }
+
+    /// <summary>Composes the Flatpak builder command.</summary>
+    protected virtual string CreateFlatpakBuilderCommand(string architecture, AbsolutePath repository,
+        AbsolutePath buildDirectory, AbsolutePath manifest)
+    {
+        return $"flatpak-builder --force-clean --disable-rofiles-fuse --arch={architecture.QuoteShell()} " +
+               $"--repo={repository.ToString().QuoteShell()} {buildDirectory.ToString().QuoteShell()} " +
+               manifest.ToString().QuoteShell();
+    }
+
+    /// <summary>Composes the Flatpak single-file bundle command.</summary>
+    protected virtual string CreateFlatpakBundleCommand(string architecture, AbsolutePath repository,
+        AbsolutePath output, string applicationId)
+    {
+        return $"flatpak build-bundle --arch={architecture.QuoteShell()} {repository.ToString().QuoteShell()} " +
+               $"{output.ToString().QuoteShell()} {applicationId.QuoteShell()}";
+    }
+
+    /// <summary>Composes the RPM build command.</summary>
+    protected virtual string CreateRpmBuildCommand(AbsolutePath topDirectory, AbsolutePath specFile)
+    {
+        return $"rpmbuild --define {$"_topdir {topDirectory}".QuoteShell()} -bb {specFile.ToString().QuoteShell()}";
+    }
+
+    /// <summary>Composes the Arch Linux binary-package build command.</summary>
+    protected virtual string CreateArchPackageBuildCommand()
+    {
+        return "PKGEXT=.pkg.tar.zst makepkg --force --noconfirm --ignorearch";
+    }
+
+    /// <summary>Composes the Snap build command.</summary>
+    protected virtual string CreateSnapBuildCommand()
+    {
+        return "snapcraft pack --destructive-mode";
+    }
+
+    private string GetLinuxPackageName()
+    {
+        return LinuxPackage.GetPackageName(SoftwareName);
+    }
+
+    private static void MovePackageOutput(AbsolutePath temporaryOutput, AbsolutePath output, string packageType)
+    {
+        if (!temporaryOutput.FileExists())
+            throw new FileNotFoundException($"{packageType} packaging did not produce '{temporaryOutput}'.",
+                temporaryOutput);
+        temporaryOutput.Move(output, ExistsPolicy.FileOverwrite);
+    }
+
+    private static AbsolutePath CreateTemporaryPackageOutputPath(AbsolutePath output)
+    {
+        return output.Parent / $".{output.Name}.{Guid.NewGuid():N}.tmp";
+    }
+
+    private static void SetDebianControlPermissions(AbsolutePath controlDirectory, AbsolutePath controlFile)
+    {
+        if (OperatingSystem.IsWindows())
+            return;
+
+        File.SetUnixFileMode(controlDirectory,
+            UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+            UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
+            UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+        File.SetUnixFileMode(controlFile,
+            UnixFileMode.UserRead | UnixFileMode.UserWrite |
+            UnixFileMode.GroupRead | UnixFileMode.OtherRead);
+    }
+
+    private static void ValidateLinuxIcon(AbsolutePath icon)
+    {
+        if (!icon.FileExists())
+            throw new FileNotFoundException($"The configured Linux application icon '{icon}' does not exist.", icon);
+        if (!icon.Extension.Equals(".svg", StringComparison.OrdinalIgnoreCase) &&
+            !icon.Extension.Equals(".png", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"The configured Linux application icon '{icon}' must use the .svg or .png extension.");
+        }
+    }
+
+    private static string GetDebArchitecture(string architecture)
+    {
+        return architecture switch { "x64" => "amd64", "arm64" => "arm64", _ => architecture };
+    }
+
+    private static string GetRpmArchitecture(string architecture)
+    {
+        return architecture switch { "x64" => "x86_64", "arm64" => "aarch64", _ => architecture };
+    }
+
+    private static string GetArchArchitecture(string architecture)
+    {
+        return architecture switch { "x64" => "x86_64", "arm64" => "aarch64", _ => architecture };
+    }
+
+    private static string GetFlatpakArchitecture(string architecture)
+    {
+        return architecture switch { "x64" => "x86_64", "arm64" => "aarch64", _ => architecture };
+    }
+
+    private static string GetSnapArchitecture(string architecture)
+    {
+        return architecture switch { "x64" => "amd64", "arm64" => "arm64", _ => architecture };
+    }
+
+    private static string GetSnapArchitecture(Architecture architecture)
+    {
+        return architecture switch
+        {
+            Architecture.X64 => "amd64",
+            Architecture.Arm64 => "arm64",
+            _ => throw new InvalidOperationException(
+                $"Host architecture '{architecture}' is not supported by Snapcraft.")
+        };
     }
 
     /// <summary>

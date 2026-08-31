@@ -4,6 +4,8 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
+using System.Text.Json;
+using StageKit.Runtime.System;
 
 namespace StageKit.Runtime;
 
@@ -82,8 +84,7 @@ public static class EntryApplication
     /// Provides lazy initialization for retrieving the description of the entry assembly, if available.
     /// </summary>
     /// <remarks>The value is obtained from the <see cref="AssemblyDescriptionAttribute"/> of the entry
-    /// assembly. If the entry assembly does not have a description attribute, the value will be <see
-    /// langword="null"/>.</remarks>
+    /// assembly. If the entry assembly does not have a description attribute, the value will be <see langword="null"/>.</remarks>
     private static readonly Lazy<string?> AssemblyDescriptionLazy = new(() =>
         EntryAssembly?.GetCustomAttribute<AssemblyDescriptionAttribute>()?.Description);
 
@@ -159,8 +160,7 @@ public static class EntryApplication
     /// Provides lazy initialization for retrieving the file version of the entry assembly, if available.
     /// </summary>
     /// <remarks>The value is obtained from the <see cref="AssemblyFileVersionAttribute"/> of the entry
-    /// assembly. If the entry assembly does not define this attribute, the value will be <see
-    /// langword="null"/>.</remarks>
+    /// assembly. If the entry assembly does not define this attribute, the value will be <see langword="null"/>.</remarks>
     private static readonly Lazy<string?> AssemblyFileVersionLazy = new(() =>
         EntryAssembly?.GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version);
 
@@ -202,7 +202,7 @@ public static class EntryApplication
     /// Provides lazy initialization for the Flatpak application ID on Linux systems.
     /// </summary>
     /// <remarks>The value is retrieved from the FLATPAK_ID environment variable if the current operating
-    /// system is Linux; otherwise, the value is null. Accessing this member does not trigger environment variable
+    /// system is Linux; otherwise, the value is null. Accessing this member does not trigger the environment variable
     /// lookup until the value is requested.</remarks>
     private static readonly Lazy<string?> LinuxFlatpakIdLazy = new(() =>
         OperatingSystem.IsLinux() ? Environment.GetEnvironmentVariable("FLATPAK_ID") : null);
@@ -213,9 +213,16 @@ public static class EntryApplication
     /// <remarks>The value is available only when the FLATPAK_ID environment variable identifies a Flatpak
     /// application. The container marker is not an executable path and is never used for process selection.</remarks>
     private static readonly Lazy<string?> LinuxFlatpakPathLazy = new(() =>
-        OperatingSystem.IsLinux() && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("FLATPAK_ID"))
+        IsLinuxFlatpak
             ? AppContext.BaseDirectory
             : null);
+
+    /// <summary>
+    /// Provides lazy initialization for the Snap application ID on Linux systems.
+    /// </summary>
+    private static Lazy<string?> LinuxSnapIdLazy = new(() =>
+        OperatingSystem.IsLinux() ? Environment.GetEnvironmentVariable("SNAP") : null);
+
 
     /// <summary>
     /// Provides a lazily initialized path to the root of the current application's macOS .app bundle, if running on
@@ -223,7 +230,7 @@ public static class EntryApplication
     /// </summary>
     /// <remarks>This value is determined based on the application's base directory and is only available when
     /// running on macOS within a standard .app bundle structure. If the application is not running on macOS or is not
-    /// packaged as a .app bundle, the value will be null.</remarks>
+    /// packaged as an .app bundle, the value will be null.</remarks>
     private static readonly Lazy<string?> MacOSAppBundlePathLazy = new(() =>
     {
         if (!OperatingSystem.IsMacOS()) return null;
@@ -304,6 +311,15 @@ public static class EntryApplication
         DetectDotNetSingleFileAppPath(AssemblyLocation, IsRunningFromDotNetProcess, Environment.ProcessPath));
 
     /// <summary>
+    /// Provides lazy initialization of the packaging type written by the Fallout runtime manifest.
+    /// </summary>
+    private static readonly Lazy<ApplicationPackagingType?> RuntimeManifestPackagingTypeLazy = new(() =>
+        DetectRuntimeManifestPackagingType(
+            AppContext.BaseDirectory,
+            AssemblyLocation,
+            Environment.ProcessPath));
+
+    /// <summary>
     /// Lazily retrieves information about the current process's executable, including its path, name, and base
     /// directory.
     /// </summary>
@@ -354,10 +370,40 @@ public static class EntryApplication
     /// times.</remarks>
     private static readonly Lazy<ApplicationPackagingType> PackagingTypeLazy = new(() =>
     {
-        if (IsLinuxAppImage) return ApplicationPackagingType.LinuxAppImage;
-        if (IsLinuxFlatpak) return ApplicationPackagingType.LinuxFlatpak;
-        if (IsMacOSAppBundle) return ApplicationPackagingType.MacOSAppBundle;
-        if (IsDotNetSingleFileApp) return ApplicationPackagingType.DotNetSingleFile;
+        if (!string.IsNullOrWhiteSpace(DotNetSingleFileAppPath)) return ApplicationPackagingType.DotNetSingleFile;
+
+        if (OperatingSystem.IsLinux())
+        {
+            if (!string.IsNullOrWhiteSpace(LinuxAppImagePath)) return ApplicationPackagingType.LinuxAppImage;
+            if (!string.IsNullOrWhiteSpace(LinuxFlatpakId)) return ApplicationPackagingType.LinuxFlatpak;
+            if (!string.IsNullOrWhiteSpace(LinuxSnapId)) return ApplicationPackagingType.LinuxSnap;
+
+            var applicationFile = AssemblyLocation ?? Environment.ProcessPath ?? AppContext.BaseDirectory;
+
+            if (!string.IsNullOrWhiteSpace(applicationFile))
+            {
+                if (Utilities.IsOwnedByPackage("dpkg", "-S", applicationFile)) return ApplicationPackagingType.LinuxDeb;
+                if (Utilities.IsOwnedByPackage("rpm", "-qf", applicationFile)) return ApplicationPackagingType.LinuxRpm;
+                if (Utilities.IsOwnedByPackage("pacman", "-Qo", applicationFile))
+                    return ApplicationPackagingType.LinuxArchPackage;
+            }
+        }
+        else if (OperatingSystem.IsMacOS())
+        {
+            if (!string.IsNullOrWhiteSpace(MacOSAppBundlePath)) return ApplicationPackagingType.MacOSAppBundle;
+
+            var applicationFile = AssemblyLocation ?? Environment.ProcessPath;
+
+            if (!string.IsNullOrWhiteSpace(applicationFile))
+            {
+                if (IsInstalledByMacOSPkg(applicationFile)) return ApplicationPackagingType.MacOSPkg;
+                if (IsRunningFromMacOSDmg(applicationFile)) return ApplicationPackagingType.MacOSDmg;
+            }
+        }
+
+        if (RuntimeManifestPackagingType is { } manifestPackagingType)
+            return manifestPackagingType;
+
         return ApplicationPackagingType.Portable;
     });
 
@@ -505,19 +551,97 @@ public static class EntryApplication
     public static ApplicationPackagingType PackagingType => PackagingTypeLazy.Value;
 
     /// <summary>
+    /// Gets the application packaging type written by the Fallout runtime manifest, if available.
+    /// </summary>
+    private static ApplicationPackagingType? RuntimeManifestPackagingType => RuntimeManifestPackagingTypeLazy.Value;
+
+    /// <summary>
+    /// Gets a value indicating whether the application was packaged as a portable application (not bundled).
+    /// </summary>
+    public static bool IsPortable => PackagingType is ApplicationPackagingType.Portable;
+
+    /// <summary>
+    /// Gets a value indicating whether the application was packaged as a Windows Installer.
+    /// </summary>
+    public static bool IsWindowsInstaller => PackagingType is ApplicationPackagingType.WindowsInstaller;
+
+    /// <summary>
+    /// Gets a value indicating whether the application was packaged as a Linux AppImage.
+    /// </summary>
+    [MemberNotNullWhen(true, nameof(LinuxAppImagePath), nameof(ExecutablePath), nameof(ExecutableName),
+        nameof(BaseDirectory))]
+    public static bool IsLinuxAppImage => PackagingType is ApplicationPackagingType.LinuxAppImage;
+
+    /// <summary>
+    /// Gets a value indicating whether the application was packaged as a Snap package.
+    /// </summary>
+    [MemberNotNullWhen(true, nameof(ExecutablePath), nameof(ExecutableName),
+        nameof(BaseDirectory))]
+    public static bool IsLinuxSnap => PackagingType is ApplicationPackagingType.LinuxSnap;
+
+    /// <summary>
+    /// Gets a value indicating whether the application was packaged as a Debian package.
+    /// </summary>
+    [MemberNotNullWhen(true, nameof(ExecutablePath), nameof(ExecutableName),
+        nameof(BaseDirectory))]
+    public static bool IsLinuxDeb => PackagingType is ApplicationPackagingType.LinuxDeb;
+
+    /// <summary>
+    /// Gets a value indicating whether the application was packaged as an RPM package.
+    /// </summary>
+    [MemberNotNullWhen(true, nameof(ExecutablePath), nameof(ExecutableName),
+        nameof(BaseDirectory))]
+    public static bool IsLinuxRpm => PackagingType is ApplicationPackagingType.LinuxRpm;
+
+    /// <summary>
+    /// Gets a value indicating whether the application was packaged as an Arch Linux package.
+    /// </summary>
+    [MemberNotNullWhen(true, nameof(ExecutablePath), nameof(ExecutableName),
+        nameof(BaseDirectory))]
+    public static bool IsLinuxArchPackage => PackagingType is ApplicationPackagingType.LinuxArchPackage;
+
+    /// <summary>
+    /// Gets a value indicating whether the application was packaged as a macOS app bundle.
+    /// </summary>
+    [MemberNotNullWhen(true, nameof(MacOSAppBundlePath), nameof(ExecutablePath), nameof(ExecutableName),
+        nameof(BaseDirectory))]
+    public static bool IsMacOSAppBundle => PackagingType is ApplicationPackagingType.MacOSAppBundle;
+
+    /// <summary>
+    /// Gets a value indicating whether the application was packaged as a macOS disk image.
+    /// </summary>
+    public static bool IsMacOSDmg => PackagingType is ApplicationPackagingType.MacOSDmg;
+
+    /// <summary>
+    /// Gets a value indicating whether the application was packaged as a macOS Installer package.
+    /// </summary>
+    [MemberNotNullWhen(true, nameof(ExecutablePath), nameof(ExecutableName),
+        nameof(BaseDirectory))]
+    public static bool IsMacOSPkg => PackagingType is ApplicationPackagingType.MacOSPkg;
+
+    /// <summary>
     /// Checks if the application is running under a bundled application.<br/>
     /// Example: dotnet single-file, linux AppImage, macOS app bundle.
     /// </summary>
     public static bool IsAppBundled => PackagingType
         is ApplicationPackagingType.DotNetSingleFile
+        or ApplicationPackagingType.WindowsInstaller
         or ApplicationPackagingType.LinuxAppImage
         or ApplicationPackagingType.LinuxFlatpak
-        or ApplicationPackagingType.MacOSAppBundle;
+        or ApplicationPackagingType.LinuxDeb
+        or ApplicationPackagingType.LinuxRpm
+        or ApplicationPackagingType.LinuxArchPackage
+        or ApplicationPackagingType.LinuxSnap
+        or ApplicationPackagingType.MacOSAppBundle
+        or ApplicationPackagingType.MacOSDmg
+        or ApplicationPackagingType.MacOSPkg;
 
     /// <summary>
     /// Checks if the application is running under a bundled single-file application that extracts itself.<br/>
     /// Example: dotnet single-file, linux AppImage.
     /// </summary>
+    [MemberNotNullWhen(true, nameof(ExecutablePath), nameof(ExecutableName),
+        nameof(BaseDirectory))]
     public static bool IsSingleFileApp => IsSingleFileBundle(PackagingType);
 
     /// <summary>
@@ -527,6 +651,11 @@ public static class EntryApplication
         nameof(ExecutableName),
         nameof(BaseDirectory))]
     public static bool IsRunningFromDotNetProcess => IsRunningFromDotNetProcessLazy.Value;
+
+    /// <summary>
+    /// Checks if the application is running as a standalone process (not under dotnet).
+    /// </summary>
+    public static bool IsRunningStandaloneProcess => !IsRunningFromDotNetProcess;
 
     /// <summary>
     /// Gets the path to the running application if is a single-file app (PublishSingleFile) bundled by dotnet.
@@ -546,13 +675,6 @@ public static class EntryApplication
     public static string? LinuxAppImagePath => LinuxAppImagePathLazy.Value;
 
     /// <summary>
-    /// Checks if the application is running under linux application image (AppImage).
-    /// </summary>
-    [MemberNotNullWhen(true, nameof(LinuxAppImagePath), nameof(ExecutablePath), nameof(ExecutableName),
-        nameof(BaseDirectory))]
-    public static bool IsLinuxAppImage => !string.IsNullOrWhiteSpace(LinuxAppImagePath);
-
-    /// <summary>
     /// Gets the id to the running linux flatpak.
     /// </summary>
     public static string? LinuxFlatpakId => LinuxFlatpakIdLazy.Value;
@@ -570,22 +692,20 @@ public static class EntryApplication
     public static bool IsLinuxFlatpak => !string.IsNullOrWhiteSpace(LinuxFlatpakId);
 
     /// <summary>
+    /// Gets the id to the running linux snap.
+    /// </summary>
+    public static string? LinuxSnapId => LinuxSnapIdLazy.Value;
+
+    /// <summary>
     /// Gets the path to the running macOS application bundle if is a macOS app bundle.
     /// </summary>
     public static string? MacOSAppBundlePath => MacOSAppBundlePathLazy.Value;
 
     /// <summary>
-    /// Checks if the application is running under a macOS app bundle.
-    /// </summary>
-    [MemberNotNullWhen(true, nameof(MacOSAppBundlePath), nameof(ExecutablePath), nameof(ExecutableName),
-        nameof(BaseDirectory))]
-    public static bool IsMacOSAppBundle => !string.IsNullOrWhiteSpace(MacOSAppBundlePath);
-
-    /// <summary>
     /// Gets the base directory of the entry executable of the running application.<br/>
     /// This is the directory where the entry executable is located and not the app executable itself (eg. macOS bundle or AppImage directory).
     /// </summary>
-    /// <remarks>Use <see cref="AppContextBaseDirectory"/> instead for executable directory.</remarks>
+    /// <remarks>Use <see cref="AppContextBaseDirectory"/> instead for the executable directory.</remarks>
     public static string? BaseDirectory => ExecutableInfoLazy.Value.BaseDirectory;
 
     /// <summary>
@@ -702,6 +822,93 @@ public static class EntryApplication
             : null;
     }
 
+    private static bool IsInstalledByMacOSPkg(string executablePath)
+    {
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = "/usr/sbin/pkgutil",
+                ArgumentList =
+                {
+                    "--file-info",
+                    executablePath
+                },
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+
+            if (process is null)
+                return false;
+
+            var output = process.StandardOutput.ReadToEnd();
+
+            process.WaitForExit();
+
+            return output
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Any(x => x.StartsWith("pkgid:", StringComparison.Ordinal));
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool IsRunningFromMacOSDmg(string executablePath)
+    {
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = "/usr/bin/hdiutil",
+                ArgumentList =
+                {
+                    "info"
+                },
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+
+            if (process is null)
+                return false;
+
+            var output = process.StandardOutput.ReadToEnd();
+
+            process.WaitForExit();
+
+            if (process.ExitCode != 0)
+                return false;
+
+            foreach (var line in output.Split('\n'))
+            {
+                var index = line.IndexOf("/Volumes/", StringComparison.Ordinal);
+
+                if (index < 0)
+                    continue;
+
+                var mountPoint = line[index..].Trim();
+
+                if (executablePath.StartsWith(
+                        mountPoint + "/",
+                        StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     /// <summary>
     /// Selects the appropriate executable path based on the current runtime environment and application packaging type.
     /// </summary>
@@ -744,6 +951,57 @@ public static class EntryApplication
     }
 
     /// <summary>
+    /// Reads the packaging type from a Fallout runtime manifest in one of the application directories.
+    /// </summary>
+    internal static ApplicationPackagingType? DetectRuntimeManifestPackagingType(
+        string? appContextBaseDirectory,
+        string? assemblyLocation,
+        string? processPath)
+    {
+        var directories = new[]
+        {
+            appContextBaseDirectory,
+            GetDirectoryName(assemblyLocation),
+            GetDirectoryName(processPath)
+        };
+
+        foreach (var directory in directories.Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(
+                     OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal))
+        {
+            var manifestPath = Path.Combine(directory!, "build-runtime.json");
+            try
+            {
+                if (!File.Exists(manifestPath)) continue;
+                using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
+                if (!document.RootElement.TryGetProperty("PackagingType", out var packagingType)) continue;
+                if (packagingType.ValueKind != JsonValueKind.String) continue;
+                if (Enum.TryParse<ApplicationPackagingType>(packagingType.GetString(), true,
+                        out var result))
+                    return result;
+            }
+            catch (IOException)
+            {
+                // A runtime marker is optional and must not prevent application startup.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // A runtime marker is optional and must not prevent application startup.
+            }
+            catch (JsonException)
+            {
+                // A runtime marker is optional and must not prevent application startup.
+            }
+        }
+
+        return null;
+
+        static string? GetDirectoryName(string? path)
+        {
+            return string.IsNullOrWhiteSpace(path) ? null : Path.GetDirectoryName(path);
+        }
+    }
+
+    /// <summary>
     /// Returns a dictionary of the entry application information.
     /// </summary>
     /// <returns>Dictionary containing application information key-value pairs.</returns>
@@ -779,12 +1037,20 @@ public static class EntryApplication
         // Packaging type
         info[nameof(PackagingType)] = PackagingType.ToString();
         info[nameof(IsAppBundled)] = IsAppBundled.ToString();
+        info[nameof(IsPortable)] = IsPortable.ToString();
         info[nameof(IsSingleFileApp)] = IsSingleFileApp.ToString();
 
         // DotNet specific
         info[nameof(IsRunningFromDotNetProcess)] = IsRunningFromDotNetProcess.ToString();
+        info[nameof(IsRunningStandaloneProcess)] = IsRunningStandaloneProcess.ToString();
         info[nameof(IsDotNetSingleFileApp)] = IsDotNetSingleFileApp.ToString();
         if (IsDotNetSingleFileApp) info[nameof(DotNetSingleFileAppPath)] = DotNetSingleFileAppPath;
+
+        // Windows specific
+        if (OperatingSystem.IsWindows())
+        {
+            info[nameof(IsWindowsInstaller)] = IsWindowsInstaller.ToString();
+        }
 
         // Linux specific
         if (OperatingSystem.IsLinux())
@@ -798,13 +1064,23 @@ public static class EntryApplication
                 info[nameof(LinuxFlatpakId)] = LinuxFlatpakId;
                 info[nameof(LinuxFlatpakPath)] = LinuxFlatpakPath;
             }
+
+            info[nameof(IsLinuxSnap)] = IsLinuxSnap.ToString();
+            if (IsLinuxSnap) info[nameof(LinuxSnapId)] = LinuxSnapId;
+
+            info[nameof(IsLinuxDeb)] = IsLinuxDeb.ToString();
+            info[nameof(IsLinuxRpm)] = IsLinuxRpm.ToString();
+            info[nameof(IsLinuxArchPackage)] = IsLinuxArchPackage.ToString();
         }
 
-        // MacOS specific
+        // macOS specific
         if (OperatingSystem.IsMacOS())
         {
             info[nameof(IsMacOSAppBundle)] = IsMacOSAppBundle.ToString();
             if (IsMacOSAppBundle) info[nameof(MacOSAppBundlePath)] = MacOSAppBundlePath;
+
+            info[nameof(IsMacOSDmg)] = IsMacOSDmg.ToString();
+            info[nameof(IsMacOSPkg)] = IsMacOSPkg.ToString();
         }
 
         // Paths
@@ -812,6 +1088,18 @@ public static class EntryApplication
         info[nameof(ExecutablePath)] = ExecutablePath;
         info[nameof(ExecutableName)] = ExecutableName;
         info[nameof(IsExecutablePathKnown)] = IsExecutablePathKnown.ToString();
+
+        info[nameof(AppContextBaseDirectory)] = AppContextBaseDirectory;
+        info[nameof(ProcessPath)] = ProcessPath;
+
+        if (OperatingSystem.IsLinux())
+        {
+            info[$"LinuxRuntime.PackageManager"] = LinuxRuntime.PackageManager.ToString();
+            foreach (var keyValue in LinuxRuntime.OsRelease)
+            {
+                info[$"LinuxRuntime.OsRelease.{keyValue.Key}"] = keyValue.Value;
+            }
+        }
 
         return info;
     }

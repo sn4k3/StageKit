@@ -5,7 +5,6 @@ using System.Text.Json;
 using Fallout.Common;
 using Fallout.Common.IO;
 using Fallout.Solutions;
-using Serilog;
 
 namespace StageKit.Fallout;
 
@@ -131,7 +130,8 @@ public abstract partial class StageKitBuild : FalloutBuild
             var projects = Solution.AllProjects;
             if (field is null)
             {
-                var candidates = projects.Where(p => Convert.ToBoolean(GetProjectProperty(p, "FalloutMainProject"))).ToArray();
+                var candidates = projects.Where(p => Convert.ToBoolean(GetProjectProperty(p, "FalloutMainProject")))
+                    .ToArray();
                 if (candidates.Length == 0)
                 {
                     candidates = projects.Where(p => !IsExcludedByName(p) && IsRunnableProject(p)).ToArray();
@@ -298,6 +298,12 @@ public abstract partial class StageKitBuild : FalloutBuild
             return field;
         }
     }
+
+    /// <summary>
+    /// Gets the software package maintainers in RFC 822 format, which is retrieved from the main project's properties.
+    /// If the maintainers are not specified, it defaults to the software authors with a no reply email.
+    /// </summary>
+    public virtual string SoftwarePackageMaintainersRFC822 => field ??= $"{SoftwareAuthors} <noreply@void.com>";
 
     /// <summary>
     /// Gets the software summary, which is retrieved from the main project's properties.
