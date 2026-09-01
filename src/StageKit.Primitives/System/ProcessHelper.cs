@@ -1,6 +1,6 @@
-using StageKit.Primitives.Extensions;
 using System.Diagnostics;
 using System.Text;
+using StageKit.Primitives.Extensions;
 
 namespace StageKit.Primitives.System;
 
@@ -33,7 +33,8 @@ public static class ProcessHelper
     {
         try
         {
-            return StartProcess(CreateProcessStartInfo(name, arguments, requireElevation), waitForCompletion, waitTimeout);
+            return StartProcess(CreateProcessStartInfo(name, arguments, requireElevation), waitForCompletion,
+                waitTimeout);
         }
         catch (Exception exception)
         {
@@ -110,7 +111,8 @@ public static class ProcessHelper
     {
         try
         {
-            return StartProcess(CreateProcessStartInfo(name, arguments, requireElevation), waitForCompletion, waitTimeout);
+            return StartProcess(CreateProcessStartInfo(name, arguments, requireElevation), waitForCompletion,
+                waitTimeout);
         }
         catch (Exception exception)
         {
@@ -164,6 +166,80 @@ public static class ProcessHelper
     }
 
     /// <summary>
+    /// Starts a process using the supplied start information.
+    /// </summary>
+    /// <param name="processStartInfo">
+    /// The process configuration, including its working directory, environment, and window settings.
+    /// </param>
+    /// <param name="waitForCompletion"><see langword="true"/> to wait for the process to complete.</param>
+    /// <param name="waitTimeout">The number of milliseconds to wait for completion.</param>
+    /// <returns>
+    /// The exit code when waiting for completion, zero when the process starts without waiting, or <c>-1</c> when
+    /// startup fails or the wait times out.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="processStartInfo"/> is <see langword="null"/>.</exception>
+    public static int StartProcess(
+        ProcessStartInfo processStartInfo,
+        bool waitForCompletion = false,
+        int waitTimeout = Timeout.Infinite)
+    {
+        ArgumentNullException.ThrowIfNull(processStartInfo);
+
+        try
+        {
+            return StartProcessCore(processStartInfo, waitForCompletion, waitTimeout);
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            return -1;
+        }
+    }
+
+    /// <summary>
+    /// Asynchronously starts a process using the supplied start information.
+    /// </summary>
+    /// <param name="processStartInfo">
+    /// The process configuration, including its working directory, environment, and window settings.
+    /// </param>
+    /// <param name="waitForCompletion"><see langword="true"/> to asynchronously wait for the process to complete.</param>
+    /// <param name="waitTimeout">The number of milliseconds to wait for completion.</param>
+    /// <param name="cancellationToken">The token used to cancel waiting for completion.</param>
+    /// <returns>
+    /// A task containing the exit code when waiting for completion, zero when the process starts without waiting, or
+    /// <c>-1</c> when startup fails or the wait times out.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="processStartInfo"/> is <see langword="null"/>.</exception>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> is cancelled.</exception>
+    public static async Task<int> StartProcessAsync(
+        ProcessStartInfo processStartInfo,
+        bool waitForCompletion = false,
+        int waitTimeout = Timeout.Infinite,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(processStartInfo);
+
+        try
+        {
+            return await StartProcessCoreAsync(
+                    processStartInfo,
+                    waitForCompletion,
+                    waitTimeout,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            return -1;
+        }
+    }
+
+    /// <summary>
     /// Starts a command through the host command shell.
     /// </summary>
     /// <param name="command">The shell command to execute.</param>
@@ -176,18 +252,15 @@ public static class ProcessHelper
     /// The exit code when waiting for completion, zero when the shell starts without waiting, or <c>-1</c> when
     /// startup fails or the wait times out.
     /// </returns>
-    /// <remarks>Uses <c>cmd /c</c> on Windows and <c>bash -c</c> on other operating systems.</remarks>
+    /// <remarks>Uses <c>cmd /d /c</c> on Windows and <c>bash -c</c> on other operating systems.</remarks>
     public static int StartShell(
         string command,
         bool requireElevation = false,
         bool waitForCompletion = false,
         int waitTimeout = Timeout.Infinite)
     {
-        var (name, commandSwitch) = GetShell();
         return StartProcess(
-            name,
-            [commandSwitch, command],
-            requireElevation,
+            CreateShellProcessStartInfo(command, requireElevation),
             waitForCompletion,
             waitTimeout);
     }
@@ -206,7 +279,7 @@ public static class ProcessHelper
     /// A task containing the exit code when waiting for completion, zero when the shell starts without waiting, or
     /// <c>-1</c> when startup fails or the wait times out.
     /// </returns>
-    /// <remarks>Uses <c>cmd /c</c> on Windows and <c>bash -c</c> on other operating systems.</remarks>
+    /// <remarks>Uses <c>cmd /d /c</c> on Windows and <c>bash -c</c> on other operating systems.</remarks>
     public static Task<int> StartShellAsync(
         string command,
         bool requireElevation = false,
@@ -214,11 +287,8 @@ public static class ProcessHelper
         int waitTimeout = Timeout.Infinite,
         CancellationToken cancellationToken = default)
     {
-        var (name, commandSwitch) = GetShell();
         return StartProcessAsync(
-            name,
-            [commandSwitch, command],
-            requireElevation,
+            CreateShellProcessStartInfo(command, requireElevation),
             waitForCompletion,
             waitTimeout,
             cancellationToken);
@@ -359,6 +429,71 @@ public static class ProcessHelper
     }
 
     /// <summary>
+    /// Runs a process to completion using the supplied start information and captures its standard output and error.
+    /// </summary>
+    /// <param name="processStartInfo">
+    /// The process configuration, including its working directory, environment, and window settings.
+    /// </param>
+    /// <returns>The process exit code, standard output, and standard error.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="processStartInfo"/> is <see langword="null"/>.</exception>
+    /// <remarks>
+    /// Output capture enables redirection and sets <see cref="ProcessStartInfo.UseShellExecute"/> to
+    /// <see langword="false"/>. A non-privileged Windows process cannot capture output through <c>runas</c>; that
+    /// combination returns a failed result with exit code <c>-1</c>.
+    /// </remarks>
+    public static ProcessOutput GetProcessOutput(ProcessStartInfo processStartInfo)
+    {
+        ArgumentNullException.ThrowIfNull(processStartInfo);
+
+        try
+        {
+            return GetProcessOutputCore(processStartInfo);
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            return new ProcessOutput(-1, string.Empty, string.Empty);
+        }
+    }
+
+    /// <summary>
+    /// Asynchronously runs a process to completion using the supplied start information and captures its standard
+    /// output and error.
+    /// </summary>
+    /// <param name="processStartInfo">
+    /// The process configuration, including its working directory, environment, and window settings.
+    /// </param>
+    /// <param name="cancellationToken">The token used to cancel the process and output capture.</param>
+    /// <returns>A task containing the process exit code, standard output, and standard error.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="processStartInfo"/> is <see langword="null"/>.</exception>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> is cancelled.</exception>
+    /// <remarks>
+    /// Output capture enables redirection and sets <see cref="ProcessStartInfo.UseShellExecute"/> to
+    /// <see langword="false"/>. A non-privileged Windows process cannot capture output through <c>runas</c>; that
+    /// combination returns a failed result with exit code <c>-1</c>.
+    /// </remarks>
+    public static async Task<ProcessOutput> GetProcessOutputAsync(
+        ProcessStartInfo processStartInfo,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(processStartInfo);
+
+        try
+        {
+            return await GetProcessOutputCoreAsync(processStartInfo, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            return new ProcessOutput(-1, string.Empty, string.Empty);
+        }
+    }
+
+    /// <summary>
     /// Runs a command through the host command shell and captures its standard output and standard error.
     /// </summary>
     /// <param name="command">The shell command to execute.</param>
@@ -367,13 +502,12 @@ public static class ProcessHelper
     /// </param>
     /// <returns>The shell exit code, standard output, and standard error.</returns>
     /// <remarks>
-    /// Uses <c>cmd /c</c> on Windows and <c>bash -c</c> on other operating systems. A non-privileged Windows process
+    /// Uses <c>cmd /d /c</c> on Windows and <c>bash -c</c> on other operating systems. A non-privileged Windows process
     /// cannot capture output when using <c>runas</c>; that combination returns a failed result with exit code <c>-1</c>.
     /// </remarks>
     public static ProcessOutput GetShellOutput(string command, bool requireElevation = false)
     {
-        var (name, commandSwitch) = GetShell();
-        return GetProcessOutput(name, [commandSwitch, command], requireElevation);
+        return GetProcessOutput(CreateShellProcessStartInfo(command, requireElevation));
     }
 
     /// <summary>
@@ -386,7 +520,7 @@ public static class ProcessHelper
     /// <param name="cancellationToken">The token used to cancel the shell and output capture.</param>
     /// <returns>A task containing the shell exit code, standard output, and standard error.</returns>
     /// <remarks>
-    /// Uses <c>cmd /c</c> on Windows and <c>bash -c</c> on other operating systems. A non-privileged Windows process
+    /// Uses <c>cmd /d /c</c> on Windows and <c>bash -c</c> on other operating systems. A non-privileged Windows process
     /// cannot capture output when using <c>runas</c>; that combination returns a failed result with exit code <c>-1</c>.
     /// </remarks>
     public static Task<ProcessOutput> GetShellOutputAsync(
@@ -394,14 +528,82 @@ public static class ProcessHelper
         bool requireElevation = false,
         CancellationToken cancellationToken = default)
     {
-        var (name, commandSwitch) = GetShell();
-        return GetProcessOutputAsync(name, [commandSwitch, command], requireElevation, cancellationToken);
+        return GetProcessOutputAsync(
+            CreateShellProcessStartInfo(command, requireElevation),
+            cancellationToken);
     }
 
-    internal static ProcessStartInfo CreateProcessStartInfo(
+    /// <summary>
+    /// Creates start information for a command executed through the host command shell.
+    /// </summary>
+    /// <param name="argument">The shell command to execute.</param>
+    /// <param name="requireElevation">
+    /// <see langword="true"/> to request administrator elevation unless the current process is already privileged.
+    /// </param>
+    /// <returns>A configurable <see cref="ProcessStartInfo"/> instance.</returns>
+    /// <remarks>Uses <c>cmd /d /c</c> on Windows and <c>bash -c</c> on other operating systems.</remarks>
+    public static ProcessStartInfo CreateShellProcessStartInfo(
+        string argument,
+        bool requireElevation = false)
+    {
+        return CreateShellProcessStartInfo(argument, requireElevation, Environment.IsPrivilegedProcess);
+    }
+
+    internal static ProcessStartInfo CreateShellProcessStartInfo(
+        string argument,
+        bool requireElevation,
+        bool isPrivilegedProcess)
+    {
+        return CreateShellProcessStartInfo([argument], requireElevation, isPrivilegedProcess);
+    }
+
+    /// <summary>
+    /// Creates start information for the host command shell with the supplied argument list.
+    /// </summary>
+    /// <param name="arguments">The complete argument list to pass to the host command shell.</param>
+    /// <param name="requireElevation">
+    /// <see langword="true"/> to request administrator elevation unless the current process is already privileged.
+    /// </param>
+    /// <returns>A configurable <see cref="ProcessStartInfo"/> instance.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="arguments"/> is <see langword="null"/>.</exception>
+    /// <remarks>
+    /// Prepends <c>/d /c</c> for <c>cmd.exe</c> on Windows and <c>-c</c> for <c>bash</c> on other operating systems.
+    /// </remarks>
+    public static ProcessStartInfo CreateShellProcessStartInfo(
+        IEnumerable<string> arguments,
+        bool requireElevation = false)
+    {
+        return CreateShellProcessStartInfo(arguments, requireElevation, Environment.IsPrivilegedProcess);
+    }
+
+    internal static ProcessStartInfo CreateShellProcessStartInfo(
+        IEnumerable<string> arguments,
+        bool requireElevation,
+        bool isPrivilegedProcess)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+
+        var (name, argumentPrefix) = GetShell();
+        return CreateProcessStartInfo(
+            name,
+            [.. argumentPrefix, .. arguments],
+            requireElevation,
+            isPrivilegedProcess);
+    }
+
+    /// <summary>
+    /// Creates start information for a process with raw command-line arguments and optional administrator elevation.
+    /// </summary>
+    /// <param name="name">The executable name or path.</param>
+    /// <param name="arguments">The raw arguments to pass to the process.</param>
+    /// <param name="requireElevation">
+    /// <see langword="true"/> to request administrator elevation unless the current process is already privileged.
+    /// </param>
+    /// <returns>A configurable <see cref="ProcessStartInfo"/> instance.</returns>
+    public static ProcessStartInfo CreateProcessStartInfo(
         string name,
-        string? arguments,
-        bool requireElevation)
+        string? arguments = null,
+        bool requireElevation = false)
     {
         return CreateProcessStartInfo(name, arguments, requireElevation, Environment.IsPrivilegedProcess);
     }
@@ -413,12 +615,7 @@ public static class ProcessHelper
         bool isPrivilegedProcess)
     {
         if (!requireElevation || isPrivilegedProcess)
-        {
-            return new ProcessStartInfo(name, arguments ?? string.Empty)
-            {
-                UseShellExecute = true
-            };
-        }
+            return new ProcessStartInfo(name, arguments ?? string.Empty);
 
         if (OperatingSystem.IsWindows())
         {
@@ -430,12 +627,7 @@ public static class ProcessHelper
         }
 
         if (OperatingSystem.IsLinux())
-        {
-            return new ProcessStartInfo("pkexec", JoinProcessArguments(name, arguments))
-            {
-                UseShellExecute = true
-            };
-        }
+            return new ProcessStartInfo("pkexec", JoinProcessArguments(name, arguments));
 
         if (OperatingSystem.IsMacOS())
         {
@@ -446,13 +638,24 @@ public static class ProcessHelper
             return CreateMacOSElevatedProcessStartInfo(command);
         }
 
-        throw new PlatformNotSupportedException("Elevated process launching is not supported on this operating system.");
+        throw new PlatformNotSupportedException(
+            "Elevated process launching is not supported on this operating system.");
     }
 
-    internal static ProcessStartInfo CreateProcessStartInfo(
+    /// <summary>
+    /// Creates start information for a process with an argument list and optional administrator elevation.
+    /// </summary>
+    /// <param name="name">The executable name or path.</param>
+    /// <param name="arguments">The arguments to pass to the process.</param>
+    /// <param name="requireElevation">
+    /// <see langword="true"/> to request administrator elevation unless the current process is already privileged.
+    /// </param>
+    /// <returns>A configurable <see cref="ProcessStartInfo"/> instance.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="arguments"/> is <see langword="null"/>.</exception>
+    public static ProcessStartInfo CreateProcessStartInfo(
         string name,
         IEnumerable<string> arguments,
-        bool requireElevation)
+        bool requireElevation = false)
     {
         return CreateProcessStartInfo(name, arguments, requireElevation, Environment.IsPrivilegedProcess);
     }
@@ -471,6 +674,7 @@ public static class ProcessHelper
         if (OperatingSystem.IsWindows())
         {
             var processStartInfo = CreateArgumentListProcessStartInfo(name, arguments);
+            processStartInfo.UseShellExecute = true;
             processStartInfo.Verb = "runas";
             return processStartInfo;
         }
@@ -499,10 +703,11 @@ public static class ProcessHelper
             return CreateMacOSElevatedProcessStartInfo(command.ToString());
         }
 
-        throw new PlatformNotSupportedException("Elevated process launching is not supported on this operating system.");
+        throw new PlatformNotSupportedException(
+            "Elevated process launching is not supported on this operating system.");
     }
 
-    private static ProcessOutput GetProcessOutput(ProcessStartInfo processStartInfo)
+    private static ProcessOutput GetProcessOutputCore(ProcessStartInfo processStartInfo)
     {
         ConfigureOutputCapture(processStartInfo);
 
@@ -522,7 +727,7 @@ public static class ProcessHelper
             standardError.GetAwaiter().GetResult());
     }
 
-    private static async Task<ProcessOutput> GetProcessOutputAsync(
+    private static async Task<ProcessOutput> GetProcessOutputCoreAsync(
         ProcessStartInfo processStartInfo,
         CancellationToken cancellationToken)
     {
@@ -554,7 +759,7 @@ public static class ProcessHelper
         }
     }
 
-    private static int StartProcess(
+    private static int StartProcessCore(
         ProcessStartInfo processStartInfo,
         bool waitForCompletion,
         int waitTimeout)
@@ -570,7 +775,7 @@ public static class ProcessHelper
         return process.WaitForExit(waitTimeout) ? process.ExitCode : -1;
     }
 
-    private static async Task<int> StartProcessAsync(
+    private static async Task<int> StartProcessCoreAsync(
         ProcessStartInfo processStartInfo,
         bool waitForCompletion,
         int waitTimeout,
@@ -612,10 +817,7 @@ public static class ProcessHelper
         string name,
         IEnumerable<string> arguments)
     {
-        var processStartInfo = new ProcessStartInfo(name)
-        {
-            UseShellExecute = true
-        };
+        var processStartInfo = new ProcessStartInfo(name);
 
         foreach (var argument in arguments)
         {
@@ -666,20 +868,20 @@ public static class ProcessHelper
         try
         {
             if (!process.HasExited)
-                process.Kill(entireProcessTree: true);
+                process.Kill(true);
         }
         catch (Exception exception) when (exception is InvalidOperationException or
-                                          global::System.ComponentModel.Win32Exception or
-                                          NotSupportedException)
+                                              global::System.ComponentModel.Win32Exception or
+                                              NotSupportedException)
         {
             Debug.WriteLine(exception);
         }
     }
 
-    private static (string Name, string CommandSwitch) GetShell()
+    private static (string Name, string[] ArgumentPrefix) GetShell()
     {
         return OperatingSystem.IsWindows()
-            ? ("cmd.exe", "/c")
-            : ("bash", "-c");
+            ? ("cmd.exe", ["/d", "/c"])
+            : ("bash", ["-c"]);
     }
 }

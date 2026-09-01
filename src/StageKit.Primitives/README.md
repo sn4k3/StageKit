@@ -193,7 +193,21 @@ int exitCode = ProcessHelper.StartProcess(
     waitForCompletion: true);
 ```
 
-Run shell syntax through `cmd /c` on Windows or `bash -c` elsewhere, and use the output helpers when the exit code and
+For full control over the working directory, environment, window behavior, and other process settings, configure the
+created `ProcessStartInfo` before starting it. Use `CreateShellProcessStartInfo(...)` when the command needs shell syntax:
+
+```csharp
+var startInfo = ProcessHelper.CreateShellProcessStartInfo("system-tool --configure");
+startInfo.WorkingDirectory = workspacePath;
+startInfo.Environment["STAGEKIT_MODE"] = "maintenance";
+
+ProcessOutput output = await ProcessHelper.GetProcessOutputAsync(startInfo, cancellationToken);
+```
+
+Pass an `IEnumerable<string>` to `CreateShellProcessStartInfo(...)` to supply the command plus additional shell
+arguments. The factory prepends `/d /c` on Windows or `-c` elsewhere.
+
+Run shell syntax through `cmd /d /c` on Windows or `bash -c` elsewhere, and use the output helpers when the exit code and
 both redirected streams are needed. Output helpers also accept `requireElevation`; Linux and macOS capture through their
 elevation wrappers, while non-privileged Windows `runas` capture returns exit code `-1` because that API cannot redirect
 the elevated child streams:

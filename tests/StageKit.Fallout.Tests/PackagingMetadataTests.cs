@@ -6,21 +6,22 @@ namespace StageKit.Fallout.Tests;
 public class PackagingMetadataTests
 {
     [Fact]
-    public void ApplicationPackagingType_Values_PreserveNumericValuesWithoutFlagsAttribute()
+    public void ApplicationPackagingType_Values_AreSequentialWithoutFlagsAttribute()
     {
         Assert.False(typeof(ApplicationPackagingType).IsDefined(typeof(FlagsAttribute), false));
-        Assert.Equal(1 << 0, (int)ApplicationPackagingType.Portable);
-        Assert.Equal(1 << 1, (int)ApplicationPackagingType.DotNetSingleFile);
-        Assert.Equal(1 << 2, (int)ApplicationPackagingType.WindowsInstaller);
-        Assert.Equal(1 << 3, (int)ApplicationPackagingType.LinuxAppImage);
-        Assert.Equal(1 << 4, (int)ApplicationPackagingType.LinuxFlatpak);
-        Assert.Equal(1 << 5, (int)ApplicationPackagingType.MacOSAppBundle);
-        Assert.Equal(1 << 6, (int)ApplicationPackagingType.LinuxDeb);
-        Assert.Equal(1 << 7, (int)ApplicationPackagingType.LinuxRpm);
-        Assert.Equal(1 << 8, (int)ApplicationPackagingType.LinuxArchPackage);
-        Assert.Equal(1 << 9, (int)ApplicationPackagingType.LinuxSnap);
-        Assert.Equal(1 << 10, (int)ApplicationPackagingType.MacOSDmg);
-        Assert.Equal(1 << 11, (int)ApplicationPackagingType.MacOSPkg);
+        Assert.Equal(0, (int)ApplicationPackagingType.None);
+        Assert.Equal(1, (int)ApplicationPackagingType.Portable);
+        Assert.Equal(2, (int)ApplicationPackagingType.DotNetSingleFile);
+        Assert.Equal(3, (int)ApplicationPackagingType.WindowsInstaller);
+        Assert.Equal(4, (int)ApplicationPackagingType.LinuxAppImage);
+        Assert.Equal(5, (int)ApplicationPackagingType.LinuxFlatpak);
+        Assert.Equal(6, (int)ApplicationPackagingType.LinuxSnap);
+        Assert.Equal(7, (int)ApplicationPackagingType.LinuxDeb);
+        Assert.Equal(8, (int)ApplicationPackagingType.LinuxRpm);
+        Assert.Equal(9, (int)ApplicationPackagingType.LinuxArchPackage);
+        Assert.Equal(10, (int)ApplicationPackagingType.MacOSAppBundle);
+        Assert.Equal(11, (int)ApplicationPackagingType.MacOSDmg);
+        Assert.Equal(12, (int)ApplicationPackagingType.MacOSPkg);
     }
 
     [Theory]

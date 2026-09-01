@@ -1,6 +1,7 @@
 using StageKit.Primitives;
 using StageKit.Primitives.Extensions;
 using StageKit.Primitives.System;
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -105,6 +106,19 @@ public sealed class PrimitivesTests
     }
 
     [Fact]
+    public void ProcessHelper_StartProcess_ProcessStartInfo_ReturnsExitCode()
+    {
+        var startInfo = new ProcessStartInfo(OperatingSystem.IsWindows() ? "cmd.exe" : "/bin/sh");
+        startInfo.ArgumentList.Add(OperatingSystem.IsWindows() ? "/d" : "-c");
+        if (OperatingSystem.IsWindows()) startInfo.ArgumentList.Add("/c");
+        startInfo.ArgumentList.Add("exit 8");
+
+        var exitCode = ProcessHelper.StartProcess(startInfo, waitForCompletion: true);
+
+        Assert.Equal(8, exitCode);
+    }
+
+    [Fact]
     public void ProcessHelper_StartShell_ReturnsShellExitCodeWhenWaitingForCompletion()
     {
         var command = OperatingSystem.IsWindows() ? "exit /b 6" : "exit 6";
@@ -173,13 +187,113 @@ public sealed class PrimitivesTests
     }
 
     [Fact]
+    public async Task ProcessHelper_GetProcessOutputAsync_ProcessStartInfo_UsesCustomConfiguration()
+    {
+        var directoryPath = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(directoryPath, "working-directory.txt"), "working directory");
+
+        try
+        {
+            var command = OperatingSystem.IsWindows()
+                ? "echo %STAGEKIT_PROCESS_HELPER_TEST%&type working-directory.txt"
+                : "printf '%s\\n' \"$STAGEKIT_PROCESS_HELPER_TEST\"; cat working-directory.txt";
+            var startInfo = ProcessHelper.CreateShellProcessStartInfo(command);
+            startInfo.WorkingDirectory = directoryPath;
+            startInfo.Environment["STAGEKIT_PROCESS_HELPER_TEST"] = "custom environment";
+
+            var output = await ProcessHelper.GetProcessOutputAsync(
+                startInfo,
+                TestContext.Current.CancellationToken);
+            var outputLines = output.StandardOutput.Split(
+                ['\r', '\n'],
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            Assert.Equal(0, output.ExitCode);
+            Assert.Equal(["custom environment", "working directory"], outputLines);
+            Assert.False(startInfo.UseShellExecute);
+            Assert.True(startInfo.RedirectStandardOutput);
+            Assert.True(startInfo.RedirectStandardError);
+        }
+        finally
+        {
+            Directory.Delete(directoryPath, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ProcessHelper_CreateShellProcessStartInfo_UsesHostShellWithoutElevation()
+    {
+        const string command = "echo stagekit";
+
+        var startInfo = ProcessHelper.CreateShellProcessStartInfo(command);
+
+        Assert.Equal(OperatingSystem.IsWindows() ? "cmd.exe" : "bash", startInfo.FileName);
+        Assert.Equal(
+            OperatingSystem.IsWindows() ? ["/d", "/c", command] : ["-c", command],
+            startInfo.ArgumentList);
+        Assert.False(startInfo.UseShellExecute);
+        Assert.Empty(startInfo.Verb);
+    }
+
+    [Fact]
+    public void ProcessHelper_CreateShellProcessStartInfo_PrependsHostCommandSwitchesToArgumentList()
+    {
+        string[] arguments = ["echo stagekit", "argument zero"];
+
+        var startInfo = ProcessHelper.CreateShellProcessStartInfo(arguments);
+
+        Assert.Equal(OperatingSystem.IsWindows() ? "cmd.exe" : "bash", startInfo.FileName);
+        Assert.Equal(
+            OperatingSystem.IsWindows()
+                ? ["/d", "/c", .. arguments]
+                : ["-c", .. arguments],
+            startInfo.ArgumentList);
+        Assert.False(startInfo.UseShellExecute);
+        Assert.Empty(startInfo.Verb);
+    }
+
+    [Fact]
+    public void ProcessHelper_CreateShellProcessStartInfo_UsesHostElevationMechanism()
+    {
+        const string command = "echo stagekit";
+
+        var startInfo = ProcessHelper.CreateShellProcessStartInfo(
+            command,
+            requireElevation: true,
+            isPrivilegedProcess: false);
+
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Equal("cmd.exe", startInfo.FileName);
+            Assert.Equal(["/d", "/c", command], startInfo.ArgumentList);
+            Assert.Equal("runas", startInfo.Verb);
+            Assert.True(startInfo.UseShellExecute);
+        }
+        else if (OperatingSystem.IsLinux())
+        {
+            Assert.Equal("pkexec", startInfo.FileName);
+            Assert.Equal(["bash", "-c", command], startInfo.ArgumentList);
+            Assert.False(startInfo.UseShellExecute);
+        }
+        else if (OperatingSystem.IsMacOS())
+        {
+            Assert.Equal("osascript", startInfo.FileName);
+            Assert.Equal("-e", startInfo.ArgumentList[0]);
+            Assert.Equal(
+                "do shell script \"'bash' '-c' 'echo stagekit'\" with administrator privileges",
+                startInfo.ArgumentList[1]);
+            Assert.False(startInfo.UseShellExecute);
+        }
+    }
+
+    [Fact]
     public void ProcessHelper_CreateProcessStartInfo_PreservesArgumentListWithoutElevation()
     {
         var startInfo = ProcessHelper.CreateProcessStartInfo("tool", ["first", "two words"], requireElevation: false);
 
         Assert.Equal("tool", startInfo.FileName);
         Assert.Equal(["first", "two words"], startInfo.ArgumentList);
-        Assert.True(startInfo.UseShellExecute);
+        Assert.False(startInfo.UseShellExecute);
         Assert.Empty(startInfo.Verbs);
     }
 
@@ -197,11 +311,13 @@ public sealed class PrimitivesTests
             Assert.Equal("tool", startInfo.FileName);
             Assert.Equal("runas", startInfo.Verb);
             Assert.Equal(["first", "two words"], startInfo.ArgumentList);
+            Assert.True(startInfo.UseShellExecute);
         }
         else if (OperatingSystem.IsLinux())
         {
             Assert.Equal("pkexec", startInfo.FileName);
             Assert.Equal(["tool", "first", "two words"], startInfo.ArgumentList);
+            Assert.False(startInfo.UseShellExecute);
         }
         else if (OperatingSystem.IsMacOS())
         {
@@ -210,6 +326,7 @@ public sealed class PrimitivesTests
             Assert.Equal(
                 "do shell script \"'tool' 'first' 'two words'\" with administrator privileges",
                 startInfo.ArgumentList[1]);
+            Assert.False(startInfo.UseShellExecute);
         }
     }
 
@@ -224,6 +341,7 @@ public sealed class PrimitivesTests
 
         Assert.Equal("tool", startInfo.FileName);
         Assert.Equal(["first", "two words"], startInfo.ArgumentList);
+        Assert.False(startInfo.UseShellExecute);
         Assert.Empty(startInfo.Verb);
     }
 
@@ -263,11 +381,13 @@ public sealed class PrimitivesTests
             Assert.Equal("tool", startInfo.FileName);
             Assert.Equal("runas", startInfo.Verb);
             Assert.Equal("--first \"two words\"", startInfo.Arguments);
+            Assert.True(startInfo.UseShellExecute);
         }
         else if (OperatingSystem.IsLinux())
         {
             Assert.Equal("pkexec", startInfo.FileName);
             Assert.Equal("\"tool\" --first \"two words\"", startInfo.Arguments);
+            Assert.False(startInfo.UseShellExecute);
         }
         else if (OperatingSystem.IsMacOS())
         {
@@ -276,6 +396,7 @@ public sealed class PrimitivesTests
             Assert.Equal(
                 "do shell script \"'tool' --first \\\"two words\\\"\" with administrator privileges",
                 startInfo.ArgumentList[1]);
+            Assert.False(startInfo.UseShellExecute);
         }
     }
 

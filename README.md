@@ -484,6 +484,10 @@ ProcessOutput asyncOutput = await ProcessHelper.GetShellOutputAsync(
     cancellationToken: cancellationToken);
 ```
 
+For custom working directories, environment variables, and other process settings, use
+`ProcessHelper.CreateProcessStartInfo(...)` or `ProcessHelper.CreateShellProcessStartInfo(...)`, configure the returned
+`ProcessStartInfo`, and pass it to the `StartProcess` or `GetProcessOutput` sync/async overload.
+
 Create and restore profile backups:
 
 ```csharp

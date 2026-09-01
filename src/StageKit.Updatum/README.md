@@ -11,7 +11,7 @@
 `StageKit.Updatum` is a lightweight, easy-to-integrate C# library that automates application updates through **GitHub Releases**.
 It checks for new versions, retrieves release notes, discovers the right asset for the current runtime, downloads it with progress
 reporting and optional verification, then prepares and runs a cross-platform update — installer, portable archive, single-file
-executable, AppImage, Flatpak, or macOS app bundle.
+executable, AppImage, Flatpak, Debian, RPM, Arch Linux, Snap, or macOS app bundle.
 
 ## Features
 
@@ -38,7 +38,7 @@ The package targets .NET 8 and .NET 10.
 1. Publish your application to GitHub Releases.
 2. Name the assets so the platform and architecture are matchable, for example:
    - Windows: `MyApp_win-x64_v1.0.0.exe`, `MyApp_win-x64_v1.0.0.msi`, `MyApp_win-x64_v1.0.0.zip`
-   - Linux: `MyApp_linux-x64_v1.0.0.AppImage`, `MyApp_linux-x64_v1.0.0.zip`
+   - Linux: `MyApp_linux-x64_v1.0.0.AppImage`, `.flatpak`, `.deb`, `.rpm`, `.pkg.tar.zst`, `.snap`, or `.zip`
    - macOS: `MyApp_osx-arm64_v1.0.0.zip`
    - Asset matching is configurable via regex (`AssetRegexPattern`) and an optional extension filter (`AssetExtensionFilter`).
 
@@ -83,7 +83,8 @@ multiple matching assets and no `AssetExtensionFilter` is set, Updatum infers th
 bundle type:
 
 - Windows: `.exe` when running as a .NET single-file app, otherwise `.msi`
-- Linux: `.AppImage` under AppImage, `.flatpak` under Flatpak, otherwise `.zip`
+- Linux: `.AppImage`, `.flatpak`, `.deb`, `.rpm`, `.pkg.tar.zst`, or `.snap` for the matching runtime package type;
+  otherwise `.zip`
 - If nothing matches, the first matching asset is used
 
 Set `AssetExtensionFilter` (for example `.zip`, `.msi`, `.AppImage`) to force a package type. You typically need a marker file in
@@ -110,6 +111,7 @@ Supported targets:
 - Windows installers (`.exe` and `.msi`)
 - Linux [AppImage](https://appimage.org/)
 - Linux [Flatpak](https://flatpak.org/)
+- Linux Debian (`.deb`), RPM (`.rpm`), Arch Linux (`.pkg.tar.zst`), and Snap (`.snap`) packages
 - macOS app bundle
 
 ### Installing updates
@@ -122,9 +124,11 @@ swap fails.
 script starts. With `forceTerminate: false`, Updatum does not kill or exit the current application; the caller is responsible for
 arranging a safe shutdown when replacing locked files.
 
-Pass `UpdatumManager.NoRunAfterUpgradeToken` as `runArguments` to suppress relaunch. Flatpak installation observes cancellation,
-has a one-minute timeout, kills the child installer on cancellation or timeout, and follows both `forceTerminate` and
-no-relaunch settings.
+Pass `UpdatumManager.NoRunAfterUpgradeToken` as `runArguments` to suppress relaunch. Flatpak updates first identify whether the
+current application is installed in the user or system scope. System Flatpak updates and Debian, RPM, Arch Linux, and Snap
+packages request elevation through `ProcessHelper`; Updatum waits for a zero exit code before reporting package-install
+completion, relaunching, or terminating the current process. Denied elevation, timeout, cancellation, or installer failure
+stops that continuation.
 
 Call `SafeDeleteFile()` on a downloaded asset when installation is not attempted. It removes the downloaded file and its empty
 managed workspace on a best-effort basis.

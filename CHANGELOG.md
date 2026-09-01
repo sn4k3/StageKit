@@ -1,13 +1,19 @@
 # Unreleased
 
+- Change `ApplicationPackagingType` to use sequential automatic enum values.
 - Add `HostSystem.TryFindExecutable` for subprocess-free executable lookup with Windows `PATHEXT` support and Unix
   execute-permission validation.
-- Add `ProcessHelper` with privileged-process-aware administrator elevation through Windows `runas`, Linux `pkexec`,
-  and macOS `osascript`, synchronous and asynchronous captured stdout/stderr results, and cross-platform process and
-  shell helpers with cancellation support.
-- Add Linux `PackagingTypes` for Flatpak, Debian, RPM, Arch Linux binary, and Snap packages, plus macOS DMG and PKG output.
-  Package creation uses the platform-native `flatpak-builder`, `dpkg-deb`, `rpmbuild`, `makepkg`, `snapcraft`,
+- Add `ProcessHelper` with privileged-process-aware administrator elevation through Windows `runas`, Linux `pkexec`, and
+  macOS `osascript`, synchronous and asynchronous captured stdout/stderr results, and cross-platform process and shell
+  helpers with cancellation support. Direct executable launches now use the modern .NET default of
+  `UseShellExecute=false`, and configurable process and shell `ProcessStartInfo` factories and execution overloads
+  expose working-directory, environment, and other native process settings.
+- Add Linux `PackagingTypes` for Flatpak, Debian, RPM, Arch Linux binary, and Snap packages, plus macOS DMG and PKG
+  output. Package creation uses the platform-native `flatpak-builder`, `dpkg-deb`, `rpmbuild`, `makepkg`, `snapcraft`,
   `hdiutil`, and `pkgbuild` tools.
+- Extend Updatum asset selection and installation to Linux Flatpak, Debian, RPM, Arch Linux binary, and Snap packages.
+  Flatpak updates preserve the current user/system installation scope, privileged package installs use `ProcessHelper`
+  elevation, and post-install completion or relaunch only continues after a successful installer exit code.
 - Update the release workflow to build runtime assets for supported platforms, attach packages and assets to a GitHub
   release, and omit Winget publishing.
 - Replace the original `StageKit.Demo` console sample with an Avalonia desktop workshop for runtime diagnostics,
