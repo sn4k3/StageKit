@@ -207,6 +207,69 @@ ProcessOutput output = await ProcessHelper.GetProcessOutputAsync(startInfo, canc
 Pass an `IEnumerable<string>` to `CreateShellProcessStartInfo(...)` to supply the command plus additional shell
 arguments. The factory prepends `/d /c` on Windows or `-c` elsewhere.
 
+Use `CreateShellScriptProcessStartInfo(...)` to run a script *file*. It passes the path as a discrete argument instead of
+embedding it in a shell command string, so a path containing spaces survives; `bash -c` would word-split it apart:
+
+```csharp
+var startInfo = ProcessHelper.CreateShellScriptProcessStartInfo(scriptFilePath, requireElevation: true);
+startInfo.WorkingDirectory = workspacePath;
+
+int exitCode = await ProcessHelper.StartProcessAsync(startInfo, waitForCompletion: true, cancellationToken: token);
+```
+
+On Unix the script runs under `bash`, which reads the file directly and ignores its shebang. Windows still routes through
+`cmd /d /c`, because a batch file cannot be launched without a command interpreter.
+
+### Detecting a denied elevation
+
+`IsExitCodeElevationDenied(...)` tells a refused administrator prompt apart from an ordinary command failure, so callers
+can prompt again instead of reporting a broken install:
+
+```csharp
+int exitCode = await ProcessHelper.StartProcessAsync(startInfo, waitForCompletion: true, cancellationToken: token);
+
+if (ProcessHelper.IsExitCodeElevationDenied(exitCode)) { /* the user declined the prompt */ }
+```
+
+| Platform | Denial exit code | Constant |
+| --- | --- | --- |
+| Windows | `1223` | `WindowsElevationCancelledExitCode` |
+| Linux | `126`, `127` | `LinuxElevationDismissedExitCode`, `LinuxElevationNotAuthorizedExitCode` |
+| macOS | `1` | `MacOSElevationCancelledExitCode` |
+
+Windows reports a dismissed `runas` prompt as `ERROR_CANCELLED` from process creation rather than as an exit code; the
+start and output helpers translate it to `WindowsElevationCancelledExitCode` so it can be matched like any other code.
+Every other startup failure and every timeout still returns `-1`.
+
+A cancelled macOS prompt shares exit code `1` with an ordinary command failure, so the single-argument overload always
+returns `false` there. Pass the captured standard error to the second overload to cover macOS, which matches the
+AppleScript cancellation error `-128`:
+
+```csharp
+ProcessOutput output = await ProcessHelper.GetProcessOutputAsync(startInfo, token);
+
+if (ProcessHelper.IsExitCodeElevationDenied(output.ExitCode, output.StandardError)) { /* declined */ }
+```
+
+Note that Linux `127` is also a shell's "command not found", so it is not an unambiguous denial signal.
+
+`StageKit.Primitives.Extensions.ProcessExtensions` offers the same check without passing anything, on an exited
+`Process` or on a captured `ProcessOutput`:
+
+```csharp
+using var process = Process.Start(startInfo);
+await process.WaitForExitAsync(token);
+
+if (process.IsExitCodeElevationDenied()) { /* the user declined the prompt */ }
+
+ProcessOutput output = await ProcessHelper.GetProcessOutputAsync(startInfo, token);
+
+if (output.IsExitCodeElevationDenied()) { /* also covers the macOS prompt, via standard error */ }
+```
+
+The `Process` overload reads `ExitCode`, so it throws `InvalidOperationException` when the process has not exited, and
+it inherits the macOS limitation. The `ProcessOutput` overload has the standard error available and does not.
+
 Run shell syntax through `cmd /d /c` on Windows or `bash -c` elsewhere, and use the output helpers when the exit code and
 both redirected streams are needed. Output helpers also accept `requireElevation`; Linux and macOS capture through their
 elevation wrappers, while non-privileged Windows `runas` capture returns exit code `-1` because that API cannot redirect

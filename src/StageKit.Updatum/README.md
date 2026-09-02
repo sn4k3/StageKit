@@ -142,9 +142,12 @@ packages request elevation through `ProcessHelper`; Updatum waits for a zero exi
 completion, relaunching, or terminating the current process. Denied elevation, timeout, cancellation, or installer failure
 stops that continuation.
 
-macOS PKG and DMG installation uses the native administrator prompt. PKG assets run through `/usr/sbin/installer`. DMG assets
-are mounted read-only and always detached; an embedded PKG is installed with `installer`, while an embedded app bundle is staged
+macOS PKG and DMG installation uses the native administrator prompt when privileges are actually required. PKG assets run
+through `/usr/sbin/installer`, which always installs into the system domain and therefore always prompts. DMG assets are
+mounted read-only and always detached; an embedded PKG is installed with `installer`, while an embedded app bundle is staged
 and atomically replaced in its current location (or `/Applications` when no current bundle is known), with rollback on failure.
+A DMG runs unprivileged first and only re-runs with the administrator prompt when it wraps a PKG or targets a directory the
+current user cannot write, so instance termination and `InstallUpdateInjectCustomScript` still run exactly once.
 
 Call `SafeDeleteFile()` on a downloaded asset when installation is not attempted. It removes the downloaded file and its empty
 managed workspace on a best-effort basis.

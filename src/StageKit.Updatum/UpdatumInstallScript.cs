@@ -129,17 +129,32 @@ internal static class UpdatumInstallScript
         writer.WriteLine("rm -rf -- \"$BACKUP_PATH\"");
     }
 
+    /// <summary>
+    /// The exit code a generated macOS script uses to report that it must be re-run with administrator privileges.
+    /// </summary>
+    /// <remarks>Matches the <c>EX_NOPERM</c> convention from <c>sysexits.h</c>.</remarks>
+    public const int PrivilegeEscalationRequiredExitCode = 77;
+
     public static void WriteMacOSPkgInstallation(TextWriter writer)
     {
         writer.WriteLine("echo \"- Installing macOS package\"");
-        writer.WriteLine("if [[ ! -e \"$FILEPATH\" ]]; then");
+        writer.WriteLine("if [[ ! -f \"$FILEPATH\" ]]; then");
         writer.WriteLine("  echo \"- Error: Package does not exist: $FILEPATH\"");
         writer.WriteLine("  exit 1");
         writer.WriteLine("fi");
         writer.WriteLine("/usr/sbin/installer -pkg \"$FILEPATH\" -target /");
     }
 
-    public static void WriteMacOSDmgInstallation(TextWriter writer)
+    /// <summary>
+    /// Writes the disk image mount and target resolution stage that precedes any destructive or author-supplied step.
+    /// </summary>
+    /// <param name="writer">The script writer.</param>
+    /// <remarks>
+    /// The stage exits with <see cref="PrivilegeEscalationRequiredExitCode"/> when the resolved work needs
+    /// administrator privileges the current run does not have, so the caller can retry elevated without repeating
+    /// instance termination or a custom script.
+    /// </remarks>
+    public static void WriteMacOSDmgPreparation(TextWriter writer)
     {
         writer.WriteLine("MOUNT_POINT=\"\"");
         writer.WriteLine("DMG_ATTACHED=False");
@@ -171,37 +186,54 @@ internal static class UpdatumInstallScript
         writer.WriteLine("  break");
         writer.WriteLine(
             "done < <(/usr/bin/find \"$MOUNT_POINT\" -type d -name \"*.app\" -prune -o -name \"*.pkg\" -print0)");
+        writer.WriteLine("APP_PATH=\"\"");
+        writer.WriteLine("if [[ -z \"$PKG_PATH\" ]]; then");
+        writer.WriteLine("  while IFS= read -r -d '' candidate; do");
+        writer.WriteLine("    APP_PATH=\"$candidate\"");
+        writer.WriteLine("    break");
+        writer.WriteLine(
+            "  done < <(/usr/bin/find \"$MOUNT_POINT\" -type d -name \"*.app\" -prune -print0)");
+        writer.WriteLine("  if [[ -z \"$APP_PATH\" ]]; then");
+        writer.WriteLine("    echo \"- Error: Disk image contains neither a PKG installer nor an app bundle\"");
+        writer.WriteLine("    exit 1");
+        writer.WriteLine("  fi");
+        writer.WriteLine("fi");
+        writer.WriteLine();
+        writer.WriteLine("if [[ -n \"$PKG_PATH\" ]]; then");
+        writer.WriteLine("  # A PKG always installs into the system domain, which requires root.");
+        writer.WriteLine($"  if [[ $EUID -ne 0 ]]; then exit {PrivilegeEscalationRequiredExitCode}; fi");
+        writer.WriteLine("else");
+        writer.WriteLine("  if [[ \"$CURRENT_APP_BUNDLE_PATH\" = *.app ]]; then");
+        writer.WriteLine("    DEST_PATH=\"$CURRENT_APP_BUNDLE_PATH\"");
+        writer.WriteLine("  else");
+        writer.WriteLine("    DEST_PATH=\"/Applications/$(/usr/bin/basename \"$APP_PATH\")\"");
+        writer.WriteLine("  fi");
+        writer.WriteLine("  DEST_PARENT=$(/usr/bin/dirname \"$DEST_PATH\")");
+        writer.WriteLine("  APP_NAME=$(/usr/bin/basename \"$DEST_PATH\")");
+        writer.WriteLine("  STAGED_PATH=\"${DEST_PARENT}/.${APP_NAME}.updatum-new-$$\"");
+        writer.WriteLine("  BACKUP_PATH=\"${DEST_PARENT}/.${APP_NAME}.updatum-backup-$$\"");
+        writer.WriteLine("  if [[ ! -d \"$DEST_PARENT\" || -e \"$STAGED_PATH\" || -e \"$BACKUP_PATH\" ]]; then");
+        writer.WriteLine("    echo \"- Error: App bundle replacement paths are not safe\"");
+        writer.WriteLine("    exit 1");
+        writer.WriteLine("  fi");
+        writer.WriteLine("  # An app bundle only needs root when its parent directory denies the current user.");
+        writer.WriteLine(
+            $"  if [[ ! -w \"$DEST_PARENT\" && $EUID -ne 0 ]]; then exit {PrivilegeEscalationRequiredExitCode}; fi");
+        writer.WriteLine("fi");
+    }
+
+    /// <summary>
+    /// Writes the disk image installation stage, which requires <see cref="WriteMacOSDmgPreparation"/> to have run.
+    /// </summary>
+    /// <param name="writer">The script writer.</param>
+    public static void WriteMacOSDmgInstallation(TextWriter writer)
+    {
         writer.WriteLine("if [[ -n \"$PKG_PATH\" ]]; then");
         writer.WriteLine("  echo \"- Installing package from disk image\"");
         writer.WriteLine("  /usr/sbin/installer -pkg \"$PKG_PATH\" -target /");
         writer.WriteLine("  exit $?");
         writer.WriteLine("fi");
         writer.WriteLine();
-        writer.WriteLine("APP_PATH=\"\"");
-        writer.WriteLine("while IFS= read -r -d '' candidate; do");
-        writer.WriteLine("  APP_PATH=\"$candidate\"");
-        writer.WriteLine("  break");
-        writer.WriteLine(
-            "done < <(/usr/bin/find \"$MOUNT_POINT\" -type d -name \"*.app\" -prune -print0)");
-        writer.WriteLine("if [[ -z \"$APP_PATH\" ]]; then");
-        writer.WriteLine("  echo \"- Error: Disk image contains neither a PKG installer nor an app bundle\"");
-        writer.WriteLine("  exit 1");
-        writer.WriteLine("fi");
-        writer.WriteLine();
-        writer.WriteLine("if [[ \"$CURRENT_APP_BUNDLE_PATH\" = *.app ]]; then");
-        writer.WriteLine("  DEST_PATH=\"$CURRENT_APP_BUNDLE_PATH\"");
-        writer.WriteLine("else");
-        writer.WriteLine("  DEST_PATH=\"/Applications/$(/usr/bin/basename \"$APP_PATH\")\"");
-        writer.WriteLine("fi");
-        writer.WriteLine("DEST_PARENT=$(/usr/bin/dirname \"$DEST_PATH\")");
-        writer.WriteLine("APP_NAME=$(/usr/bin/basename \"$DEST_PATH\")");
-        writer.WriteLine("STAGED_PATH=\"${DEST_PARENT}/.${APP_NAME}.updatum-new-$$\"");
-        writer.WriteLine("BACKUP_PATH=\"${DEST_PARENT}/.${APP_NAME}.updatum-backup-$$\"");
-        writer.WriteLine();
-        writer.WriteLine("if [[ ! -d \"$DEST_PARENT\" || -e \"$STAGED_PATH\" || -e \"$BACKUP_PATH\" ]]; then");
-        writer.WriteLine("  echo \"- Error: App bundle replacement paths are not safe\"");
-        writer.WriteLine("  exit 1");
-        writer.WriteLine("fi");
         writer.WriteLine("echo \"- Staging app bundle at $DEST_PATH\"");
         writer.WriteLine("/usr/bin/ditto \"$APP_PATH\" \"$STAGED_PATH\" || { /bin/rm -rf -- \"$STAGED_PATH\"; exit 1; }");
         writer.WriteLine("/usr/bin/xattr -dr com.apple.quarantine \"$STAGED_PATH\" 2>/dev/null || true");

@@ -253,6 +253,146 @@ public sealed class PrimitivesTests
     }
 
     [Fact]
+    public void ProcessHelper_IsExitCodeElevationDenied_AcceptsSuccessAndOrdinaryFailuresAsNotDenied()
+    {
+        Assert.False(ProcessHelper.IsExitCodeElevationDenied(0));
+        Assert.False(ProcessHelper.IsExitCodeElevationDenied(-1));
+        Assert.False(ProcessHelper.IsExitCodeElevationDenied(2));
+    }
+
+    [Fact]
+    public void ProcessHelper_IsExitCodeElevationDenied_MatchesTheHostElevationMechanism()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.True(
+                ProcessHelper.IsExitCodeElevationDenied(ProcessHelper.WindowsElevationCancelledExitCode));
+
+            // pkexec codes carry no meaning on Windows.
+            Assert.False(ProcessHelper.IsExitCodeElevationDenied(ProcessHelper.LinuxElevationDismissedExitCode));
+        }
+        else if (OperatingSystem.IsLinux())
+        {
+            Assert.True(ProcessHelper.IsExitCodeElevationDenied(ProcessHelper.LinuxElevationDismissedExitCode));
+            Assert.True(ProcessHelper.IsExitCodeElevationDenied(ProcessHelper.LinuxElevationNotAuthorizedExitCode));
+            Assert.False(ProcessHelper.IsExitCodeElevationDenied(ProcessHelper.WindowsElevationCancelledExitCode));
+        }
+        else
+        {
+            // A cancelled macOS prompt shares its exit code with an ordinary failure.
+            Assert.False(ProcessHelper.IsExitCodeElevationDenied(ProcessHelper.MacOSElevationCancelledExitCode));
+        }
+    }
+
+    [Fact]
+    public void ProcessHelper_IsExitCodeElevationDenied_UsesStandardErrorForTheMacOSPrompt()
+    {
+        const string cancelledError = "execution error: User canceled. (-128)";
+
+        Assert.Equal(
+            OperatingSystem.IsMacOS(),
+            ProcessHelper.IsExitCodeElevationDenied(
+                ProcessHelper.MacOSElevationCancelledExitCode,
+                cancelledError));
+
+        // A failing command without the cancellation marker is never a denial.
+        Assert.False(
+            ProcessHelper.IsExitCodeElevationDenied(
+                ProcessHelper.MacOSElevationCancelledExitCode,
+                "installer: Error - the package could not be opened."));
+    }
+
+    [Fact]
+    public async Task ProcessExtensions_IsExitCodeElevationDenied_ReadsTheExitedProcess()
+    {
+        var startInfo = ProcessHelper.CreateShellProcessStartInfo("exit 0");
+        using var process = Process.Start(startInfo);
+
+        Assert.NotNull(process);
+        await process.WaitForExitAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(process.IsExitCodeElevationDenied());
+    }
+
+    [Fact]
+    public void ProcessExtensions_IsExitCodeElevationDenied_ClassifiesCapturedOutput()
+    {
+        var succeeded = new ProcessOutput(0, string.Empty, string.Empty);
+        Assert.False(succeeded.IsExitCodeElevationDenied());
+
+        var failed = new ProcessOutput(2, string.Empty, "installer: Error - the package could not be opened.");
+        Assert.False(failed.IsExitCodeElevationDenied());
+
+        // The captured standard error resolves the macOS prompt an exit code alone cannot.
+        var cancelled = new ProcessOutput(
+            ProcessHelper.MacOSElevationCancelledExitCode,
+            string.Empty,
+            "execution error: User canceled. (-128)");
+
+        Assert.Equal(OperatingSystem.IsMacOS(), cancelled.IsExitCodeElevationDenied());
+    }
+
+    [Fact]
+    public void ProcessHelper_CreateShellScriptProcessStartInfo_PassesScriptPathAsDiscreteArgument()
+    {
+        const string scriptFilePath = "/tmp/a directory with spaces/upgrade script.sh";
+
+        var startInfo = ProcessHelper.CreateShellScriptProcessStartInfo(scriptFilePath);
+
+        Assert.Equal(OperatingSystem.IsWindows() ? "cmd.exe" : "bash", startInfo.FileName);
+
+        // Unix drops "-c" so the shell never word-splits the path back apart.
+        Assert.Equal(
+            OperatingSystem.IsWindows() ? ["/d", "/c", scriptFilePath] : [scriptFilePath],
+            startInfo.ArgumentList);
+        Assert.False(startInfo.UseShellExecute);
+        Assert.Empty(startInfo.Verb);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void ProcessHelper_CreateShellScriptProcessStartInfo_RejectsMissingScriptPath(string? scriptFilePath)
+    {
+        // Null reports ArgumentNullException, empty and white space report ArgumentException.
+        Assert.ThrowsAny<ArgumentException>(() => ProcessHelper.CreateShellScriptProcessStartInfo(scriptFilePath!));
+    }
+
+    [Fact]
+    public async Task ProcessHelper_CreateShellScriptProcessStartInfo_RunsScriptStoredUnderAPathWithSpaces()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), $"stagekit script test {Guid.NewGuid():N}");
+        Directory.CreateDirectory(directoryPath);
+
+        try
+        {
+            var scriptFilePath = Path.Combine(
+                directoryPath,
+                OperatingSystem.IsWindows() ? "upgrade script.bat" : "upgrade script.sh");
+
+            await File.WriteAllTextAsync(
+                scriptFilePath,
+                OperatingSystem.IsWindows()
+                    ? "@echo off\r\necho stagekit script\r\n"
+                    : "#!/usr/bin/env bash\necho \"stagekit script\"\n",
+                TestContext.Current.CancellationToken);
+
+            var startInfo = ProcessHelper.CreateShellScriptProcessStartInfo(scriptFilePath);
+            var output = await ProcessHelper.GetProcessOutputAsync(
+                startInfo,
+                TestContext.Current.CancellationToken);
+
+            Assert.Equal(0, output.ExitCode);
+            Assert.Equal("stagekit script", output.StandardOutput.Trim());
+        }
+        finally
+        {
+            Directory.Delete(directoryPath, recursive: true);
+        }
+    }
+
+    [Fact]
     public void ProcessHelper_CreateShellProcessStartInfo_UsesHostElevationMechanism()
     {
         const string command = "echo stagekit";

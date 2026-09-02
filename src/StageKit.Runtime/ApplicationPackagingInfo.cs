@@ -10,12 +10,20 @@ namespace StageKit.Runtime;
 /// <param name="PackageName">The name of the package.</param>
 /// <param name="Extensions">The file extensions associated with the packaging type.</param>
 /// <param name="SupportedPlatform">The platform supported by the packaging type.</param>
+/// <param name="DistroSpecific">Indicates whether the packaging type is specific to a particular Linux distribution.</param>
 public record ApplicationPackagingInfo(
     ApplicationPackagingType PackagingType,
     string PackageName,
     string[] Extensions,
-    OSPlatform? SupportedPlatform)
+    OSPlatform? SupportedPlatform,
+    bool DistroSpecific = false)
 {
+    /// <summary>
+    /// Gets a value indicating whether the packaging type is supported on the current platform.
+    /// </summary>
+    public bool IsSupportedOnCurrentPlatform =>
+        SupportedPlatform is null || RuntimeInformation.IsOSPlatform(SupportedPlatform.Value);
+
     /// <summary>
     /// Gets a dictionary of known application packaging types and their corresponding information.
     /// </summary>
@@ -27,7 +35,7 @@ public record ApplicationPackagingInfo(
             {
                 {
                     ApplicationPackagingType.None,
-                    new ApplicationPackagingInfo(ApplicationPackagingType.None, "None", [], null)
+                    new ApplicationPackagingInfo(ApplicationPackagingType.None, "None", [], OSPlatform.Create("None"))
                 },
                 {
                     ApplicationPackagingType.Portable,
@@ -65,17 +73,17 @@ public record ApplicationPackagingInfo(
                 {
                     ApplicationPackagingType.LinuxDeb,
                     new ApplicationPackagingInfo(ApplicationPackagingType.LinuxDeb, "Linux Debian Package", [".deb"],
-                        OSPlatform.Linux)
+                        OSPlatform.Linux, true)
                 },
                 {
                     ApplicationPackagingType.LinuxRpm,
                     new ApplicationPackagingInfo(ApplicationPackagingType.LinuxRpm, "Linux RPM Package", [".rpm"],
-                        OSPlatform.Linux)
+                        OSPlatform.Linux, true)
                 },
                 {
                     ApplicationPackagingType.LinuxArchPackage,
                     new ApplicationPackagingInfo(ApplicationPackagingType.LinuxArchPackage, "Linux Arch Package",
-                        [".pkg.tar.zst"], OSPlatform.Linux)
+                        [".pkg.tar.zst"], OSPlatform.Linux, true)
                 },
                 {
                     ApplicationPackagingType.MacOSAppBundle,

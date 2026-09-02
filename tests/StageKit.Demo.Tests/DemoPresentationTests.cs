@@ -26,13 +26,13 @@ public class DemoPresentationTests
     }
 
     [Fact]
-    public void CreateUpdater_DefaultConfiguration_TargetsUvtoolsSafely()
+    public void CreateUpdater_DefaultConfiguration_TargetsStageKitSafely()
     {
         using var updater = DemoUpdateManager.Create();
 
         Assert.Equal("sn4k3", updater.Owner);
-        Assert.Equal("UVtools", updater.Repository);
-        Assert.StartsWith("^UVtools_", updater.AssetRegexPattern);
+        Assert.Equal("StageKit", updater.Repository);
+        Assert.StartsWith("^StageKit_", updater.AssetRegexPattern);
         Assert.Contains(EntryApplication.GenericRuntimeIdentifier, updater.AssetRegexPattern);
         Assert.True(updater.RequireAssetChecksum);
         Assert.False(updater.AllowPreReleases);

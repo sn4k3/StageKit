@@ -7,15 +7,23 @@
   macOS `osascript`, synchronous and asynchronous captured stdout/stderr results, and cross-platform process and shell
   helpers with cancellation support. Direct executable launches now use the modern .NET default of
   `UseShellExecute=false`, and configurable process and shell `ProcessStartInfo` factories and execution overloads
-  expose working-directory, environment, and other native process settings.
+  expose working-directory, environment, and other native process settings. `CreateShellScriptProcessStartInfo` runs a
+  script file by passing its path as a discrete argument, so a path containing spaces is not word-split by `bash -c`.
+- Add elevation-denial detection to `ProcessHelper` so a refused administrator prompt is distinguishable from an
+  ordinary command failure: named exit-code constants per platform, `IsExitCodeElevationDenied` overloads, and
+  parameterless `Process` and `ProcessOutput` extension methods. A cancelled Windows `runas` prompt now returns
+  `WindowsElevationCancelledExitCode` instead of the generic `-1`; other startup failures and timeouts still return
+  `-1`. Updatum reports a denied package installation with a dedicated message.
 - Add Linux `PackagingTypes` for Flatpak, Debian, RPM, Arch Linux binary, and Snap packages, plus macOS DMG and PKG
   output. Package creation uses the platform-native `flatpak-builder`, `dpkg-deb`, `rpmbuild`, `makepkg`, `snapcraft`,
   `hdiutil`, and `pkgbuild` tools.
 - Extend Updatum asset selection and installation to Linux Flatpak, Debian, RPM, Arch Linux binary, and Snap packages, plus
   macOS PKG and DMG packages. Flatpak updates preserve the current user/system installation scope, privileged package installs
   use `ProcessHelper` elevation, and post-install completion or relaunch only continues after a successful installer exit code.
-  DMG installation mounts images read-only, always detaches them, and installs an embedded PKG or atomically replaces an embedded
-  app bundle with rollback.
+  DMG installation mounts images read-only, always detaches them, and installs an embedded PKG or atomically replaces an
+  embedded app bundle with rollback. A DMG runs unprivileged first and only re-runs with the administrator prompt when it
+  wraps a PKG or targets a directory the current user cannot write, so instance termination and
+  `InstallUpdateInjectCustomScript` still run exactly once.
 - Update the release workflow to build runtime assets for supported platforms, attach packages and assets to a GitHub
   release, and omit Winget publishing.
 - Replace the original `StageKit.Demo` console sample with an Avalonia desktop workshop for runtime diagnostics,

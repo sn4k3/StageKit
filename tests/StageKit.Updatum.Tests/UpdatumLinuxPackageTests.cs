@@ -1,3 +1,6 @@
+using System.Runtime.InteropServices;
+using StageKit.Primitives.System;
+using StageKit.Runtime;
 using StageKit.Runtime.System;
 
 namespace StageKit.Updatum.Tests;
@@ -63,5 +66,87 @@ public sealed class UpdatumLinuxPackageTests
     public void EnsurePackageInstallationSucceeded_AcceptsZeroExitCode()
     {
         UpdatumManager.EnsurePackageInstallationSucceeded("Debian", 0);
+    }
+
+    [Fact]
+    public void EnsurePackageInstallationSucceeded_ReportsDeniedElevationDistinctly()
+    {
+        var deniedExitCode = OperatingSystem.IsWindows()
+            ? ProcessHelper.WindowsElevationCancelledExitCode
+            : ProcessHelper.LinuxElevationDismissedExitCode;
+
+        // macOS cannot classify a denial from the exit code alone, so it keeps the generic message.
+        var expectsDenialMessage = !OperatingSystem.IsMacOS();
+
+        var exception = Assert.Throws<IOException>(() =>
+            UpdatumManager.EnsurePackageInstallationSucceeded("Debian", deniedExitCode));
+
+        Assert.Equal(expectsDenialMessage, exception.Message.Contains("administrator privileges"));
+        Assert.Contains(deniedExitCode.ToString(), exception.Message);
+    }
+
+    [Theory]
+    [InlineData("update.deb", ApplicationPackagingType.LinuxDeb)]
+    [InlineData("update.rpm", ApplicationPackagingType.LinuxRpm)]
+    [InlineData("update.snap", ApplicationPackagingType.LinuxSnap)]
+    [InlineData("update.flatpak", ApplicationPackagingType.LinuxFlatpak)]
+    [InlineData("update.AppImage", ApplicationPackagingType.LinuxAppImage)]
+    // The Arch suffix must win over the macOS ".pkg" it contains.
+    [InlineData("update.pkg.tar.zst", ApplicationPackagingType.LinuxArchPackage)]
+    public void GetPackagingTypeForFile_ResolvesLinuxPackagesForTheLinuxTarget(
+        string filePath,
+        ApplicationPackagingType expected)
+    {
+        Assert.Equal(expected, UpdatumManager.GetPackagingTypeForFile(filePath, OSPlatform.Linux));
+    }
+
+    [Theory]
+    [InlineData("update.pkg", ApplicationPackagingType.MacOSPkg)]
+    [InlineData("update.dmg", ApplicationPackagingType.MacOSDmg)]
+    public void GetPackagingTypeForFile_ResolvesMacOSPackagesForTheMacOSTarget(
+        string filePath,
+        ApplicationPackagingType expected)
+    {
+        Assert.Equal(expected, UpdatumManager.GetPackagingTypeForFile(filePath, OSPlatform.OSX));
+    }
+
+    [Theory]
+    [InlineData("update.pkg")]
+    [InlineData("update.dmg")]
+    public void GetPackagingTypeForFile_RejectsForeignPlatformPackages(string filePath)
+    {
+        Assert.Null(UpdatumManager.GetPackagingTypeForFile(filePath, OSPlatform.Linux));
+    }
+
+    [Theory]
+    // A platform-agnostic type still resolves under an explicit target.
+    [InlineData("update.zip", OperatingSystemTarget.Linux, ApplicationPackagingType.Portable)]
+    [InlineData("update.zip", OperatingSystemTarget.Windows, ApplicationPackagingType.Portable)]
+    public void GetPackagingTypeForFile_KeepsPlatformAgnosticTypes(
+        string filePath,
+        OperatingSystemTarget target,
+        ApplicationPackagingType expected)
+    {
+        var platform = target is OperatingSystemTarget.Linux ? OSPlatform.Linux : OSPlatform.Windows;
+
+        Assert.Equal(expected, UpdatumManager.GetPackagingTypeForFile(filePath, platform));
+    }
+
+    [Fact]
+    public void GetPackagingTypeForFile_ReturnsNullForUnknownExtensions()
+    {
+        Assert.Null(UpdatumManager.GetPackagingTypeForFile("update.unknownext", OSPlatform.Linux));
+    }
+
+    /// <summary>
+    /// Identifies a target platform for theory data, because <see cref="OSPlatform"/> is not a constant.
+    /// </summary>
+    public enum OperatingSystemTarget
+    {
+        /// <summary>Targets Windows.</summary>
+        Windows,
+
+        /// <summary>Targets Linux.</summary>
+        Linux
     }
 }

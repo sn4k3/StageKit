@@ -889,34 +889,55 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         // Try to infer the best asset based on the EntryApplication bundle.
         if (string.IsNullOrWhiteSpace(AssetExtensionFilter))
         {
-            var extension = GetPreferredAssetExtension();
-            return candidateAssets.FirstOrDefault(asset => AssetNameMatchesExtension(asset.Name, extension),
-                candidateAssets[0]);
+            foreach (var extension in GetPreferredAssetExtensions())
+            {
+                var preferredAsset =
+                    candidateAssets.FirstOrDefault(asset => AssetNameMatchesExtension(asset.Name, extension));
+                if (preferredAsset is not null) return preferredAsset;
+            }
         }
 
         return candidateAssets[0];
     }
 
-    internal static string GetPreferredAssetExtension()
+    /// <summary>
+    /// Gets the asset extensions to try, most preferred first, for the current packaging type.
+    /// </summary>
+    /// <returns>An ordered array of extensions.</returns>
+    /// <remarks>
+    /// macOS reports <see cref="ApplicationPackagingType.MacOSAppBundle"/> regardless of how the bundle was
+    /// originally delivered, so the bundle formats fall back to each other instead of resolving to a single
+    /// extension.
+    /// </remarks>
+    internal static string[] GetPreferredAssetExtensions()
     {
-        if (OperatingSystem.IsWindows())
-        {
-            return EntryApplication.PackagingType is ApplicationPackagingType.DotNetSingleFile ? ".exe" : ".msi";
-        }
-
         if (EntryApplication.PackagingType is ApplicationPackagingType.DotNetSingleFile)
         {
-            return ApplicationPackagingInfo.KnownPackagingTypes[ApplicationPackagingType.DotNetSingleFile].Extensions
-                       .FirstOrDefault(ext =>
-                           !string.IsNullOrWhiteSpace(ext) &&
-                           !ext.Equals(".exe", StringComparison.OrdinalIgnoreCase)) ??
-                   ".bin";
+            if (OperatingSystem.IsWindows())
+            {
+                return [".exe", ".msi", ".zip"];
+            }
+
+            return
+            [
+                ApplicationPackagingInfo.KnownPackagingTypes[ApplicationPackagingType.DotNetSingleFile].Extensions
+                    .FirstOrDefault(ext =>
+                        !string.IsNullOrWhiteSpace(ext) &&
+                        !ext.Equals(".exe", StringComparison.OrdinalIgnoreCase)) ??
+                ".bin"
+            ];
         }
 
-        return ApplicationPackagingInfo.KnownPackagingTypes.TryGetValue(EntryApplication.PackagingType,
-            out var packagingInfo)
-            ? packagingInfo.Extensions.FirstOrDefault() ?? ".zip"
-            : ".zip";
+        return ApplicationPackagingInfo.KnownPackagingTypes
+            .Where(kvp => kvp.Value.IsSupportedOnCurrentPlatform
+                          && kvp.Key is not (ApplicationPackagingType.None or ApplicationPackagingType.DotNetSingleFile)
+                          && (kvp.Key == EntryApplication.PackagingType || !kvp.Value.DistroSpecific))
+            .OrderBy(pair => pair.Key == EntryApplication.PackagingType ? 0
+                : pair.Key == ApplicationPackagingType.Portable ? 2
+                : 1)
+            .SelectMany(pair => pair.Value.Extensions)
+            .DistinctBy(s => s)
+            .ToArray();
     }
 
 
@@ -1329,11 +1350,46 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
 
     internal static void EnsurePackageInstallationSucceeded(string packageType, int exitCode)
     {
-        if (exitCode != 0)
-            throw new IOException($"{packageType} installation failed with error code: {exitCode}.");
+        if (exitCode == 0) return;
+
+        if (ProcessHelper.IsExitCodeElevationDenied(exitCode))
+            throw new IOException(
+                $"{packageType} installation requires administrator privileges that were not granted " +
+                $"(error code: {exitCode}).");
+
+        throw new IOException($"{packageType} installation failed with error code: {exitCode}.");
     }
 
-    private static ApplicationPackagingType? GetPackagingTypeForFile(
+    /// <summary>
+    /// Runs a generated macOS installation script and waits for it to complete.
+    /// </summary>
+    /// <param name="scriptFilePath">The generated script to run.</param>
+    /// <param name="workingDirectory">The working directory for the script process.</param>
+    /// <param name="requireElevation"><c>True</c> to request administrator privileges.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The script exit code.</returns>
+    /// <remarks>
+    /// <paramref name="workingDirectory"/> only reaches the script when <paramref name="requireElevation"/> is
+    /// <c>false</c> or the process is already privileged; the elevated path launches through <c>osascript</c>.
+    /// The script therefore anchors itself with its own directory.
+    /// </remarks>
+    private static Task<int> RunMacOSInstallScriptAsync(
+        string scriptFilePath,
+        string workingDirectory,
+        bool requireElevation,
+        CancellationToken cancellationToken)
+    {
+        var startInfo = ProcessHelper.CreateShellScriptProcessStartInfo(scriptFilePath, requireElevation);
+        startInfo.WorkingDirectory = workingDirectory;
+
+        return ProcessHelper.StartProcessAsync(
+            startInfo,
+            true,
+            PackageInstallTimeoutMilliseconds,
+            cancellationToken);
+    }
+
+    internal static ApplicationPackagingType? GetPackagingTypeForFile(
         string filePath,
         OSPlatform? targetPlatform = null)
     {
@@ -1344,7 +1400,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                 (info.SupportedPlatform is null ||
                  (targetPlatform.HasValue
                      ? info.SupportedPlatform.Value.Equals(targetPlatform.Value)
-                     : RuntimeInformation.IsOSPlatform(info.SupportedPlatform.Value))) &&
+                     : info.IsSupportedOnCurrentPlatform)) &&
                 info.Extensions.Any(extension => AssetNameMatchesExtension(filePath, extension)))
             ?.PackagingType;
     }
@@ -2087,7 +2143,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                             cancellationToken.ThrowIfCancellationRequested();
                             RaiseEvent(InstallUpdateCompleted, downloadedAsset);
 
-                            var startInfo = ProcessHelper.CreateShellProcessStartInfo(upgradeScriptFilePath);
+                            var startInfo = ProcessHelper.CreateShellScriptProcessStartInfo(upgradeScriptFilePath);
                             startInfo.WorkingDirectory = tmpPath;
                             var result = ProcessHelper.StartProcess(startInfo);
 
@@ -2227,7 +2283,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                             RaiseEvent(InstallUpdateCompleted, downloadedAsset);
 
                             // Execute the script
-                            var startInfo = ProcessHelper.CreateShellProcessStartInfo(upgradeScriptFilePath);
+                            var startInfo = ProcessHelper.CreateShellScriptProcessStartInfo(upgradeScriptFilePath);
                             startInfo.WorkingDirectory = tmpPath;
                             var result = ProcessHelper.StartProcess(startInfo);
 
@@ -2309,7 +2365,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                         cancellationToken.ThrowIfCancellationRequested();
                         RaiseEvent(InstallUpdateCompleted, downloadedAsset);
 
-                        var startInfo = ProcessHelper.CreateShellProcessStartInfo(upgradeScriptFilePath);
+                        var startInfo = ProcessHelper.CreateShellScriptProcessStartInfo(upgradeScriptFilePath);
                         startInfo.WorkingDirectory = tmpPath;
                         var result = ProcessHelper.StartProcess(startInfo);
 
@@ -2329,6 +2385,8 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                     if (!OperatingSystem.IsMacOS())
                         throw new NotSupportedException($"The package '{fileName}' is only supported on macOS.");
 
+                    var isPkgPackage = inferredPackageType is ApplicationPackagingType.MacOSPkg;
+
                     using var temporaryScriptFile = new TemporaryFile(installWorkspacePath, ".sh");
                     var installScriptFilePath = temporaryScriptFile.FilePath;
                     using (var stream = new StreamWriter(temporaryScriptFile.Create()))
@@ -2341,35 +2399,56 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                             $"MACOS_CODESIGN_APP={InstallUpdateCodesignMacOSApp.ToString().QuoteBashAnsiCString()}");
                         stream.WriteLine();
 
-                        if (inferredPackageType is ApplicationPackagingType.MacOSPkg)
-                            UpdatumInstallScript.WriteMacOSPkgInstallation(stream);
-                        else
-                            UpdatumInstallScript.WriteMacOSDmgInstallation(stream);
+                        // Mount and resolve the target before anything with side effects, so a privilege-escalation
+                        // retry never terminates instances or runs the custom script twice.
+                        if (!isPkgPackage) UpdatumInstallScript.WriteMacOSDmgPreparation(stream);
+
+                        if (forceTerminate) WriteLinuxScriptKillInstances(stream);
+                        WriteLinuxScriptInjectCustomScript(stream);
+
+                        if (isPkgPackage) UpdatumInstallScript.WriteMacOSPkgInstallation(stream);
+                        else UpdatumInstallScript.WriteMacOSDmgInstallation(stream);
                     }
 
                     UnixSystem.SetUnix755Executable(installScriptFilePath);
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    var startInfo = ProcessHelper.CreateShellProcessStartInfo(installScriptFilePath, true);
-                    startInfo.WorkingDirectory = installWorkspacePath;
-                    var exitCode = await ProcessHelper.StartProcessAsync(
-                            startInfo,
-                            true,
-                            PackageInstallTimeoutMilliseconds,
+                    // A PKG always installs into the system domain and needs root. A DMG only needs it when it wraps
+                    // a PKG or targets a directory the user cannot write, so try unprivileged first and let the
+                    // script ask for elevation.
+                    var exitCode = await RunMacOSInstallScriptAsync(
+                            installScriptFilePath,
+                            installWorkspacePath,
+                            isPkgPackage,
                             cancellationToken)
                         .ConfigureAwait(false);
 
-                    var packageType = inferredPackageType is ApplicationPackagingType.MacOSPkg
-                        ? "macOS PKG"
-                        : "macOS DMG";
-                    EnsurePackageInstallationSucceeded(packageType, exitCode);
+                    if (!isPkgPackage && exitCode == UpdatumInstallScript.PrivilegeEscalationRequiredExitCode)
+                    {
+                        exitCode = await RunMacOSInstallScriptAsync(
+                                installScriptFilePath,
+                                installWorkspacePath,
+                                true,
+                                cancellationToken)
+                            .ConfigureAwait(false);
+                    }
+
+                    EnsurePackageInstallationSucceeded(isPkgPackage ? "macOS PKG" : "macOS DMG", exitCode);
 
                     cancellationToken.ThrowIfCancellationRequested();
                     RaiseEvent(InstallUpdateCompleted, downloadedAsset);
                     if (runArguments != NoRunAfterUpgradeToken) EntryApplication.LaunchNewInstance(runArguments);
 
                     downloadedAsset.SafeDeleteFile();
-                    if (forceTerminate) Environment.Exit(0);
+                    if (forceTerminate)
+                    {
+                        // Environment.Exit runs neither the using above nor the finally below, and the script has
+                        // already completed, so release the workspace explicitly.
+                        temporaryScriptFile.Dispose();
+                        DeleteTemporaryWorkspace(installWorkspacePath);
+                        Environment.Exit(0);
+                    }
+
                     return true;
                 }
 
@@ -2610,7 +2689,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                         cancellationToken.ThrowIfCancellationRequested();
                         RaiseEvent(InstallUpdateCompleted, downloadedAsset);
 
-                        var startInfo = ProcessHelper.CreateShellProcessStartInfo(upgradeScriptFilePath);
+                        var startInfo = ProcessHelper.CreateShellScriptProcessStartInfo(upgradeScriptFilePath);
                         startInfo.WorkingDirectory = tmpPath;
                         var result = ProcessHelper.StartProcess(startInfo);
 
@@ -2694,7 +2773,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                         cancellationToken.ThrowIfCancellationRequested();
                         RaiseEvent(InstallUpdateCompleted, downloadedAsset);
 
-                        var startInfo = ProcessHelper.CreateShellProcessStartInfo(upgradeScriptFilePath);
+                        var startInfo = ProcessHelper.CreateShellScriptProcessStartInfo(upgradeScriptFilePath);
                         startInfo.WorkingDirectory = tmpPath;
                         var result = ProcessHelper.StartProcess(startInfo);
 
