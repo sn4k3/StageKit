@@ -46,4 +46,47 @@ public sealed class UpdatumInstallScriptTests
         Assert.Contains("STAGED_PATH", unixWriter.ToString());
         Assert.Contains("restore_directory_backup", unixWriter.ToString());
     }
+
+    [Fact]
+    public void WriteMacOSPkgInstallation_UsesNativeInstaller()
+    {
+        using var writer = new StringWriter();
+
+        UpdatumInstallScript.WriteMacOSPkgInstallation(writer);
+        var script = writer.ToString();
+
+        Assert.Contains("[[ ! -e \"$FILEPATH\" ]]", script);
+        Assert.Contains("/usr/sbin/installer -pkg \"$FILEPATH\" -target /", script);
+    }
+
+    [Fact]
+    public void WriteMacOSDmgInstallation_MountsReadOnlyAndAlwaysDetaches()
+    {
+        using var writer = new StringWriter();
+
+        UpdatumInstallScript.WriteMacOSDmgInstallation(writer);
+        var script = writer.ToString();
+
+        Assert.Contains("trap cleanup_macos_dmg EXIT", script);
+        Assert.Contains("hdiutil attach \"$FILEPATH\" -mountpoint \"$MOUNT_POINT\" -nobrowse -readonly -quiet", script);
+        Assert.Contains("hdiutil detach \"$MOUNT_POINT\" -quiet", script);
+    }
+
+    [Fact]
+    public void WriteMacOSDmgInstallation_InstallsPkgOrAtomicallyReplacesAppBundle()
+    {
+        using var writer = new StringWriter();
+
+        UpdatumInstallScript.WriteMacOSDmgInstallation(writer);
+        var script = writer.ToString();
+
+        Assert.Contains("/usr/sbin/installer -pkg \"$PKG_PATH\" -target /", script);
+        Assert.Contains("DEST_PATH=\"$CURRENT_APP_BUNDLE_PATH\"", script);
+        Assert.Contains("DEST_PATH=\"/Applications/$(/usr/bin/basename \"$APP_PATH\")\"", script);
+        Assert.Contains("/usr/bin/ditto \"$APP_PATH\" \"$STAGED_PATH\"", script);
+        Assert.True(
+            script.IndexOf("\"$DEST_PATH\" \"$BACKUP_PATH\"", StringComparison.Ordinal)
+            < script.IndexOf("\"$STAGED_PATH\" \"$DEST_PATH\"", StringComparison.Ordinal));
+        Assert.Contains("\"$BACKUP_PATH\" \"$DEST_PATH\"", script);
+    }
 }

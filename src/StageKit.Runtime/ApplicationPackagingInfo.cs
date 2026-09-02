@@ -10,7 +10,7 @@ namespace StageKit.Runtime;
 /// <param name="PackageName">The name of the package.</param>
 /// <param name="Extensions">The file extensions associated with the packaging type.</param>
 /// <param name="SupportedPlatform">The platform supported by the packaging type.</param>
-public record struct ApplicationPackagingInfo(
+public record ApplicationPackagingInfo(
     ApplicationPackagingType PackagingType,
     string PackageName,
     string[] Extensions,

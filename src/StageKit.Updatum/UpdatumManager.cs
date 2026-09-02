@@ -795,7 +795,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
     /// </summary>
     /// <param name="cancellationToken">A token used to cancel the operation.</param>
     /// <returns><c>True</c> if an update is found; otherwise, <c>false</c>.</returns>
-    public Task<bool> CheckForUpdatesAsync(CancellationToken cancellationToken)
+    public Task<bool> CheckForUpdatesAsync(CancellationToken cancellationToken = default)
     {
         return CheckForUpdatesAsync(CurrentVersion, cancellationToken);
     }
@@ -1269,7 +1269,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
 
-        var packagingType = GetPackagingTypeForFile(filePath);
+        var packagingType = GetPackagingTypeForFile(filePath, OSPlatform.Linux);
         if (packagingType is ApplicationPackagingType.LinuxFlatpak)
         {
             var isSystemInstallation = flatpakInstallationScope is FlatpakInstallationScope.System;
@@ -1333,25 +1333,20 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
             throw new IOException($"{packageType} installation failed with error code: {exitCode}.");
     }
 
-    private static bool IsLinuxPackageFile(string filePath)
-    {
-        return GetPackagingTypeForFile(filePath) is
-            ApplicationPackagingType.LinuxFlatpak or
-            ApplicationPackagingType.LinuxSnap or
-            ApplicationPackagingType.LinuxDeb or
-            ApplicationPackagingType.LinuxRpm or
-            ApplicationPackagingType.LinuxArchPackage;
-    }
-
-    private static ApplicationPackagingType? GetPackagingTypeForFile(string filePath)
+    private static ApplicationPackagingType? GetPackagingTypeForFile(
+        string filePath,
+        OSPlatform? targetPlatform = null)
     {
         return ApplicationPackagingInfo.KnownPackagingTypes.Values
             .OrderBy(info => info.SupportedPlatform is null ? 1 : 0)
             .FirstOrDefault(info =>
                 info.Extensions.Length > 0 &&
                 (info.SupportedPlatform is null ||
-                 RuntimeInformation.IsOSPlatform(info.SupportedPlatform.Value)) &&
-                info.Extensions.Any(extension => AssetNameMatchesExtension(filePath, extension))).PackagingType;
+                 (targetPlatform.HasValue
+                     ? info.SupportedPlatform.Value.Equals(targetPlatform.Value)
+                     : RuntimeInformation.IsOSPlatform(info.SupportedPlatform.Value))) &&
+                info.Extensions.Any(extension => AssetNameMatchesExtension(filePath, extension)))
+            ?.PackagingType;
     }
 
     private static string ResolvePackageInstallerExecutable(LinuxPackageInstallCommand command)
@@ -1948,6 +1943,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                 if (fileExtension.Equals(".zip", StringComparison.OrdinalIgnoreCase))
                 {
                     using var archive = ZipFile.OpenRead(filePath);
+
                     if (archive.Entries.Count == 0) return false; // No entries in the archive
                     if (archive.Entries.Count == 1 && archive.Entries[0].IsFile())
                     {
@@ -2244,6 +2240,8 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                     }
                 }
 
+                var inferredPackageType = GetPackagingTypeForFile(filePath);
+
                 ////////////////////////
                 // Windows Installers //
                 ////////////////////////
@@ -2324,16 +2322,73 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                 }
 
                 ///////////////////////////
+                // macOS package formats //
+                ///////////////////////////
+                if (inferredPackageType is ApplicationPackagingType.MacOSPkg or ApplicationPackagingType.MacOSDmg)
+                {
+                    if (!OperatingSystem.IsMacOS())
+                        throw new NotSupportedException($"The package '{fileName}' is only supported on macOS.");
+
+                    using var temporaryScriptFile = new TemporaryFile(installWorkspacePath, ".sh");
+                    var installScriptFilePath = temporaryScriptFile.FilePath;
+                    using (var stream = new StreamWriter(temporaryScriptFile.Create()))
+                    {
+                        stream.NewLine = "\n";
+                        WriteLinuxScriptHeader(stream);
+                        stream.WriteLine(
+                            $"CURRENT_APP_BUNDLE_PATH={EntryApplication.MacOSAppBundlePath.QuoteBashAnsiCString()}");
+                        stream.WriteLine(
+                            $"MACOS_CODESIGN_APP={InstallUpdateCodesignMacOSApp.ToString().QuoteBashAnsiCString()}");
+                        stream.WriteLine();
+
+                        if (inferredPackageType is ApplicationPackagingType.MacOSPkg)
+                            UpdatumInstallScript.WriteMacOSPkgInstallation(stream);
+                        else
+                            UpdatumInstallScript.WriteMacOSDmgInstallation(stream);
+                    }
+
+                    UnixSystem.SetUnix755Executable(installScriptFilePath);
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var startInfo = ProcessHelper.CreateShellProcessStartInfo(installScriptFilePath, true);
+                    startInfo.WorkingDirectory = installWorkspacePath;
+                    var exitCode = await ProcessHelper.StartProcessAsync(
+                            startInfo,
+                            true,
+                            PackageInstallTimeoutMilliseconds,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+
+                    var packageType = inferredPackageType is ApplicationPackagingType.MacOSPkg
+                        ? "macOS PKG"
+                        : "macOS DMG";
+                    EnsurePackageInstallationSucceeded(packageType, exitCode);
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                    RaiseEvent(InstallUpdateCompleted, downloadedAsset);
+                    if (runArguments != NoRunAfterUpgradeToken) EntryApplication.LaunchNewInstance(runArguments);
+
+                    downloadedAsset.SafeDeleteFile();
+                    if (forceTerminate) Environment.Exit(0);
+                    return true;
+                }
+
+                ///////////////////////////
                 // Linux package formats //
                 ///////////////////////////
-                if (IsLinuxPackageFile(filePath))
+                if (inferredPackageType
+                    is ApplicationPackagingType.LinuxFlatpak
+                    or ApplicationPackagingType.LinuxSnap
+                    or ApplicationPackagingType.LinuxDeb
+                    or ApplicationPackagingType.LinuxRpm
+                    or ApplicationPackagingType.LinuxArchPackage)
                 {
                     if (!OperatingSystem.IsLinux())
                         throw new NotSupportedException($"The package '{fileName}' is only supported on Linux.");
 
                     var flatpakInstallationScope = FlatpakInstallationScope.User;
                     string? resolvedFlatpakExecutable = null;
-                    if (GetPackagingTypeForFile(filePath) is ApplicationPackagingType.LinuxFlatpak)
+                    if (inferredPackageType is ApplicationPackagingType.LinuxFlatpak)
                     {
                         var initialCommand = CreateLinuxPackageInstallCommand(
                             filePath,
@@ -2375,20 +2430,20 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                 ///////////////////////////////////////////////////////////
                 // Handle single-file apps / executables for all systems //
                 ///////////////////////////////////////////////////////////
-                var executablePackagingType = GetPackagingTypeForFile(filePath);
-                if (executablePackagingType is ApplicationPackagingType.DotNetSingleFile
+                if (inferredPackageType
+                    is ApplicationPackagingType.DotNetSingleFile
                     or ApplicationPackagingType.LinuxAppImage)
                 {
-                    if (executablePackagingType is ApplicationPackagingType.DotNetSingleFile &&
+                    if (inferredPackageType is ApplicationPackagingType.DotNetSingleFile &&
                         OperatingSystem.IsWindows() &&
                         !filePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
                         throw new NotSupportedException(
                             "An extensionless single-file update is only supported on Unix systems.");
-                    if (executablePackagingType is ApplicationPackagingType.DotNetSingleFile &&
+                    if (inferredPackageType is ApplicationPackagingType.DotNetSingleFile &&
                         filePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) && !OperatingSystem.IsWindows())
                         throw new NotSupportedException(
                             "A Windows single-file update is only supported on Windows.");
-                    if (executablePackagingType is ApplicationPackagingType.LinuxAppImage && !OperatingSystem.IsLinux())
+                    if (inferredPackageType is ApplicationPackagingType.LinuxAppImage && !OperatingSystem.IsLinux())
                         throw new NotSupportedException("An AppImage update is only supported on Linux.");
 
 
@@ -2667,7 +2722,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
     /// <p>Sets <see cref="ReleasesAhead"/> lists to the specified release in order to trigger a forced update.</p>
     /// <p>Use this to test your application, for debug purposes or to force a downgrade.</p>
     /// </summary>
-    /// <param name="release">The release to set as update.</param>
+    /// <param name="release">The release to set as an update.</param>
     public void ForceTriggerUpdateFromRelease(Release release)
     {
         ReleasesAhead = [release];

@@ -11,7 +11,7 @@
 `StageKit.Updatum` is a lightweight, easy-to-integrate C# library that automates application updates through **GitHub Releases**.
 It checks for new versions, retrieves release notes, discovers the right asset for the current runtime, downloads it with progress
 reporting and optional verification, then prepares and runs a cross-platform update — installer, portable archive, single-file
-executable, AppImage, Flatpak, Debian, RPM, Arch Linux, Snap, or macOS app bundle.
+executable, AppImage, Flatpak, Debian, RPM, Arch Linux, Snap, macOS app bundle, PKG, or DMG.
 
 ## Features
 
@@ -31,6 +31,12 @@ executable, AppImage, Flatpak, Debian, RPM, Arch Linux, Snap, or macOS app bundl
 dotnet add package StageKit.Updatum
 ```
 
+Or add the package reference directly to your project:
+
+```xml
+<PackageReference Include="StageKit.Updatum" Version="*" />
+```
+
 The package targets .NET 8 and .NET 10.
 
 ## Requirements
@@ -39,8 +45,13 @@ The package targets .NET 8 and .NET 10.
 2. Name the assets so the platform and architecture are matchable, for example:
    - Windows: `MyApp_win-x64_v1.0.0.exe`, `MyApp_win-x64_v1.0.0.msi`, `MyApp_win-x64_v1.0.0.zip`
    - Linux: `MyApp_linux-x64_v1.0.0.AppImage`, `.flatpak`, `.deb`, `.rpm`, `.pkg.tar.zst`, `.snap`, or `.zip`
-   - macOS: `MyApp_osx-arm64_v1.0.0.zip`
+   - macOS: `MyApp_osx-arm64_v1.0.0.zip`, `.pkg`, or `.dmg`
+   - See the [UVtools release assets](https://github.com/sn4k3/UVtools/releases/latest) for a real-world naming example.
    - Asset matching is configurable via regex (`AssetRegexPattern`) and an optional extension filter (`AssetExtensionFilter`).
+
+The selected asset must be compatible with the application’s runtime identifier and packaging type. For example, a portable
+Windows application might publish `MyApp_win-x64_v1.0.0.zip`, while an installed build might publish an `.msi` with the same
+runtime identifier.
 
 ## Basic usage
 
@@ -113,6 +124,7 @@ Supported targets:
 - Linux [Flatpak](https://flatpak.org/)
 - Linux Debian (`.deb`), RPM (`.rpm`), Arch Linux (`.pkg.tar.zst`), and Snap (`.snap`) packages
 - macOS app bundle
+- macOS PKG (`.pkg`) and disk image (`.dmg`) packages
 
 ### Installing updates
 
@@ -129,6 +141,10 @@ current application is installed in the user or system scope. System Flatpak upd
 packages request elevation through `ProcessHelper`; Updatum waits for a zero exit code before reporting package-install
 completion, relaunching, or terminating the current process. Denied elevation, timeout, cancellation, or installer failure
 stops that continuation.
+
+macOS PKG and DMG installation uses the native administrator prompt. PKG assets run through `/usr/sbin/installer`. DMG assets
+are mounted read-only and always detached; an embedded PKG is installed with `installer`, while an embedded app bundle is staged
+and atomically replaced in its current location (or `/Applications` when no current bundle is known), with rollback on failure.
 
 Call `SafeDeleteFile()` on a downloaded asset when installation is not attempted. It removes the downloaded file and its empty
 managed workspace on a best-effort basis.
@@ -202,6 +218,15 @@ updater.PropertyChanged += (_, e) =>
 
 Adjust the progress notification frequency with `DownloadProgressUpdateFrequencySeconds` (default `0.1`; `0` reports every chunk).
 
+For periodic checks, subscribe to `UpdateFound` and configure `AutoUpdateCheckTimer`. The timer uses the same manager and
+does not start until `Start()` is called:
+
+```csharp
+updater.UpdateFound += (_, _) => Console.WriteLine("An update is available.");
+updater.AutoUpdateCheckTimer.Interval = TimeSpan.FromHours(1).TotalMilliseconds;
+updater.AutoUpdateCheckTimer.Start();
+```
+
 ## FAQs
 
 ### Custom asset pattern
@@ -261,7 +286,9 @@ using var updater = new UpdatumManager(owner, repository)
 
 ## Example
 
-See `demo/Updatum.Demo` in the repository for a complete console example.
+See `demo/StageKit.Demo` in the repository for a complete Avalonia example. Its `MainWindowViewModel` demonstrates the
+full check, changelog, compatible-asset selection, checksum-verified download, cancellation, progress binding, manual
+installation, automatic installation, and temporary-asset cleanup flow.
 
 ## License
 

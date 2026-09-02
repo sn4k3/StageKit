@@ -128,4 +128,96 @@ internal static class UpdatumInstallScript
         writer.WriteLine("fi");
         writer.WriteLine("rm -rf -- \"$BACKUP_PATH\"");
     }
+
+    public static void WriteMacOSPkgInstallation(TextWriter writer)
+    {
+        writer.WriteLine("echo \"- Installing macOS package\"");
+        writer.WriteLine("if [[ ! -e \"$FILEPATH\" ]]; then");
+        writer.WriteLine("  echo \"- Error: Package does not exist: $FILEPATH\"");
+        writer.WriteLine("  exit 1");
+        writer.WriteLine("fi");
+        writer.WriteLine("/usr/sbin/installer -pkg \"$FILEPATH\" -target /");
+    }
+
+    public static void WriteMacOSDmgInstallation(TextWriter writer)
+    {
+        writer.WriteLine("MOUNT_POINT=\"\"");
+        writer.WriteLine("DMG_ATTACHED=False");
+        writer.WriteLine("cleanup_macos_dmg() {");
+        writer.WriteLine("  local exit_code=$?");
+        writer.WriteLine("  trap - EXIT");
+        writer.WriteLine("  if [[ \"$DMG_ATTACHED\" = \"True\" ]]; then");
+        writer.WriteLine("    /usr/bin/hdiutil detach \"$MOUNT_POINT\" -quiet || true");
+        writer.WriteLine("  fi");
+        writer.WriteLine("  if [[ -n \"$MOUNT_POINT\" && \"$MOUNT_POINT\" != \"/\" ]]; then");
+        writer.WriteLine("    /bin/rmdir \"$MOUNT_POINT\" 2>/dev/null || true");
+        writer.WriteLine("  fi");
+        writer.WriteLine("  exit \"$exit_code\"");
+        writer.WriteLine("}");
+        writer.WriteLine("trap cleanup_macos_dmg EXIT");
+        writer.WriteLine();
+        writer.WriteLine("if [[ ! -f \"$FILEPATH\" ]]; then");
+        writer.WriteLine("  echo \"- Error: Disk image does not exist: $FILEPATH\"");
+        writer.WriteLine("  exit 1");
+        writer.WriteLine("fi");
+        writer.WriteLine("MOUNT_POINT=$(/usr/bin/mktemp -d \"${TMPDIR:-/tmp}/StageKit.Updatum.Dmg.XXXXXX\") || exit 1");
+        writer.WriteLine("echo \"- Mounting macOS disk image\"");
+        writer.WriteLine("/usr/bin/hdiutil attach \"$FILEPATH\" -mountpoint \"$MOUNT_POINT\" -nobrowse -readonly -quiet || exit 1");
+        writer.WriteLine("DMG_ATTACHED=True");
+        writer.WriteLine();
+        writer.WriteLine("PKG_PATH=\"\"");
+        writer.WriteLine("while IFS= read -r -d '' candidate; do");
+        writer.WriteLine("  PKG_PATH=\"$candidate\"");
+        writer.WriteLine("  break");
+        writer.WriteLine(
+            "done < <(/usr/bin/find \"$MOUNT_POINT\" -type d -name \"*.app\" -prune -o -name \"*.pkg\" -print0)");
+        writer.WriteLine("if [[ -n \"$PKG_PATH\" ]]; then");
+        writer.WriteLine("  echo \"- Installing package from disk image\"");
+        writer.WriteLine("  /usr/sbin/installer -pkg \"$PKG_PATH\" -target /");
+        writer.WriteLine("  exit $?");
+        writer.WriteLine("fi");
+        writer.WriteLine();
+        writer.WriteLine("APP_PATH=\"\"");
+        writer.WriteLine("while IFS= read -r -d '' candidate; do");
+        writer.WriteLine("  APP_PATH=\"$candidate\"");
+        writer.WriteLine("  break");
+        writer.WriteLine(
+            "done < <(/usr/bin/find \"$MOUNT_POINT\" -type d -name \"*.app\" -prune -print0)");
+        writer.WriteLine("if [[ -z \"$APP_PATH\" ]]; then");
+        writer.WriteLine("  echo \"- Error: Disk image contains neither a PKG installer nor an app bundle\"");
+        writer.WriteLine("  exit 1");
+        writer.WriteLine("fi");
+        writer.WriteLine();
+        writer.WriteLine("if [[ \"$CURRENT_APP_BUNDLE_PATH\" = *.app ]]; then");
+        writer.WriteLine("  DEST_PATH=\"$CURRENT_APP_BUNDLE_PATH\"");
+        writer.WriteLine("else");
+        writer.WriteLine("  DEST_PATH=\"/Applications/$(/usr/bin/basename \"$APP_PATH\")\"");
+        writer.WriteLine("fi");
+        writer.WriteLine("DEST_PARENT=$(/usr/bin/dirname \"$DEST_PATH\")");
+        writer.WriteLine("APP_NAME=$(/usr/bin/basename \"$DEST_PATH\")");
+        writer.WriteLine("STAGED_PATH=\"${DEST_PARENT}/.${APP_NAME}.updatum-new-$$\"");
+        writer.WriteLine("BACKUP_PATH=\"${DEST_PARENT}/.${APP_NAME}.updatum-backup-$$\"");
+        writer.WriteLine();
+        writer.WriteLine("if [[ ! -d \"$DEST_PARENT\" || -e \"$STAGED_PATH\" || -e \"$BACKUP_PATH\" ]]; then");
+        writer.WriteLine("  echo \"- Error: App bundle replacement paths are not safe\"");
+        writer.WriteLine("  exit 1");
+        writer.WriteLine("fi");
+        writer.WriteLine("echo \"- Staging app bundle at $DEST_PATH\"");
+        writer.WriteLine("/usr/bin/ditto \"$APP_PATH\" \"$STAGED_PATH\" || { /bin/rm -rf -- \"$STAGED_PATH\"; exit 1; }");
+        writer.WriteLine("/usr/bin/xattr -dr com.apple.quarantine \"$STAGED_PATH\" 2>/dev/null || true");
+        writer.WriteLine("if [[ \"$MACOS_CODESIGN_APP\" = \"True\" ]]; then");
+        writer.WriteLine("  /usr/bin/codesign --force --deep --sign - \"$STAGED_PATH\" || { /bin/rm -rf -- \"$STAGED_PATH\"; exit 1; }");
+        writer.WriteLine("fi");
+        writer.WriteLine();
+        writer.WriteLine("if [[ -e \"$DEST_PATH\" ]]; then");
+        writer.WriteLine("  /bin/mv -f -- \"$DEST_PATH\" \"$BACKUP_PATH\" || { /bin/rm -rf -- \"$STAGED_PATH\"; exit 1; }");
+        writer.WriteLine("fi");
+        writer.WriteLine("if ! /bin/mv -f -- \"$STAGED_PATH\" \"$DEST_PATH\"; then");
+        writer.WriteLine("  /bin/rm -rf -- \"$DEST_PATH\"");
+        writer.WriteLine("  if [[ -e \"$BACKUP_PATH\" ]]; then /bin/mv -f -- \"$BACKUP_PATH\" \"$DEST_PATH\"; fi");
+        writer.WriteLine("  /bin/rm -rf -- \"$STAGED_PATH\"");
+        writer.WriteLine("  exit 1");
+        writer.WriteLine("fi");
+        writer.WriteLine("/bin/rm -rf -- \"$BACKUP_PATH\"");
+    }
 }

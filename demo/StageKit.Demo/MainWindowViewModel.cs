@@ -325,7 +325,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         try
         {
             UpdaterStatus = $"Checking {_updater.Owner}/{_updater.Repository}…";
-            var updateFound = await _updater.CheckForUpdatesAsync(cancellation.Token);
+            var updateFound = await _updater.CheckForUpdatesAsync(new Version(), cancellation.Token);
             if (!updateFound || _updater.LatestRelease is null)
             {
                 ReleaseSummary = "The current build is up to date, or no compatible newer release was found.";

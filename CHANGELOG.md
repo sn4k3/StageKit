@@ -11,9 +11,11 @@
 - Add Linux `PackagingTypes` for Flatpak, Debian, RPM, Arch Linux binary, and Snap packages, plus macOS DMG and PKG
   output. Package creation uses the platform-native `flatpak-builder`, `dpkg-deb`, `rpmbuild`, `makepkg`, `snapcraft`,
   `hdiutil`, and `pkgbuild` tools.
-- Extend Updatum asset selection and installation to Linux Flatpak, Debian, RPM, Arch Linux binary, and Snap packages.
-  Flatpak updates preserve the current user/system installation scope, privileged package installs use `ProcessHelper`
-  elevation, and post-install completion or relaunch only continues after a successful installer exit code.
+- Extend Updatum asset selection and installation to Linux Flatpak, Debian, RPM, Arch Linux binary, and Snap packages, plus
+  macOS PKG and DMG packages. Flatpak updates preserve the current user/system installation scope, privileged package installs
+  use `ProcessHelper` elevation, and post-install completion or relaunch only continues after a successful installer exit code.
+  DMG installation mounts images read-only, always detaches them, and installs an embedded PKG or atomically replaces an embedded
+  app bundle with rollback.
 - Update the release workflow to build runtime assets for supported platforms, attach packages and assets to a GitHub
   release, and omit Winget publishing.
 - Replace the original `StageKit.Demo` console sample with an Avalonia desktop workshop for runtime diagnostics,

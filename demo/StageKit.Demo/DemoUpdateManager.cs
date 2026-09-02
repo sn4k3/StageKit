@@ -7,9 +7,9 @@ public static class DemoUpdateManager
 {
     public static UpdatumManager Create()
     {
-        return new UpdatumManager("sn4k3", "UVtools")
+        return new UpdatumManager("sn4k3", "StageKit")
         {
-            AssetRegexPattern = $"^UVtools_{EntryApplication.GenericRuntimeIdentifier}_v",
+            AssetRegexPattern = $"^StageKit_{EntryApplication.GenericRuntimeIdentifier}_v",
             RequireAssetChecksum = true,
             AllowPreReleases = false,
             FetchOnlyLatestRelease = false,
