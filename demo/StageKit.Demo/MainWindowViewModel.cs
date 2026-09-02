@@ -3,6 +3,7 @@ using System.ComponentModel;
 using Avalonia;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StageKit.Primitives.Extensions;
 using StageKit.Primitives.System;
 using StageKit.Runtime;
 using StageKit.Updatum;
@@ -156,18 +157,27 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
             PrivilegedProcessOutput = $"Executable: {executablePath}\n\n{FormatProcessOutput(output)}";
 
-            if (OperatingSystem.IsWindows() &&
+            if (output.IsExitCodeElevationDenied())
+            {
+                PrivilegedProcessOutput +=
+                    "\n\nAdministrator approval was denied. The privileged process was not started.";
+                StatusMessage = "Administrator approval was denied.";
+            }
+            else if (OperatingSystem.IsWindows() &&
                 !Environment.IsPrivilegedProcess &&
                 output.ExitCode == -1)
             {
                 PrivilegedProcessOutput +=
                     "\n\nWindows note: runas cannot redirect an elevated child's output. " +
                     "Start the demo as administrator to exercise output capture on Windows.";
+                StatusMessage = $"The privileged process completed with exit code {output.ExitCode}.";
             }
-
-            StatusMessage = output.Succeeded
-                ? "Privileged process output captured."
-                : $"The privileged process completed with exit code {output.ExitCode}.";
+            else
+            {
+                StatusMessage = output.Succeeded
+                    ? "Privileged process output captured."
+                    : $"The privileged process completed with exit code {output.ExitCode}.";
+            }
         }
         catch (Exception exception)
         {
