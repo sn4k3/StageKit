@@ -165,13 +165,14 @@ jobs:
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
           sudo apt-get update
-          sudo apt-get install --yes flatpak flatpak-builder dpkg-dev makepkg fakeroot zstd libarchive-tools snapd
+          sudo apt-get install --yes flatpak flatpak-builder dpkg-dev makepkg pacman-package-manager fakeroot zstd libarchive-tools snapd
           sudo snap install snapcraft --classic
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
           flatpak install --user -y --arch=${{ matrix.flatpak_arch }} flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08
           command -v flatpak-builder
           command -v dpkg-deb
           command -v makepkg
+          command -v pacman
           command -v bsdtar
           command -v snapcraft
 
