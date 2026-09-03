@@ -1,6 +1,5 @@
-# Unreleased
+# v0.3.0 (02/09/2026)
 
-- Change `ApplicationPackagingType` to use sequential automatic enum values.
 - Add `HostSystem.TryFindExecutable` for subprocess-free executable lookup with Windows `PATHEXT` support and Unix
   execute-permission validation.
 - Add `ProcessHelper` with privileged-process-aware administrator elevation through Windows `runas`, Linux `pkexec`, and

@@ -29,8 +29,28 @@ public partial class StageKitBuild
     /// <param name="path">The file-system entry path.</param>
     protected virtual void DeleteFileSystemEntry(AbsolutePath path)
     {
-        path.DeleteFile();
-        path.DeleteDirectory();
+        var fileSystemPath = path.ToString();
+        FileAttributes attributes;
+        try
+        {
+            attributes = File.GetAttributes(fileSystemPath);
+        }
+        catch (FileNotFoundException)
+        {
+            return;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return;
+        }
+
+        if ((attributes & FileAttributes.Directory) != 0)
+        {
+            Directory.Delete(fileSystemPath, true);
+            return;
+        }
+
+        File.Delete(fileSystemPath);
     }
 
     /// <summary>

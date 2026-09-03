@@ -2293,6 +2293,39 @@ public class PublishPipelineTests
     }
 
     /// <summary>
+    /// Verifies staging cleanup removes directory symlinks without traversing their targets.
+    /// </summary>
+    [Fact]
+    public void DeleteFileSystemEntry_DirectoryContainsSymbolicLink_PreservesLinkTarget()
+    {
+        if (!OperatingSystem.IsLinux())
+            return;
+
+        var rootDirectory = Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}");
+        var stagingDirectory = Path.Combine(rootDirectory, "staging");
+        var targetDirectory = Path.Combine(rootDirectory, "target");
+        var targetFile = Path.Combine(targetDirectory, "preserve.txt");
+        Directory.CreateDirectory(stagingDirectory);
+        Directory.CreateDirectory(targetDirectory);
+        File.WriteAllText(targetFile, "preserve");
+        Directory.CreateSymbolicLink(Path.Combine(stagingDirectory, "run"), targetDirectory);
+
+        try
+        {
+            var build = new TestBuild();
+
+            build.InvokeDeleteFileSystemEntry((AbsolutePath)stagingDirectory);
+
+            Assert.False(Directory.Exists(stagingDirectory));
+            Assert.True(File.Exists(targetFile));
+        }
+        finally
+        {
+            Directory.Delete(rootDirectory, true);
+        }
+    }
+
+    /// <summary>
     /// Verifies base AppDir creation sets execute bits on AppRun and the copied application executable on Linux.
     /// </summary>
     [Fact]
@@ -3576,6 +3609,11 @@ public class PublishPipelineTests
         internal void InvokeCreateLinuxDeb(PublishRidContext context, string architecture)
         {
             CreateLinuxDeb(context, architecture);
+        }
+
+        internal void InvokeDeleteFileSystemEntry(AbsolutePath path)
+        {
+            DeleteFileSystemEntry(path);
         }
 
         internal AbsolutePath InvokeCreateTemporaryAppImageOutputPath(AbsolutePath outputPath)
