@@ -438,6 +438,50 @@ public sealed class PrimitivesTests
     }
 
     [Fact]
+    public void ProcessHelper_CreateHostProcessStartInfo_OutsideFlatpak_UsesCommandDirectly()
+    {
+        var startInfo = ProcessHelper.CreateHostProcessStartInfo(
+            "tool",
+            ["first", "two words"],
+            requireElevation: false,
+            isFlatpakSandbox: false,
+            isPrivilegedProcess: false);
+
+        Assert.Equal("tool", startInfo.FileName);
+        Assert.Equal(["first", "two words"], startInfo.ArgumentList);
+    }
+
+    [Fact]
+    public void ProcessHelper_CreateHostProcessStartInfo_InsideFlatpak_WrapsCommandAndArguments()
+    {
+        var startInfo = ProcessHelper.CreateHostProcessStartInfo(
+            "tool",
+            ["first", "two words"],
+            requireElevation: false,
+            isFlatpakSandbox: true,
+            isPrivilegedProcess: false);
+
+        Assert.Equal("flatpak-spawn", startInfo.FileName);
+        Assert.Equal(["--host", "tool", "first", "two words"], startInfo.ArgumentList);
+    }
+
+    [Fact]
+    public void ProcessHelper_CreateHostProcessStartInfo_InsideFlatpak_WrapsElevationOnHost()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+
+        var startInfo = ProcessHelper.CreateHostProcessStartInfo(
+            "tool",
+            ["first", "two words"],
+            requireElevation: true,
+            isFlatpakSandbox: true,
+            isPrivilegedProcess: false);
+
+        Assert.Equal("flatpak-spawn", startInfo.FileName);
+        Assert.Equal(["--host", "pkexec", "tool", "first", "two words"], startInfo.ArgumentList);
+    }
+
+    [Fact]
     public void ProcessHelper_CreateProcessStartInfo_UsesHostElevationMechanism()
     {
         var startInfo = ProcessHelper.CreateProcessStartInfo(

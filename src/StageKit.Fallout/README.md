@@ -236,8 +236,8 @@ Unix permissions even when the repository is on a Windows-mounted WSL path such 
 
 Set `LinuxAppBundleOptions.FlatpakAllowHostCommandExecution` to `true` when a Flatpak application must use
 `flatpak-spawn --host`. This adds the broad `--talk-name=org.freedesktop.Flatpak` sandbox permission and is disabled by
-default; prefer a narrower portal operation whenever one is available. The option grants access to the host service but
-does not itself translate sandbox paths or launch host commands.
+default; prefer a narrower portal operation whenever one is available. StageKit.Updatum uses this host bridge
+automatically for Flatpak package installation and stages its downloaded bundle in the host-visible application cache.
 
 Icons are read from `MediaDirectory` (`media/` by default): `<SoftwareName>.icns` for macOS and `<SoftwareName>.svg`
 for Linux. Override `LinuxIconFile` to use a `.png` icon; both SVG and PNG are accepted. SVG icons are installed in the

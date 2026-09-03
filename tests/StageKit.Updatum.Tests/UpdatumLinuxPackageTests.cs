@@ -7,6 +7,49 @@ namespace StageKit.Updatum.Tests;
 
 public sealed class UpdatumLinuxPackageTests
 {
+    [Fact]
+    public void CreateDownloadWorkspace_Flatpak_UsesHostVisibleCacheDirectory()
+    {
+        var cacheDirectory = Path.Combine(Path.GetTempPath(), $"StageKit.Updatum.Tests-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(cacheDirectory);
+
+        try
+        {
+            var workspace = UpdatumManager.CreateDownloadWorkspace(
+                isLinuxFlatpak: true,
+                flatpakCacheDirectory: cacheDirectory);
+
+            try
+            {
+                Assert.Equal(cacheDirectory, Directory.GetParent(workspace)?.FullName);
+                Assert.StartsWith("StageKit.Updatum-", Path.GetFileName(workspace), StringComparison.Ordinal);
+                Assert.True(Directory.Exists(workspace));
+            }
+            finally
+            {
+                Directory.Delete(workspace, recursive: true);
+            }
+        }
+        finally
+        {
+            Directory.Delete(cacheDirectory, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void CreateDownloadWorkspace_FlatpakWithoutCacheDirectory_Throws(string? cacheDirectory)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            UpdatumManager.CreateDownloadWorkspace(
+                isLinuxFlatpak: true,
+                flatpakCacheDirectory: cacheDirectory));
+
+        Assert.Contains("XDG_CACHE_HOME", exception.Message, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("update.deb", LinuxPackageManager.Apt, "apt-get", true)]
     [InlineData("update.rpm", LinuxPackageManager.Dnf, "dnf", true)]

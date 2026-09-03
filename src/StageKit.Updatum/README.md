@@ -137,10 +137,12 @@ script starts. With `forceTerminate: false`, Updatum does not kill or exit the c
 arranging a safe shutdown when replacing locked files.
 
 Pass `UpdatumManager.NoRunAfterUpgradeToken` as `runArguments` to suppress relaunch. Flatpak updates first identify whether the
-current application is installed in the user or system scope. System Flatpak updates and Debian, RPM, Arch Linux, and Snap
-packages request elevation through `ProcessHelper`; Updatum waits for a zero exit code before reporting package-install
-completion, relaunching, or terminating the current process. Denied elevation, timeout, cancellation, or installer failure
-stops that continuation.
+current application is installed in the user or system scope. When running inside Flatpak, Updatum stages the downloaded
+bundle in the host-visible application cache and invokes the host Flatpak CLI through `flatpak-spawn --host`; the manifest
+must grant `--talk-name=org.freedesktop.Flatpak`. System Flatpak updates and Debian, RPM, Arch Linux, and Snap packages request
+elevation through `ProcessHelper`; Updatum waits for a zero exit code before reporting package-install completion,
+relaunching, or terminating the current process. Denied elevation, timeout, cancellation, or installer failure stops that
+continuation.
 
 macOS PKG and DMG installation uses the native administrator prompt when privileges are actually required. PKG assets run
 through `/usr/sbin/installer`, which always installs into the system domain and therefore always prompts. DMG assets are

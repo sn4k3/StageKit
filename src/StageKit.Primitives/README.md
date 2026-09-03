@@ -193,6 +193,21 @@ int exitCode = ProcessHelper.StartProcess(
     waitForCompletion: true);
 ```
 
+Use `StartHostProcess(...)` or `StartHostProcessAsync(...)` when a command must run on the host from a Flatpak app.
+Inside Flatpak these methods route argument lists through `flatpak-spawn --host`; elsewhere they behave like the normal
+start helpers. Host execution requires the Flatpak manifest permission `--talk-name=org.freedesktop.Flatpak`:
+
+```csharp
+int exitCode = await ProcessHelper.StartHostProcessAsync(
+    "flatpak",
+    ["--user", "info", applicationId],
+    waitForCompletion: true,
+    cancellationToken: cancellationToken);
+```
+
+`CreateHostProcessStartInfo(...)` exposes the composed start information when additional launcher configuration is
+needed. Only the argument-list overload is provided so command boundaries remain intact across the host bridge.
+
 For full control over the working directory, environment, window behavior, and other process settings, configure the
 created `ProcessStartInfo` before starting it. Use `CreateShellProcessStartInfo(...)` when the command needs shell syntax:
 

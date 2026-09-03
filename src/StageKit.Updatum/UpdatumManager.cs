@@ -997,7 +997,9 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
             if (asset is null) return null;
 
             ValidateAssetFileName(asset.Name);
-            temporaryDirectoryPath = Directory.CreateTempSubdirectory("StageKit.Updatum-").FullName;
+            temporaryDirectoryPath = CreateDownloadWorkspace(
+                EntryApplication.IsLinuxFlatpak,
+                Environment.GetEnvironmentVariable("XDG_CACHE_HOME"));
             var targetPath = Path.Combine(temporaryDirectoryPath, asset.Name);
 
             using var request = CreateAssetRequest(asset);
@@ -1283,6 +1285,30 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         }
     }
 
+    internal static string CreateDownloadWorkspace(bool isLinuxFlatpak, string? flatpakCacheDirectory)
+    {
+        string parentDirectoryPath;
+        if (isLinuxFlatpak)
+        {
+            if (string.IsNullOrWhiteSpace(flatpakCacheDirectory))
+            {
+                throw new InvalidOperationException(
+                    "A Flatpak update requires the XDG_CACHE_HOME environment variable for host-visible staging.");
+            }
+
+            parentDirectoryPath = Path.GetFullPath(flatpakCacheDirectory);
+            Directory.CreateDirectory(parentDirectoryPath);
+        }
+        else
+        {
+            parentDirectoryPath = Path.GetTempPath();
+        }
+
+        return Directory.CreateDirectory(
+                Path.Combine(parentDirectoryPath, $"StageKit.Updatum-{Guid.NewGuid():N}"))
+            .FullName;
+    }
+
     internal static LinuxPackageInstallCommand CreateLinuxPackageInstallCommand(
         string filePath,
         LinuxPackageManager packageManager,
@@ -1407,6 +1433,15 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
 
     private static string ResolvePackageInstallerExecutable(LinuxPackageInstallCommand command)
     {
+        if (command.Executable == "flatpak" && EntryApplication.IsLinuxFlatpak)
+        {
+            if (HostSystem.TryFindExecutable("flatpak-spawn", out _)) return command.Executable;
+
+            throw new FileNotFoundException(
+                "Flatpak host installation requires the 'flatpak-spawn' executable.",
+                "flatpak-spawn");
+        }
+
         if (HostSystem.TryFindExecutable(command.Executable, out var executablePath)) return executablePath;
 
         if (command.Executable == "apt-get" && HostSystem.TryFindExecutable("apt", out executablePath))
@@ -1425,7 +1460,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
             return FlatpakInstallationScope.User;
 
         var applicationId = EntryApplication.LinuxFlatpakId;
-        var userExitCode = await ProcessHelper.StartProcessAsync(
+        var userExitCode = await ProcessHelper.StartHostProcessAsync(
                 flatpakExecutable,
                 ["--user", "info", applicationId],
                 waitForCompletion: true,
@@ -1434,7 +1469,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
             .ConfigureAwait(false);
         if (userExitCode == 0) return FlatpakInstallationScope.User;
 
-        var systemExitCode = await ProcessHelper.StartProcessAsync(
+        var systemExitCode = await ProcessHelper.StartHostProcessAsync(
                 flatpakExecutable,
                 ["--system", "info", applicationId],
                 waitForCompletion: true,
@@ -1453,8 +1488,15 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         if (packagingType is ApplicationPackagingType.LinuxFlatpak)
         {
             var applicationId = EntryApplication.LinuxFlatpakId ?? Path.GetFileNameWithoutExtension(filePath);
-            if (HostSystem.TryFindExecutable("flatpak", out var flatpakExecutable))
-                ProcessHelper.StartProcess(flatpakExecutable, ["run", applicationId]);
+            if (EntryApplication.IsLinuxFlatpak)
+            {
+                ProcessHelper.StartHostProcess("flatpak", ["run", applicationId]);
+            }
+            else if (HostSystem.TryFindExecutable("flatpak", out var flatpakExecutable))
+            {
+                ProcessHelper.StartHostProcess(flatpakExecutable, ["run", applicationId]);
+            }
+
             return;
         }
 
@@ -2486,14 +2528,23 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                         flatpakInstallationScope);
                     var installerExecutable = resolvedFlatpakExecutable
                                               ?? ResolvePackageInstallerExecutable(installCommand);
-                    var exitCode = await ProcessHelper.StartProcessAsync(
-                            installerExecutable,
-                            installCommand.Arguments,
-                            installCommand.RequiresElevation,
-                            true,
-                            PackageInstallTimeoutMilliseconds,
-                            cancellationToken)
-                        .ConfigureAwait(false);
+                    var exitCode = inferredPackageType is ApplicationPackagingType.LinuxFlatpak
+                        ? await ProcessHelper.StartHostProcessAsync(
+                                installerExecutable,
+                                installCommand.Arguments,
+                                installCommand.RequiresElevation,
+                                true,
+                                PackageInstallTimeoutMilliseconds,
+                                cancellationToken)
+                            .ConfigureAwait(false)
+                        : await ProcessHelper.StartProcessAsync(
+                                installerExecutable,
+                                installCommand.Arguments,
+                                installCommand.RequiresElevation,
+                                true,
+                                PackageInstallTimeoutMilliseconds,
+                                cancellationToken)
+                            .ConfigureAwait(false);
 
                     EnsurePackageInstallationSucceeded(installCommand.PackageType, exitCode);
 

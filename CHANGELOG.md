@@ -3,6 +3,9 @@
   the `org.freedesktop.Flatpak` host-command service.
 - Stage `libicu74` in Snap packages by default so self-contained .NET applications have globalization support, with a
   configurable `LinuxAppBundleOptions.SnapStagePackages` list for other bases and runtime dependencies.
+- Add `ProcessHelper` host-process factories and start helpers that use `flatpak-spawn --host` inside Flatpak and normal
+  process launching elsewhere. Updatum now installs and relaunches Flatpak updates through that bridge, using its
+  host-visible application cache for downloaded bundles.
 - Add `HostSystem.TryFindExecutable` for subprocess-free executable lookup with Windows `PATHEXT` support and Unix
   execute-permission validation.
 

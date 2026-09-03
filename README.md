@@ -484,6 +484,10 @@ ProcessOutput asyncOutput = await ProcessHelper.GetShellOutputAsync(
     cancellationToken: cancellationToken);
 ```
 
+Use `ProcessHelper.StartHostProcess(...)` or `StartHostProcessAsync(...)` for commands that must escape a Flatpak
+sandbox. They use `flatpak-spawn --host` when `FLATPAK_ID` is present and otherwise start the command normally. The
+Flatpak manifest must grant `--talk-name=org.freedesktop.Flatpak`.
+
 For custom working directories, environment variables, and other process settings, use
 `ProcessHelper.CreateProcessStartInfo(...)` or `ProcessHelper.CreateShellProcessStartInfo(...)`, configure the returned
 `ProcessStartInfo`, and pass it to the `StartProcess` or `GetProcessOutput` sync/async overload.

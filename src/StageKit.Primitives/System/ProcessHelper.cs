@@ -10,6 +10,10 @@ namespace StageKit.Primitives.System;
 /// </summary>
 public static class ProcessHelper
 {
+    private static readonly bool IsFlatpakSandbox = OperatingSystem.IsLinux() &&
+                                                     !string.IsNullOrWhiteSpace(
+                                                         Environment.GetEnvironmentVariable("FLATPAK_ID"));
+
     #region Elevation exit codes
 
     /// <summary>
@@ -232,6 +236,90 @@ public static class ProcessHelper
         {
             return await StartProcessAsync(
                     CreateProcessStartInfo(name, arguments, requireElevation),
+                    waitForCompletion,
+                    waitTimeout,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            return -1;
+        }
+    }
+
+    /// <summary>
+    /// Starts a process on the host system, escaping a Flatpak sandbox when necessary.
+    /// </summary>
+    /// <param name="name">The executable name or path.</param>
+    /// <param name="arguments">The arguments to pass to the process.</param>
+    /// <param name="requireElevation">
+    /// <see langword="true"/> to request administrator elevation unless the host process is already privileged.
+    /// </param>
+    /// <param name="waitForCompletion"><see langword="true"/> to wait for the process to complete.</param>
+    /// <param name="waitTimeout">The number of milliseconds to wait for completion.</param>
+    /// <returns>
+    /// The exit code when waiting for completion, zero when the process starts without waiting, or <c>-1</c> when
+    /// startup fails or the wait times out.
+    /// </returns>
+    /// <remarks>
+    /// Inside a Flatpak sandbox, the command is launched through <c>flatpak-spawn --host</c>. Outside Flatpak, this
+    /// method behaves like <see cref="StartProcess(string, IEnumerable{string}, bool, bool, int)"/>.
+    /// </remarks>
+    public static int StartHostProcess(
+        string name,
+        IEnumerable<string> arguments,
+        bool requireElevation = false,
+        bool waitForCompletion = false,
+        int waitTimeout = Timeout.Infinite)
+    {
+        try
+        {
+            return StartProcess(CreateHostProcessStartInfo(name, arguments, requireElevation), waitForCompletion,
+                waitTimeout);
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            return -1;
+        }
+    }
+
+    /// <summary>
+    /// Asynchronously starts a process on the host system, escaping a Flatpak sandbox when necessary.
+    /// </summary>
+    /// <param name="name">The executable name or path.</param>
+    /// <param name="arguments">The arguments to pass to the process.</param>
+    /// <param name="requireElevation">
+    /// <see langword="true"/> to request administrator elevation unless the host process is already privileged.
+    /// </param>
+    /// <param name="waitForCompletion"><see langword="true"/> to asynchronously wait for the process to complete.</param>
+    /// <param name="waitTimeout">The number of milliseconds to wait for completion.</param>
+    /// <param name="cancellationToken">The token used to cancel waiting for completion.</param>
+    /// <returns>
+    /// A task containing the exit code when waiting for completion, zero when the process starts without waiting, or
+    /// <c>-1</c> when startup fails or the wait times out.
+    /// </returns>
+    /// <remarks>
+    /// Inside a Flatpak sandbox, the command is launched through <c>flatpak-spawn --host</c>. Outside Flatpak, this
+    /// method behaves like <see cref="StartProcessAsync(string, IEnumerable{string}, bool, bool, int, CancellationToken)"/>.
+    /// </remarks>
+    public static async Task<int> StartHostProcessAsync(
+        string name,
+        IEnumerable<string> arguments,
+        bool requireElevation = false,
+        bool waitForCompletion = false,
+        int waitTimeout = Timeout.Infinite,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await StartProcessAsync(
+                    CreateHostProcessStartInfo(name, arguments, requireElevation),
                     waitForCompletion,
                     waitTimeout,
                     cancellationToken)
@@ -842,6 +930,55 @@ public static class ProcessHelper
         bool requireElevation = false)
     {
         return CreateProcessStartInfo(name, arguments, requireElevation, Environment.IsPrivilegedProcess);
+    }
+
+    /// <summary>
+    /// Creates start information for a process on the host system, escaping a Flatpak sandbox when necessary.
+    /// </summary>
+    /// <param name="name">The executable name or path.</param>
+    /// <param name="arguments">The arguments to pass to the process.</param>
+    /// <param name="requireElevation">
+    /// <see langword="true"/> to request administrator elevation unless the host process is already privileged.
+    /// </param>
+    /// <returns>A configurable <see cref="ProcessStartInfo"/> instance.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="arguments"/> is <see langword="null"/>.</exception>
+    /// <remarks>
+    /// Inside a Flatpak sandbox, the returned instance targets <c>flatpak-spawn --host</c>. Outside Flatpak, this
+    /// method behaves like <see cref="CreateProcessStartInfo(string, IEnumerable{string}, bool)"/>.
+    /// </remarks>
+    public static ProcessStartInfo CreateHostProcessStartInfo(
+        string name,
+        IEnumerable<string> arguments,
+        bool requireElevation = false)
+    {
+        return CreateHostProcessStartInfo(
+            name,
+            arguments,
+            requireElevation,
+            IsFlatpakSandbox,
+            Environment.IsPrivilegedProcess);
+    }
+
+    internal static ProcessStartInfo CreateHostProcessStartInfo(
+        string name,
+        IEnumerable<string> arguments,
+        bool requireElevation,
+        bool isFlatpakSandbox,
+        bool isPrivilegedProcess)
+    {
+        var targetStartInfo = CreateProcessStartInfo(name, arguments, requireElevation, isPrivilegedProcess);
+        if (!isFlatpakSandbox) return targetStartInfo;
+
+        var hostStartInfo = CreateArgumentListProcessStartInfo(
+            "flatpak-spawn",
+            ["--host", targetStartInfo.FileName]);
+
+        foreach (var argument in targetStartInfo.ArgumentList)
+        {
+            hostStartInfo.ArgumentList.Add(argument);
+        }
+
+        return hostStartInfo;
     }
 
     internal static ProcessStartInfo CreateProcessStartInfo(
