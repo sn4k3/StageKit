@@ -110,6 +110,12 @@ jobs:
           --configuration Release --no-build --no-restore
           --output artifacts/packages
 
+      - name: Pack StageKit.Fallout
+        run: >-
+          dotnet pack src/StageKit.Fallout/StageKit.Fallout.csproj
+          --configuration Release --no-build --no-restore
+          --output artifacts/packages
+
       - name: Pack StageKit
         run: >-
           dotnet pack src/StageKit/StageKit.csproj
