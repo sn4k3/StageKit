@@ -3,7 +3,8 @@
     <PropertyGroup>
         <OutputType>WinExe</OutputType>
         <Description>Avalonia desktop showcase for StageKit application infrastructure and Updatum.</Description>
-        <TargetFrameworks>net10.0</TargetFrameworks>
+        <TargetFrameworks></TargetFrameworks>
+        <TargetFramework>net10.0</TargetFramework>
         <IsPackable>false</IsPackable>
         <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
 
