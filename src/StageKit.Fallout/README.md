@@ -11,9 +11,6 @@
 (NUKE-style) build that discovers the solution and main project, resolves software metadata from MSBuild properties, and
 exposes ready-made targets to restore, compile, run, and publish an application to every supported platform bundle.
 
-This library is **not published to NuGet**. It is consumed through a `ProjectReference` from the repository's build
-entry project (`builds/build/build.csproj`).
-
 ## Features
 
 - Solution and main-project discovery, preferring `.slnx` over `.sln`
