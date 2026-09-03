@@ -1414,7 +1414,7 @@ public class PublishPipelineTests
     {
         var command = new TestBuild().InvokeCreateArchPackageBuildCommand();
 
-        Assert.Equal("PKGDEST=\"$PWD\" PKGEXT=.pkg.tar.zst makepkg --force --noconfirm --ignorearch", command);
+        Assert.Equal("PACMAN=true PKGDEST=\"$PWD\" PKGEXT=.pkg.tar.zst makepkg --force --noconfirm --ignorearch", command);
         Assert.DoesNotContain("--source", command, StringComparison.Ordinal);
     }
 

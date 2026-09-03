@@ -158,6 +158,13 @@ public partial class StageKitBuild
     /// <summary>Creates one Flatpak bundle using <c>flatpak-builder</c>.</summary>
     protected virtual void CreateLinuxFlatpak(PublishRidContext context, string architecture)
     {
+        if (!CanBuildFlatpakArchitecture(architecture))
+        {
+            Log.Warning("Skipping Flatpak bundle for {Rid}: target architecture {Architecture} is not native to the Linux host.",
+                context.RuntimeIdentifier, architecture);
+            return;
+        }
+
         var options = LinuxAppBundleOptions;
         ResolveLinuxPathOptions(options);
         var staging = PublishStagingDirectory / Guid.NewGuid().ToString("N");
@@ -406,7 +413,17 @@ public partial class StageKitBuild
     /// <summary>Composes the Arch Linux binary-package build command.</summary>
     protected virtual string CreateArchPackageBuildCommand()
     {
-        return "PKGDEST=\"$PWD\" PKGEXT=.pkg.tar.zst makepkg --force --noconfirm --ignorearch";
+        return "PACMAN=true PKGDEST=\"$PWD\" PKGEXT=.pkg.tar.zst makepkg --force --noconfirm --ignorearch";
+    }
+
+    private bool CanBuildFlatpakArchitecture(string architecture)
+    {
+        return HostArchitecture switch
+        {
+            Architecture.X64 => architecture is "x64",
+            Architecture.Arm64 => architecture is "arm64",
+            _ => false
+        };
     }
 
     /// <summary>Composes the Snap build command.</summary>
