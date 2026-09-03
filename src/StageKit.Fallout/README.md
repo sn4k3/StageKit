@@ -5,6 +5,7 @@
 [![License](https://img.shields.io/github/license/sn4k3/StageKit?style=for-the-badge)](https://github.com/sn4k3/StageKit/blob/main/LICENSE)
 [![GitHub repo size](https://img.shields.io/github/repo-size/sn4k3/StageKit?style=for-the-badge)](#)
 [![Code size](https://img.shields.io/github/languages/code-size/sn4k3/StageKit?style=for-the-badge)](#)
+[![Nuget](https://img.shields.io/nuget/v/StageKit.Fallout?style=for-the-badge)](https://www.nuget.org/packages/StageKit.Fallout)
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/sn4k3?color=red&style=for-the-badge)](https://github.com/sponsors/sn4k3)
 
 `StageKit.Fallout` is the reusable build-pipeline library behind StageKit's release process. It is a Fallout
@@ -38,10 +39,10 @@ The native Linux package tools are only required when the corresponding value is
 | Packaging type     | Required tool                        | Debian/Ubuntu package                  | Fedora package                              | Arch package                |
 |--------------------|--------------------------------------|----------------------------------------|---------------------------------------------|-----------------------------|
 | `LinuxFlatpak`     | `flatpak`, `flatpak-builder`         | `flatpak flatpak-builder`              | `flatpak flatpak-builder`                   | `flatpak flatpak-builder`   |
+| `LinuxSnap`        | `snapcraft`                          | Snap package (`snapd`), then Snapcraft | Snap package (`snapd`), then Snapcraft      | AUR `snapd`, then Snapcraft |
 | `LinuxDeb`         | `dpkg-deb`                           | `dpkg-dev`                             | `dpkg`                                      | `dpkg`                      |
 | `LinuxRpm`         | `rpmbuild`                           | `rpm`                                  | `rpm-build`                                 | `rpm`                       |
 | `LinuxArchPackage` | `makepkg`, `pacman`, `tar`, `bsdtar`, `fakeroot`, `zstd` | `makepkg pacman-package-manager fakeroot zstd libarchive-tools` | Arch Linux host/container with `base-devel` | `base-devel`                |
-| `LinuxSnap`        | `snapcraft`                          | Snap package (`snapd`), then Snapcraft | Snap package (`snapd`), then Snapcraft      | AUR `snapd`, then Snapcraft |
 
 Install the tools for a Debian or Ubuntu build host with:
 
@@ -191,20 +192,20 @@ macOS and Linux bundle launchers use the same executable name while retaining `S
 names. Windows installer builds receive both values as `ApplicationName` and `ApplicationExecutableName`, so WiX
 metadata, shortcuts, and install folders remain product-named while the payload points to the actual executable.
 
-| Bundle             | `ApplicationPackagingType` value | Host requirement                                      | Output                                                                       |
-|--------------------|----------------------------------|-------------------------------------------------------|------------------------------------------------------------------------------|
-| Portable zip       | `Portable`                       | Any                                                   | `<asset>.zip` (skipped for macOS RIDs when `MacOSAppBundle` is also enabled) |
-| .NET single-file   | `DotNetSingleFile`               | Any                                                   | Single executable copied beside the publish folder                           |
-| Windows installer  | `WindowsInstaller`               | Windows host **and** a WiX `.wixproj` in the solution | `.msi` / `.exe` produced by the installer project                            |
-| macOS app bundle   | `MacOSAppBundle`                 | Unix host                                             | `<SoftwareName>.app`                                                         |
-| macOS disk image   | `MacOSDmg`                       | macOS host with `hdiutil`                             | `<asset>.dmg`                                                                |
-| macOS installer    | `MacOSPkg`                       | macOS host with `pkgbuild`                            | `<asset>.pkg`                                                                |
-| Linux AppImage     | `LinuxAppImage`                  | Linux host                                            | `<asset>.AppImage`                                                           |
-| Linux Flatpak      | `LinuxFlatpak`                   | Linux host with `flatpak-builder`                     | `<asset>.flatpak`                                                            |
-| Linux Debian       | `LinuxDeb`                       | Linux host with `dpkg-deb`                            | `<asset>.deb`                                                                |
-| Linux RPM          | `LinuxRpm`                       | Linux host with `rpmbuild`                            | `<asset>.rpm`                                                                |
-| Arch Linux package | `LinuxArchPackage`               | Linux host with `makepkg`                             | `<asset>.pkg.tar.zst`                                                        |
-| Linux Snap         | `LinuxSnap`                      | Linux host with `snapcraft`                           | `<asset>.snap`                                                               |
+| Bundle            | `ApplicationPackagingType` value | Host requirement                                      | Output                                                                       |
+|-------------------|----------------------------------|-------------------------------------------------------|------------------------------------------------------------------------------|
+| Portable zip      | `Portable`                       | Any                                                   | `<asset>.zip` (skipped for macOS RIDs when `MacOSAppBundle` is also enabled) |
+| .NET single-file  | `DotNetSingleFile`               | Any                                                   | Single executable copied beside the publish folder                           |
+| Windows installer | `WindowsInstaller`               | Windows host **and** a WiX `.wixproj` in the solution | `.msi` / `.exe` produced by the installer project                            |
+| macOS app bundle  | `MacOSAppBundle`                 | Unix host                                             | `<asset>.app`                                                         |
+| macOS disk image  | `MacOSDmg`                       | macOS host with `hdiutil`                             | `<asset>.dmg`                                                                |
+| macOS installer   | `MacOSPkg`                       | macOS host with `pkgbuild`                            | `<asset>.pkg`                                                                |
+| Linux AppImage    | `LinuxAppImage`                  | Linux host                                            | `<asset>.AppImage`                                                           |
+| Linux Flatpak     | `LinuxFlatpak`                   | Linux host with `flatpak-builder`                     | `<asset>.flatpak`                                                            |
+| Linux Snap        | `LinuxSnap`                      | Linux host with `snapcraft`                           | `<asset>.snap`                                                               |
+| Debian Deb        | `LinuxDeb`                       | Linux host with `dpkg-deb`                            | `<asset>.deb`                                                                |
+| RHEL RPM          | `LinuxRpm`                       | Linux host with `rpmbuild`                            | `<asset>.rpm`                                                                |
+| Arch package      | `LinuxArchPackage`               | Linux host with `makepkg`                             | `<asset>.pkg.tar.zst`                                                        |
 
 `PackagingTypes` defaults to `[Portable]` in `StageKitBuild`. Derived builds select multiple formats with an array:
 
