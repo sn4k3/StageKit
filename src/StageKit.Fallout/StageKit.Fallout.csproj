@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net10.0</TargetFramework>
+        <TargetFrameworks>net10.0</TargetFrameworks>
         <Description>Reusable .NET build pipeline for self-contained publishing, runtime manifests, portable archives, installers, macOS bundles, and Linux distribution packages.</Description>
         <PackageTags>stagekit;build;publishing;bundling;fallout;appimage;flatpak;debian;rpm;archlinux;snap;dmg;pkg;wix;macos</PackageTags>
         <GenerateDocumentationFile>True</GenerateDocumentationFile>
