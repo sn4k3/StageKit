@@ -43,14 +43,14 @@ The native Linux package tools are only required when the corresponding value is
 | `LinuxFlatpak`     | `flatpak`, `flatpak-builder`         | `flatpak flatpak-builder`              | `flatpak flatpak-builder`                   | `flatpak flatpak-builder`   |
 | `LinuxDeb`         | `dpkg-deb`                           | `dpkg-dev`                             | `dpkg`                                      | `dpkg`                      |
 | `LinuxRpm`         | `rpmbuild`                           | `rpm`                                  | `rpm-build`                                 | `rpm`                       |
-| `LinuxArchPackage` | `makepkg`, `tar`, `fakeroot`, `zstd` | `makepkg fakeroot zstd`                | Arch Linux host/container with `base-devel` | `base-devel`                |
+| `LinuxArchPackage` | `makepkg`, `tar`, `bsdtar`, `fakeroot`, `zstd` | `makepkg fakeroot zstd libarchive-tools` | Arch Linux host/container with `base-devel` | `base-devel`                |
 | `LinuxSnap`        | `snapcraft`                          | Snap package (`snapd`), then Snapcraft | Snap package (`snapd`), then Snapcraft      | AUR `snapd`, then Snapcraft |
 
 Install the tools for a Debian or Ubuntu build host with:
 
 ```bash
 sudo apt update
-sudo apt install -y flatpak flatpak-builder dpkg-dev rpm makepkg fakeroot zstd snapd
+sudo apt install -y flatpak flatpak-builder dpkg-dev rpm makepkg fakeroot zstd libarchive-tools snapd
 sudo snap install snapcraft --classic
 ```
 
