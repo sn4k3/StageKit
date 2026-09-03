@@ -413,7 +413,7 @@ public partial class StageKitBuild
     /// <summary>Composes the Arch Linux binary-package build command.</summary>
     protected virtual string CreateArchPackageBuildCommand()
     {
-        return "PACMAN=true PKGDEST=\"$PWD\" PKGEXT=.pkg.tar.zst makepkg --force --noconfirm --ignorearch";
+        return "PKGDEST=\"$PWD\" PKGEXT=.pkg.tar.zst makepkg --force --noconfirm --ignorearch";
     }
 
     private bool CanBuildFlatpakArchitecture(string architecture)
