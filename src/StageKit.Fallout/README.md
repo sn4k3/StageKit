@@ -226,10 +226,17 @@ DMG and PKG creation stage and sign the same `.app` layout used by `MacOSAppBund
 Debian, RPM, and Arch Linux payloads install the application under `/usr/lib/<package>` and a launcher under
 `/usr/bin/<package>`. When selecting `LinuxDeb`, set
 `LinuxAppBundleOptions.DebPackageMaintainer` to `Full Name <email@example.com>`. Snap defaults to the `core24` base,
-strict confinement, and common desktop interfaces; customize `SnapBase`, `SnapConfinement`, or `SnapPlugs` through
-`LinuxAppBundleOptions`. Native package tools and the selected Flatpak/Snap runtime bases must already be available on
+strict confinement, common desktop interfaces, and the `libicu74` stage package required by self-contained .NET apps;
+customize `SnapBase`, `SnapConfinement`, `SnapPlugs`, or `SnapStagePackages` through `LinuxAppBundleOptions`. Stage-package
+names are base-specific, so update `SnapStagePackages` when changing `SnapBase`. Native package tools and the selected
+Flatpak/Snap runtime bases must already be available on
 the build host. Debian payloads are staged in the operating system's temporary directory so `dpkg-deb` receives valid
 Unix permissions even when the repository is on a Windows-mounted WSL path such as `/mnt/c` or `/mnt/d`.
+
+Set `LinuxAppBundleOptions.FlatpakAllowHostCommandExecution` to `true` when a Flatpak application must use
+`flatpak-spawn --host`. This adds the broad `--talk-name=org.freedesktop.Flatpak` sandbox permission and is disabled by
+default; prefer a narrower portal operation whenever one is available. The option grants access to the host service but
+does not itself translate sandbox paths or launch host commands.
 
 Icons are read from `MediaDirectory` (`media/` by default): `<SoftwareName>.icns` for macOS and `<SoftwareName>.svg`
 for Linux. Override `LinuxIconFile` to use a `.png` icon; both SVG and PNG are accepted. SVG icons are installed in the

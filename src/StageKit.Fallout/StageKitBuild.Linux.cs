@@ -339,9 +339,9 @@ public partial class StageKitBuild
             var snapDirectory = staging / "snap";
             snapDirectory.CreateDirectory();
             (snapDirectory / "snapcraft.yaml").WriteAllText(LinuxPackage.GetSnapcraftManifest(packageName,
-                SoftwareVersion, GetSnapArchitecture(HostArchitecture), GetSnapArchitecture(architecture),
-                options.ExecutableName!, options.Summary, options.Description, options.SnapBase,
-                options.SnapConfinement, options.SnapPlugs));
+                 SoftwareVersion, GetSnapArchitecture(HostArchitecture), GetSnapArchitecture(architecture),
+                 options.ExecutableName!, options.Summary, options.Description, options.SnapBase,
+                 options.SnapConfinement, options.SnapPlugs, options.SnapStagePackages));
             ExecuteShell(CreateSnapBuildCommand(), staging);
             var snap = Directory.GetFiles(staging, "*.snap", SearchOption.TopDirectoryOnly).SingleOrDefault()
                        ?? throw new FileNotFoundException("snapcraft did not produce exactly one Snap package.");

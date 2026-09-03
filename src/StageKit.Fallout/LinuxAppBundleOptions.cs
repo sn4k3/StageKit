@@ -173,6 +173,17 @@ public class LinuxAppBundleOptions
         ["--socket=x11", "--share=ipc", "--device=dri", "--share=network"];
 
     /// <summary>
+    /// Gets a value that indicates whether the Flatpak application can request command execution on the host.
+    /// </summary>
+    /// <value><see langword="true"/> to grant access to the <c>org.freedesktop.Flatpak</c> D-Bus service;
+    /// otherwise, <see langword="false"/>. The default is <see langword="false"/>.</value>
+    /// <remarks>
+    /// This broad permission is required by <c>flatpak-spawn --host</c> and should be enabled only when a host command
+    /// cannot be replaced by a narrower portal operation.
+    /// </remarks>
+    public bool FlatpakAllowHostCommandExecution { get; set; }
+
+    /// <summary>
     /// Gets the Debian package maintainer in RFC 822 form.
     /// </summary>
     /// <example><c>Jane Doe &lt;jane@example.com&gt;</c></example>
@@ -193,4 +204,11 @@ public class LinuxAppBundleOptions
     /// </summary>
     public List<string> SnapPlugs { get; set; } =
         ["desktop", "desktop-legacy", "opengl", "wayland", "x11", "network"];
+
+    /// <summary>
+    /// Gets the Ubuntu packages staged into the Snap application.
+    /// </summary>
+    /// <value>The stage packages. The default contains <c>libicu74</c>, matching the default <c>core24</c> base.</value>
+    /// <remarks>Package names are base-specific and should be updated when <see cref="SnapBase"/> changes.</remarks>
+    public List<string> SnapStagePackages { get; set; } = ["libicu74"];
 }

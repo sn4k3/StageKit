@@ -88,7 +88,8 @@ internal static partial class LinuxPackage
 
     internal static string GetSnapcraftManifest(string packageName, string version, string buildArchitecture,
         string targetArchitecture, string executableName,
-        string summary, string description, string snapBase, string confinement, IReadOnlyCollection<string> plugs)
+        string summary, string description, string snapBase, string confinement, IReadOnlyCollection<string> plugs,
+        IReadOnlyCollection<string> stagePackages)
     {
         ValidateSimpleValue(packageName, nameof(packageName));
         ValidateSimpleValue(version, nameof(version));
@@ -104,7 +105,15 @@ internal static partial class LinuxPackage
             throw new ArgumentException("At least one non-empty Snap plug is required.", nameof(plugs));
         foreach (var plug in plugs)
             ValidateSimpleValue(plug, nameof(plugs));
+        ArgumentNullException.ThrowIfNull(stagePackages);
+        if (stagePackages.Any(string.IsNullOrWhiteSpace))
+            throw new ArgumentException("Snap stage packages cannot contain empty values.", nameof(stagePackages));
+        foreach (var stagePackage in stagePackages)
+            ValidateSimpleValue(stagePackage, nameof(stagePackages));
         var plugLines = string.Join('\n', plugs.Select(plug => $"      - {plug.SingleQuoteYaml()}"));
+        var stagePackageBlock = stagePackages.Count == 0
+            ? string.Empty
+            : $"\n    stage-packages:\n{string.Join('\n', stagePackages.Select(package => $"      - {package.SingleQuoteYaml()}"))}";
         var architectureBlock = GetSnapArchitectureBlock(snapBase, buildArchitecture, targetArchitecture);
         return $$"""
                  name: {{packageName.SingleQuoteYaml()}}
@@ -123,7 +132,7 @@ internal static partial class LinuxPackage
                  parts:
                    application:
                      plugin: dump
-                     source: payload
+                     source: payload{{stagePackageBlock}}
                  """.ReplaceLineEndings("\n");
     }
 

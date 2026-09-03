@@ -1,7 +1,13 @@
-# v0.3.0 (02/09/2026)
-
+# v0.3.1 (/09/2026)
+- Add opt-in `LinuxAppBundleOptions.FlatpakAllowHostCommandExecution` manifest configuration for applications that need
+  the `org.freedesktop.Flatpak` host-command service.
+- Stage `libicu74` in Snap packages by default so self-contained .NET applications have globalization support, with a
+  configurable `LinuxAppBundleOptions.SnapStagePackages` list for other bases and runtime dependencies.
 - Add `HostSystem.TryFindExecutable` for subprocess-free executable lookup with Windows `PATHEXT` support and Unix
   execute-permission validation.
+
+# v0.3.0 (02/09/2026)
+
 - Add `ProcessHelper` with privileged-process-aware administrator elevation through Windows `runas`, Linux `pkexec`, and
   macOS `osascript`, synchronous and asynchronous captured stdout/stderr results, and cross-platform process and shell
   helpers with cancellation support. Direct executable launches now use the modern .NET default of

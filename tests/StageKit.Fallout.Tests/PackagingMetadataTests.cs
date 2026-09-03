@@ -104,12 +104,13 @@ public class PackagingMetadataTests
     {
         var manifest = LinuxPackage.GetSnapcraftManifest(
             "test-app", "1.2.3", "amd64", "amd64", "TestApp", "Test summary", "Long description", "core24", "strict",
-            ["desktop", "network"]);
+            ["desktop", "network"], ["libicu74"]);
 
         Assert.Contains("name: 'test-app'", manifest, StringComparison.Ordinal);
         Assert.Contains("command: 'TestApp'", manifest, StringComparison.Ordinal);
         Assert.Contains("plugin: dump", manifest, StringComparison.Ordinal);
         Assert.Contains("source: payload", manifest, StringComparison.Ordinal);
+        Assert.Contains("stage-packages:\n      - 'libicu74'", manifest, StringComparison.Ordinal);
         Assert.Contains("platforms:\n  amd64:\n    build-on: ['amd64']\n    build-for: ['amd64']\n", manifest,
             StringComparison.Ordinal);
     }
@@ -119,7 +120,7 @@ public class PackagingMetadataTests
     {
         var manifest = LinuxPackage.GetSnapcraftManifest(
             "test-app", "1.2.3", "amd64", "arm64", "TestApp", "Test summary", "Long description", "core24",
-            "strict", ["desktop"]);
+            "strict", ["desktop"], ["libicu74"]);
 
         Assert.Contains("platforms:\n  arm64:\n    build-on: ['amd64']\n    build-for: ['arm64']\n", manifest,
             StringComparison.Ordinal);
@@ -130,7 +131,7 @@ public class PackagingMetadataTests
     {
         var manifest = LinuxPackage.GetSnapcraftManifest(
             "test-app", "1.2.3", "amd64", "arm64", "TestApp", "Test summary", "Long description", "core22", "strict",
-            ["desktop"]);
+            ["desktop"], ["libicu70"]);
 
         Assert.Contains("architectures:\n  - build-on: ['amd64']\n    build-for: ['arm64']\n", manifest,
             StringComparison.Ordinal);
@@ -142,7 +143,17 @@ public class PackagingMetadataTests
     {
         Assert.Throws<ArgumentException>(() => LinuxPackage.GetSnapcraftManifest(
             "test-app", "1.2.3", "amd64", "amd64", "TestApp", "Test summary", "Long description", "core24", "strict",
-            ["desktop\napps:"]));
+            ["desktop\napps:"], ["libicu74"]));
+    }
+
+    [Fact]
+    public void GetSnapcraftManifest_NoStagePackages_OmitsStagePackagesBlock()
+    {
+        var manifest = LinuxPackage.GetSnapcraftManifest(
+            "test-app", "1.2.3", "amd64", "amd64", "TestApp", "Test summary", "Long description", "core24", "strict",
+            ["desktop"], []);
+
+        Assert.DoesNotContain("stage-packages:", manifest, StringComparison.Ordinal);
     }
 
     [Fact]

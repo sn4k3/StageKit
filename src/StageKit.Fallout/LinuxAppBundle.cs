@@ -10,6 +10,8 @@ namespace StageKit.Fallout;
 /// </summary>
 public static partial class LinuxAppBundle
 {
+    private const string FlatpakHostCommandPermission = "--talk-name=org.freedesktop.Flatpak";
+
     /// <summary>
     /// Identifies the upstream AppImage tooling repository.
     /// </summary>
@@ -163,9 +165,16 @@ public static partial class LinuxAppBundle
         var executableName = GetExecutableName(options);
         var sourceDirectory = options.ProductName;
         var executablePath = $"/app/bin/app-sources/{executableName}";
+        IEnumerable<string> flatpakFinishArguments = options.FlatpakFinishArguments;
+        if (options.FlatpakAllowHostCommandExecution &&
+            !options.FlatpakFinishArguments.Contains(FlatpakHostCommandPermission, StringComparer.Ordinal))
+        {
+            flatpakFinishArguments = flatpakFinishArguments.Append(FlatpakHostCommandPermission);
+        }
+
         var finishArguments = string.Join(
             Environment.NewLine,
-            options.FlatpakFinishArguments.Select(argument => $"  - {argument.SingleQuoteYaml()}"));
+            flatpakFinishArguments.Select(argument => $"  - {argument.SingleQuoteYaml()}"));
 
         return $$"""
                  app-id: {{options.ApplicationId.SingleQuoteYaml()}}

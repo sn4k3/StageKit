@@ -182,6 +182,37 @@ public class LinuxAppBundleTests
     }
 
     [Fact]
+    public void GetFlatpakManifest_HostCommandExecutionEnabled_AddsFlatpakServicePermission()
+    {
+        var options = CreateOptions();
+        options.FlatpakAllowHostCommandExecution = true;
+
+        var manifest = LinuxAppBundle.GetFlatpakManifest(options);
+
+        Assert.Contains("  - '--talk-name=org.freedesktop.Flatpak'", manifest, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GetFlatpakManifest_HostCommandPermissionAlreadyPresent_DoesNotDuplicatePermission()
+    {
+        var options = CreateOptions();
+        options.FlatpakAllowHostCommandExecution = true;
+        options.FlatpakFinishArguments.Add("--talk-name=org.freedesktop.Flatpak");
+
+        var manifest = LinuxAppBundle.GetFlatpakManifest(options);
+
+        Assert.Equal(1, manifest.Split("--talk-name=org.freedesktop.Flatpak").Length - 1);
+    }
+
+    [Fact]
+    public void GetFlatpakManifest_HostCommandExecutionDisabled_OmitsFlatpakServicePermission()
+    {
+        var manifest = LinuxAppBundle.GetFlatpakManifest(CreateOptions());
+
+        Assert.DoesNotContain("--talk-name=org.freedesktop.Flatpak", manifest, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void GetAppStreamMetadata_InvalidScreenshotUrl_ThrowsArgumentException()
     {
         var options = CreateOptions();
