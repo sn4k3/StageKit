@@ -20,6 +20,12 @@ public partial class StageKitBuild
         RootDirectory / "scripts" / $"install-{LinuxPackage.GetPackageName(SoftwareName)}.ps1";
 
     /// <summary>
+    /// Gets or sets the exact WinGet package identifier that the generated Windows installation script tries before
+    /// falling back to GitHub release assets. A null or whitespace value disables WinGet installation.
+    /// </summary>
+    public virtual string? WindowsInstallScriptWinGetPackageId { get; set; }
+
+    /// <summary>
     /// Generates Bash and Windows PowerShell installation scripts for the package formats selected by
     /// <see cref="PackagingTypes"/>.
     /// </summary>
@@ -53,7 +59,8 @@ public partial class StageKitBuild
             SoftwareRepositoryUrl,
             SoftwareName,
             SoftwareExecutableFileNameWithoutExtension,
-            PackagingTypes);
+            PackagingTypes,
+            WindowsInstallScriptWinGetPackageId);
     }
 
     /// <summary>

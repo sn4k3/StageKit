@@ -26,6 +26,7 @@ $Repository = 'sn4k3/StageKit'
 $ApplicationName = 'StageKit'
 $ApplicationSlug = 'stagekit'
 $ExecutableName = 'StageKit.Demo.exe'
+$WinGetPackageId = ''
 $PackageTypes = @(
     'windows-installer'
     'portable'
@@ -81,6 +82,52 @@ function Stop-Install([string] $Message) {
     Write-Host "Error: $Message" -ForegroundColor Red
     Write-Host "Run .\$ScriptName help for usage."
     exit 1
+}
+
+function Install-WithWinGet {
+    if ([string]::IsNullOrWhiteSpace($WinGetPackageId)) {
+        return $false
+    }
+
+    $winGetCommand = Get-Command -Name 'winget.exe' -CommandType Application `
+        -ErrorAction SilentlyContinue
+    if ($null -eq $winGetCommand) {
+        Write-Host 'WinGet is unavailable; falling back to the GitHub release asset.'
+        return $false
+    }
+
+    $winGetArguments = @(
+        'install'
+        '--id'
+        $WinGetPackageId
+        '--exact'
+        '--source'
+        'winget'
+        '--silent'
+        '--accept-package-agreements'
+        '--accept-source-agreements'
+        '--disable-interactivity'
+    )
+    if ($Version -ne 'latest') {
+        $winGetArguments += @('--version', ($Version -replace '^[vV]', ''), '--force')
+    }
+
+    Write-Host "Installing $ApplicationName with WinGet..."
+    try {
+        & $winGetCommand.Source @winGetArguments | Out-Host
+        $winGetExitCode = $LASTEXITCODE
+    } catch {
+        Write-Host "WinGet could not install $ApplicationName. Falling back to the GitHub release asset."
+        return $false
+    }
+
+    if ($winGetExitCode -eq 0) {
+        Write-Host "$ApplicationName was installed successfully with WinGet."
+        return $true
+    }
+
+    Write-Host "WinGet exited with code $winGetExitCode. Falling back to the GitHub release asset."
+    return $false
 }
 
 function Get-Architecture {
@@ -400,6 +447,10 @@ if ($ResolvedArguments.Action -eq 'list') {
 }
 if ($ResolvedArguments.Action -eq 'list-changelog') {
     Show-ReleaseChangelogs -Limit $ChangelogLimit
+    return
+}
+
+if (Install-WithWinGet) {
     return
 }
 

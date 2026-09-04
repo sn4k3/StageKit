@@ -14,9 +14,14 @@ internal static class MacPackage
         ValidateValue(sourceFolderPath, nameof(sourceFolderPath));
         ValidateValue(applicationsLinkPath, nameof(applicationsLinkPath));
         ValidateValue(outputPath, nameof(outputPath));
+        var uncompressedImagePath = string.Concat(outputPath, ".uncompressed.dmg");
         return $"ln -s {"/Applications".QuoteShell()} {applicationsLinkPath.QuoteShell()} && " +
+               $"uncompressed_image={uncompressedImagePath.QuoteShell()} && " +
+               "trap 'rm -f \"$uncompressed_image\"' EXIT && " +
                $"hdiutil create -volname {volumeName.QuoteShell()} -srcfolder {sourceFolderPath.QuoteShell()} " +
-               $"-ov -format UDZO {outputPath.QuoteShell()}";
+               "-ov -format UDRW \"$uncompressed_image\" && " +
+               "hdiutil convert \"$uncompressed_image\" -ov -format UDZO -tasks 1 " +
+               $"-o {outputPath.QuoteShell()}";
     }
 
     internal static string GetPkgCommand(string appPath, string bundleIdentifier, string version, string outputPath)

@@ -165,9 +165,12 @@ public class PackagingMetadataTests
         Assert.StartsWith("ln -s '/Applications' '/tmp/dmg-root/Applications' && ", command,
             StringComparison.Ordinal);
         Assert.Contains("hdiutil create", command, StringComparison.Ordinal);
-        Assert.Contains("-format UDZO", command, StringComparison.Ordinal);
+        Assert.Contains("-format UDRW \"$uncompressed_image\"", command, StringComparison.Ordinal);
+        Assert.Contains("hdiutil convert \"$uncompressed_image\" -ov -format UDZO -tasks 1", command,
+            StringComparison.Ordinal);
+        Assert.Contains("trap 'rm -f \"$uncompressed_image\"' EXIT", command, StringComparison.Ordinal);
         Assert.Contains("-srcfolder '/tmp/dmg-root'", command, StringComparison.Ordinal);
-        Assert.EndsWith("'/tmp/Test App.dmg'", command, StringComparison.Ordinal);
+        Assert.EndsWith("-o '/tmp/Test App.dmg'", command, StringComparison.Ordinal);
     }
 
     [Fact]

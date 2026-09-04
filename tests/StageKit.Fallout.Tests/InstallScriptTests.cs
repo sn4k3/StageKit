@@ -222,6 +222,47 @@ public class InstallScriptTests
     }
 
     /// <summary>
+    /// Verifies that a configured WinGet package is tried first and failures retain the GitHub asset path.
+    /// </summary>
+    [Fact]
+    public void WindowsCreate_WinGetPackageId_UsesWinGetWithGitHubFallback()
+    {
+        var script = WindowsInstallScript.Create(
+            "https://github.com/example/sample",
+            "Sample",
+            "sample",
+            [ApplicationPackagingType.WindowsInstaller],
+            "Example.Sample");
+
+        Assert.Contains("$WinGetPackageId = 'Example.Sample'", script, StringComparison.Ordinal);
+        Assert.Contains("function Install-WithWinGet", script, StringComparison.Ordinal);
+        Assert.Contains("Get-Command -Name 'winget.exe'", script, StringComparison.Ordinal);
+        Assert.Contains("'--accept-package-agreements'", script, StringComparison.Ordinal);
+        Assert.Contains("'--accept-source-agreements'", script, StringComparison.Ordinal);
+        Assert.Contains("'--disable-interactivity'", script, StringComparison.Ordinal);
+        Assert.Contains("@('--version', ($Version -replace '^[vV]', ''), '--force')", script,
+            StringComparison.Ordinal);
+        Assert.Contains("if (Install-WithWinGet)", script, StringComparison.Ordinal);
+        Assert.Contains("Falling back to the GitHub release asset", script, StringComparison.Ordinal);
+        AssertInOrder(script, "if (Install-WithWinGet)", "$Architecture = Get-Architecture", "$Release = Get-Release");
+    }
+
+    /// <summary>
+    /// Verifies that WinGet remains disabled when no package identifier is configured.
+    /// </summary>
+    [Fact]
+    public void WindowsCreate_NoWinGetPackageId_EmbedsDisabledValue()
+    {
+        var script = WindowsInstallScript.Create(
+            "https://github.com/example/sample",
+            "Sample",
+            "sample",
+            [ApplicationPackagingType.WindowsInstaller]);
+
+        Assert.Contains("$WinGetPackageId = ''", script, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// Verifies that a Windows script requires at least one Windows-compatible selected format.
     /// </summary>
     [Fact]
@@ -243,6 +284,7 @@ public class InstallScriptTests
         Assert.NotNull(typeof(StageKitBuild).GetProperty(nameof(StageKitBuild.GenerateInstallScript)));
         Assert.NotNull(typeof(StageKitBuild).GetProperty(nameof(StageKitBuild.InstallScriptFile)));
         Assert.NotNull(typeof(StageKitBuild).GetProperty(nameof(StageKitBuild.WindowsInstallScriptFile)));
+        Assert.NotNull(typeof(StageKitBuild).GetProperty(nameof(StageKitBuild.WindowsInstallScriptWinGetPackageId)));
     }
 
     /// <summary>

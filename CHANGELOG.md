@@ -4,12 +4,14 @@
   from the selected `PackagingTypes`, exposes command help and explicit downgrade/version selection, prioritizes native
   installers over generic bundles, keeps Portable last, lists all published release versions or their release-note
   changelogs (limited to 20 releases by default), reports clean PowerShell release-resolution errors, and falls back
-  when an asset or package tool is unavailable.
+  when an asset or package tool is unavailable. Windows scripts can optionally try an exact WinGet package ID first and
+  fall back to GitHub release assets when WinGet is unavailable or installation fails.
 - Fix macOS PKG and DMG auto-updates leaving the application closed by deferring relaunch to a non-elevated helper that
   waits for the old process to exit. Set the StageKit demo's Avalonia application name so its macOS menu uses
   `StageKit`.
 - Add an `/Applications` shortcut to macOS DMG images for drag-and-drop installation; PKG installers continue to install
-  their application directly in `/Applications`.
+  their application directly in `/Applications`. Limit DMG compression to one worker to reduce peak memory use on
+  hosted macOS runners.
 - Add opt-in `LinuxAppBundleOptions.FlatpakAllowHostCommandExecution` manifest configuration for applications that need
   the `org.freedesktop.Flatpak` host-command service.
 - Stage `libicu74` in Snap packages by default so self-contained .NET applications have globalization support, with a

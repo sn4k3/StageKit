@@ -268,6 +268,9 @@ and finally the Portable zip. Single-file and Portable packages install under `%
 add the executable directory to the current user's `PATH`. MSI packages run passively and request elevation when
 needed; whether an MSI permits installing an older version is controlled by that installer project. Missing release
 versions and GitHub request failures are reported as concise script errors instead of raw PowerShell exceptions.
+Set `WindowsInstallScriptWinGetPackageId` to an exact WinGet package identifier to make the Windows script try a silent
+WinGet install first. If WinGet is unavailable or returns an error, the script falls back to its normal GitHub release
+asset selection and installation. Explicit versions are passed to WinGet without a leading `v` and use its force option.
 
 Explicit version selection accepts tags with or without the leading `v` and enables package-manager downgrade options
 for DEB and RPM installation. Arch, Flatpak, Snap, portable, and application-bundle formats replace or update the
@@ -280,7 +283,8 @@ customize the output paths, contents, or write step.
 
 DMG and PKG creation stage and sign the same `.app` layout used by `MacOSAppBundle`. DMG output includes an
 `Applications` symlink for drag-and-drop installation, while PKG output installs the app directly in `/Applications`.
-With `PublishMultiArch`, both native formats contain the combined `osx-x64` and `osx-arm64` app.
+DMG compression uses one worker to keep peak memory bounded on hosted macOS runners. With `PublishMultiArch`, both
+native formats contain the combined `osx-x64` and `osx-arm64` app.
 Avalonia applications should also set `Application.Name` in `App.axaml` to the same value as `SoftwareName`; otherwise,
 Avalonia may replace the macOS menu title at runtime with its `Avalonia Application` fallback despite the generated
 `CFBundleName` and `CFBundleDisplayName` values.

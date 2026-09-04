@@ -27,7 +27,8 @@ internal static class WindowsInstallScript
         string repositoryUrl,
         string applicationName,
         string executableName,
-        IReadOnlyCollection<ApplicationPackagingType> selectedPackagingTypes)
+        IReadOnlyCollection<ApplicationPackagingType> selectedPackagingTypes,
+        string? wingetPackageId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(repositoryUrl);
         ArgumentException.ThrowIfNullOrWhiteSpace(applicationName);
@@ -51,12 +52,17 @@ internal static class WindowsInstallScript
 
         var packageTypeLines = string.Join('\n', packageTypes.Select(type => $"    '{type}'"));
         var applicationSlug = LinuxPackage.GetPackageName(applicationName);
+        wingetPackageId = string.IsNullOrWhiteSpace(wingetPackageId) ? string.Empty : wingetPackageId.Trim();
+        if (wingetPackageId.Contains('\r') || wingetPackageId.Contains('\n'))
+            throw new ArgumentException("The WinGet package identifier cannot contain line breaks.", nameof(wingetPackageId));
+
         return Template
             .Replace("{{REPOSITORY}}", EscapeSingleQuoted(repository), StringComparison.Ordinal)
             .Replace("{{APPLICATION_NAME}}", EscapeSingleQuoted(applicationName), StringComparison.Ordinal)
             .Replace("{{APPLICATION_SLUG}}", EscapeSingleQuoted(applicationSlug), StringComparison.Ordinal)
             .Replace("{{EXECUTABLE_NAME}}", EscapeSingleQuoted(string.Concat(executableName, ".exe")),
                 StringComparison.Ordinal)
+            .Replace("{{WINGET_PACKAGE_ID}}", EscapeSingleQuoted(wingetPackageId), StringComparison.Ordinal)
             .Replace("{{PACKAGE_TYPES}}", packageTypeLines, StringComparison.Ordinal)
             .ReplaceLineEndings("\r\n") + "\r\n";
     }
@@ -95,6 +101,7 @@ internal static class WindowsInstallScript
                                     $ApplicationName = '{{APPLICATION_NAME}}'
                                     $ApplicationSlug = '{{APPLICATION_SLUG}}'
                                     $ExecutableName = '{{EXECUTABLE_NAME}}'
+                                    $WinGetPackageId = '{{WINGET_PACKAGE_ID}}'
                                     $PackageTypes = @(
                                     {{PACKAGE_TYPES}}
                                     )
@@ -149,6 +156,52 @@ internal static class WindowsInstallScript
                                         Write-Host "Error: $Message" -ForegroundColor Red
                                         Write-Host "Run .\$ScriptName help for usage."
                                         exit 1
+                                    }
+
+                                    function Install-WithWinGet {
+                                        if ([string]::IsNullOrWhiteSpace($WinGetPackageId)) {
+                                            return $false
+                                        }
+
+                                        $winGetCommand = Get-Command -Name 'winget.exe' -CommandType Application `
+                                            -ErrorAction SilentlyContinue
+                                        if ($null -eq $winGetCommand) {
+                                            Write-Host 'WinGet is unavailable; falling back to the GitHub release asset.'
+                                            return $false
+                                        }
+
+                                        $winGetArguments = @(
+                                            'install'
+                                            '--id'
+                                            $WinGetPackageId
+                                            '--exact'
+                                            '--source'
+                                            'winget'
+                                            '--silent'
+                                            '--accept-package-agreements'
+                                            '--accept-source-agreements'
+                                            '--disable-interactivity'
+                                        )
+                                        if ($Version -ne 'latest') {
+                                            $winGetArguments += @('--version', ($Version -replace '^[vV]', ''), '--force')
+                                        }
+
+                                        Write-Host "Installing $ApplicationName with WinGet..."
+                                        try {
+                                            & $winGetCommand.Source @winGetArguments | Out-Host
+                                            $winGetExitCode = $LASTEXITCODE
+                                        } catch {
+                                            Write-Host "WinGet could not install $ApplicationName. Falling back to the GitHub release asset."
+                                            return $false
+                                        }
+
+                                        if ($winGetExitCode -eq 0) {
+                                            Write-Host "$ApplicationName was installed successfully with WinGet."
+                                            return $true
+                                        }
+
+                                        Write-Host "WinGet exited with code $winGetExitCode. Falling back to the GitHub release asset."
+                                        return $false
                                     }
 
                                     function Get-Architecture {
@@ -468,6 +521,10 @@ internal static class WindowsInstallScript
                                     }
                                     if ($ResolvedArguments.Action -eq 'list-changelog') {
                                         Show-ReleaseChangelogs -Limit $ChangelogLimit
+                                        return
+                                    }
+
+                                    if (Install-WithWinGet) {
                                         return
                                     }
 
