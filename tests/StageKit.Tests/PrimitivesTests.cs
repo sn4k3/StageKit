@@ -77,6 +77,97 @@ public sealed class PrimitivesTests
         Assert.Null(result);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("relative-url")]
+    [InlineData("file:///tmp/stagekit.txt")]
+    public async Task HostSystem_OpenUrl_RejectsInvalidOrFileUrl(string url)
+    {
+        Assert.False(HostSystem.OpenUrl(url));
+        Assert.False(await HostSystem.OpenUrlAsync(url, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public void HostSystem_CreateOpenTargetStartInfo_UsesHostLauncher()
+    {
+        const string target = "https://example.com/a%20path";
+
+        var startInfo = HostSystem.CreateOpenTargetStartInfo(target);
+
+        Assert.NotNull(startInfo);
+
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Equal(target, startInfo.FileName);
+            Assert.True(startInfo.UseShellExecute);
+            Assert.Empty(startInfo.ArgumentList);
+        }
+        else if (OperatingSystem.IsMacOS())
+        {
+            Assert.Equal("/usr/bin/open", startInfo.FileName);
+            Assert.Equal([target], startInfo.ArgumentList);
+            Assert.False(startInfo.UseShellExecute);
+        }
+        else if (OperatingSystem.IsLinux())
+        {
+            Assert.Equal("xdg-open", startInfo.FileName);
+            Assert.Equal([target], startInfo.ArgumentList);
+            Assert.False(startInfo.UseShellExecute);
+        }
+    }
+
+    [Fact]
+    public void HostSystem_CreateShowFileInFileManagerStartInfo_UsesHostLauncher()
+    {
+        var filePath = Path.GetFullPath(Path.Combine("folder with spaces", "file.txt"));
+
+        var startInfo = HostSystem.CreateShowFileInFileManagerStartInfo(filePath);
+
+        Assert.NotNull(startInfo);
+        Assert.False(startInfo.UseShellExecute);
+
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Equal("explorer.exe", startInfo.FileName);
+            Assert.Equal([string.Concat("/select,", filePath)], startInfo.ArgumentList);
+        }
+        else if (OperatingSystem.IsMacOS())
+        {
+            Assert.Equal("/usr/bin/open", startInfo.FileName);
+            Assert.Equal(["-R", filePath], startInfo.ArgumentList);
+        }
+        else if (OperatingSystem.IsLinux())
+        {
+            Assert.Equal("xdg-open", startInfo.FileName);
+            Assert.Equal([Path.GetDirectoryName(filePath)!], startInfo.ArgumentList);
+        }
+    }
+
+    [Fact]
+    public async Task HostSystem_PathOpenHelpers_RejectMissingPaths()
+    {
+        var missingPath = Path.Combine(Path.GetTempPath(), $"stagekit-missing-{Guid.NewGuid():N}");
+
+        Assert.False(HostSystem.OpenDirectory(missingPath));
+        Assert.False(HostSystem.OpenFile(missingPath));
+        Assert.False(HostSystem.ShowFileInFileManager(missingPath));
+        Assert.False(await HostSystem.OpenDirectoryAsync(missingPath, TestContext.Current.CancellationToken));
+        Assert.False(await HostSystem.OpenFileAsync(missingPath, TestContext.Current.CancellationToken));
+        Assert.False(await HostSystem.ShowFileInFileManagerAsync(
+            missingPath,
+            TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task HostSystem_AsyncOpenHelpers_HonorPreCancellation()
+    {
+        using var cancellationTokenSource = new CancellationTokenSource();
+        await cancellationTokenSource.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            HostSystem.OpenUrlAsync("https://example.com", cancellationTokenSource.Token));
+    }
+
     [Fact]
     public void ProcessHelper_StartProcess_ReturnsExitCodeWhenWaitingForCompletion()
     {

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.ComponentModel;
 using Avalonia;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -212,11 +211,10 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         try
         {
             Directory.CreateDirectory(path);
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = path,
-                UseShellExecute = true
-            });
+
+            if (!HostSystem.OpenDirectory(path))
+                throw new InvalidOperationException($"The host could not open '{path}'.");
+
             StatusMessage = $"Opened {description}: {path}";
         }
         catch (Exception exception)

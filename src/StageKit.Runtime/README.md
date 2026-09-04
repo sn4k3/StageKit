@@ -18,6 +18,7 @@ StageKit.Runtime provides runtime and entry-application helpers for StageKit lib
 - .NET single-file, Linux AppImage, Linux Flatpak, and macOS `.app` bundle detection
 - Formatted application and loaded-assembly diagnostics
 - Runtime, process, and entry-application diagnostic reports
+- Lazy, Native AOT-compatible access to Fallout build-runtime manifests
 - Best-effort application relaunch helper
 
 ## Install
@@ -69,6 +70,28 @@ Console.WriteLine(RuntimeDiagnostics.GetReport(includeLoadedAssemblies: true));
 Dictionary<string, string?> info = RuntimeDiagnostics.GetInfoDict();
 ```
 
+## Build Runtime Manifest
+
+`BuildRuntime.Instance` lazily loads `build-runtime.json` from the application base, entry-assembly, or process
+directory. It is `null` when no valid manifest is available:
+
+```csharp
+BuildRuntime? build = BuildRuntime.Instance;
+
+if (build is not null)
+    Console.WriteLine($"{build.Runtime}: {build.PackagingType}");
+```
+
+Use `BuildRuntime.TryLoad(...)` when Fallout is configured with a custom manifest file name:
+
+```csharp
+if (BuildRuntime.TryLoad(customManifestPath, out BuildRuntime? build))
+    Console.WriteLine(build.BuildVersion);
+```
+
+Manifest deserialization uses source-generated `System.Text.Json` metadata and the generic enum converter, so it does
+not depend on reflection-based serialization and is compatible with trimming and Native AOT.
+
 ## Relaunch
 
 Relaunch the current application when the executable path is known:
@@ -109,6 +132,10 @@ and let the process launcher handle quoting.
 - `MacOSAppBundle`
 - `MacOSDmg`
 - `MacOSPkg`
+
+`ApplicationPackagingInfo.KnownPackagingTypes` provides metadata for these formats. Enumerating that dictionary uses
+the preferred package-selection order: platform-native packages come first, generic bundles follow, and Portable is
+the final fallback. Consumers such as Fallout's generated installer preserve this order.
 
 Runtime detection checks the standard AppImage, Flatpak, Snap, and macOS bundle markers first, then reads the
 `build-runtime.json` manifest emitted by Fallout when it is available. This manifest enables detection of DEB, RPM,

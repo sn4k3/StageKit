@@ -5,6 +5,7 @@
         <Description>Runtime and entry-application helpers for .NET apps and libraries, including assembly metadata, process paths, runtime diagnostics, bundle detection, and application relaunch utilities.</Description>
         <PackageTags>stagekit;runtime;application;assembly-metadata;bundle-detection;process</PackageTags>
         <GenerateDocumentationFile>True</GenerateDocumentationFile>
+        <IsAotCompatible>true</IsAotCompatible>
     </PropertyGroup>
 
     <ItemGroup>

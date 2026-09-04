@@ -4,7 +4,6 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
-using System.Text.Json;
 using StageKit.Runtime.System;
 
 namespace StageKit.Runtime;
@@ -142,11 +141,7 @@ public static class EntryApplication
     /// <remarks>The value is determined on first access and cached for subsequent use. The location may be
     /// null if the entry assembly is not available or its location is not set, such as in certain hosting
     /// scenarios.</remarks>
-    private static readonly Lazy<string?> AssemblyLocationLazy = new(() =>
-    {
-        var location = EntryAssembly?.Location;
-        return string.IsNullOrWhiteSpace(location) ? null : location;
-    });
+    private static readonly Lazy<string?> AssemblyLocationLazy = new(GetAssemblyLocation);
 
     /// <summary>
     /// Provides lazy initialization of the version information for the entry assembly.
@@ -311,15 +306,6 @@ public static class EntryApplication
         DetectDotNetSingleFileAppPath(AssemblyLocation, IsRunningFromDotNetProcess, Environment.ProcessPath));
 
     /// <summary>
-    /// Provides lazy initialization of the packaging type written by the Fallout runtime manifest.
-    /// </summary>
-    private static readonly Lazy<ApplicationPackagingType?> RuntimeManifestPackagingTypeLazy = new(() =>
-        DetectRuntimeManifestPackagingType(
-            AppContext.BaseDirectory,
-            AssemblyLocation,
-            Environment.ProcessPath));
-
-    /// <summary>
     /// Lazily retrieves information about the current process's executable, including its path, name, and base
     /// directory.
     /// </summary>
@@ -384,14 +370,11 @@ public static class EntryApplication
             {
                 if (Utilities.IsOwnedByPackage("dpkg", "-S", applicationFile)) return ApplicationPackagingType.LinuxDeb;
                 if (Utilities.IsOwnedByPackage("rpm", "-qf", applicationFile)) return ApplicationPackagingType.LinuxRpm;
-                if (Utilities.IsOwnedByPackage("pacman", "-Qo", applicationFile))
-                    return ApplicationPackagingType.LinuxArchPackage;
+                if (Utilities.IsOwnedByPackage("pacman", "-Qo", applicationFile)) return ApplicationPackagingType.LinuxArchPackage;
             }
         }
         else if (OperatingSystem.IsMacOS())
         {
-            if (!string.IsNullOrWhiteSpace(MacOSAppBundlePath)) return ApplicationPackagingType.MacOSAppBundle;
-
             var applicationFile = AssemblyLocation ?? Environment.ProcessPath;
 
             if (!string.IsNullOrWhiteSpace(applicationFile))
@@ -403,6 +386,11 @@ public static class EntryApplication
 
         if (RuntimeManifestPackagingType is { } manifestPackagingType)
             return manifestPackagingType;
+
+        if (OperatingSystem.IsMacOS())
+        {
+            if (!string.IsNullOrWhiteSpace(MacOSAppBundlePath)) return ApplicationPackagingType.MacOSAppBundle;
+        }
 
         return ApplicationPackagingType.Portable;
     });
@@ -553,7 +541,7 @@ public static class EntryApplication
     /// <summary>
     /// Gets the application packaging type written by the Fallout runtime manifest, if available.
     /// </summary>
-    private static ApplicationPackagingType? RuntimeManifestPackagingType => RuntimeManifestPackagingTypeLazy.Value;
+    private static ApplicationPackagingType? RuntimeManifestPackagingType => BuildRuntime.Instance?.PackagingType;
 
     /// <summary>
     /// Gets a value indicating whether the application was packaged as a portable application (not bundled).
@@ -794,6 +782,16 @@ public static class EntryApplication
 
     #region Methods
 
+    [UnconditionalSuppressMessage(
+        "SingleFile",
+        "IL3000:Avoid accessing Assembly file path when publishing as a single file",
+        Justification = "An empty single-file assembly location is expected and explicitly mapped to null.")]
+    private static string? GetAssemblyLocation()
+    {
+        var location = EntryAssembly?.Location;
+        return string.IsNullOrWhiteSpace(location) ? null : location;
+    }
+
     /// <summary>
     /// Detects the path to the .NET single-file application executable if running in a single-file context; otherwise, returns null.
     /// </summary>
@@ -958,47 +956,10 @@ public static class EntryApplication
         string? assemblyLocation,
         string? processPath)
     {
-        var directories = new[]
-        {
+        return BuildRuntime.LoadFromApplicationDirectories(
             appContextBaseDirectory,
-            GetDirectoryName(assemblyLocation),
-            GetDirectoryName(processPath)
-        };
-
-        foreach (var directory in directories.Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(
-                     OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal))
-        {
-            var manifestPath = Path.Combine(directory!, "build-runtime.json");
-            try
-            {
-                if (!File.Exists(manifestPath)) continue;
-                using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
-                if (!document.RootElement.TryGetProperty("PackagingType", out var packagingType)) continue;
-                if (packagingType.ValueKind != JsonValueKind.String) continue;
-                if (Enum.TryParse<ApplicationPackagingType>(packagingType.GetString(), true,
-                        out var result))
-                    return result;
-            }
-            catch (IOException)
-            {
-                // A runtime marker is optional and must not prevent application startup.
-            }
-            catch (UnauthorizedAccessException)
-            {
-                // A runtime marker is optional and must not prevent application startup.
-            }
-            catch (JsonException)
-            {
-                // A runtime marker is optional and must not prevent application startup.
-            }
-        }
-
-        return null;
-
-        static string? GetDirectoryName(string? path)
-        {
-            return string.IsNullOrWhiteSpace(path) ? null : Path.GetDirectoryName(path);
-        }
+            assemblyLocation,
+            processPath)?.PackagingType;
     }
 
     /// <summary>

@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics;
 
 namespace StageKit.Primitives.System;
 
@@ -15,6 +16,120 @@ public static class HostSystem
         : StringComparison.Ordinal;
 
     /// <summary>
+    /// Opens an absolute URL with the host's default application.
+    /// </summary>
+    /// <param name="url">The absolute URL to open.</param>
+    /// <returns>
+    /// <see langword="true"/> if the open request was started; otherwise, <see langword="false"/>.
+    /// </returns>
+    public static bool OpenUrl(string url)
+    {
+        return Start(CreateUrlStartInfo(url));
+    }
+
+    /// <summary>
+    /// Asynchronously opens an absolute URL with the host's default application.
+    /// </summary>
+    /// <param name="url">The absolute URL to open.</param>
+    /// <param name="cancellationToken">The token used to cancel the open request before it starts.</param>
+    /// <returns>
+    /// A task containing <see langword="true"/> if the open request was started; otherwise,
+    /// <see langword="false"/>.
+    /// </returns>
+    public static Task<bool> OpenUrlAsync(string url, CancellationToken cancellationToken = default)
+    {
+        return StartAsync(CreateUrlStartInfo(url), cancellationToken);
+    }
+
+    /// <summary>
+    /// Opens an existing directory in the host's default file manager.
+    /// </summary>
+    /// <param name="directoryPath">The directory to open.</param>
+    /// <returns>
+    /// <see langword="true"/> if the open request was started; otherwise, <see langword="false"/>.
+    /// </returns>
+    public static bool OpenDirectory(string directoryPath)
+    {
+        return Start(CreateExistingPathStartInfo(directoryPath, isDirectory: true));
+    }
+
+    /// <summary>
+    /// Asynchronously opens an existing directory in the host's default file manager.
+    /// </summary>
+    /// <param name="directoryPath">The directory to open.</param>
+    /// <param name="cancellationToken">The token used to cancel the open request before it starts.</param>
+    /// <returns>
+    /// A task containing <see langword="true"/> if the open request was started; otherwise,
+    /// <see langword="false"/>.
+    /// </returns>
+    public static Task<bool> OpenDirectoryAsync(string directoryPath, CancellationToken cancellationToken = default)
+    {
+        return StartAsync(CreateExistingPathStartInfo(directoryPath, isDirectory: true), cancellationToken);
+    }
+
+    /// <summary>
+    /// Opens an existing file with the host's default application.
+    /// </summary>
+    /// <param name="filePath">The file to open.</param>
+    /// <returns>
+    /// <see langword="true"/> if the open request was started; otherwise, <see langword="false"/>.
+    /// </returns>
+    public static bool OpenFile(string filePath)
+    {
+        return Start(CreateExistingPathStartInfo(filePath, isDirectory: false));
+    }
+
+    /// <summary>
+    /// Asynchronously opens an existing file with the host's default application.
+    /// </summary>
+    /// <param name="filePath">The file to open.</param>
+    /// <param name="cancellationToken">The token used to cancel the open request before it starts.</param>
+    /// <returns>
+    /// A task containing <see langword="true"/> if the open request was started; otherwise,
+    /// <see langword="false"/>.
+    /// </returns>
+    public static Task<bool> OpenFileAsync(string filePath, CancellationToken cancellationToken = default)
+    {
+        return StartAsync(CreateExistingPathStartInfo(filePath, isDirectory: false), cancellationToken);
+    }
+
+    /// <summary>
+    /// Shows an existing file in the host's file manager.
+    /// </summary>
+    /// <param name="filePath">The file to show.</param>
+    /// <returns>
+    /// <see langword="true"/> if the request was started; otherwise, <see langword="false"/>.
+    /// </returns>
+    /// <remarks>
+    /// Windows Explorer and macOS Finder select the file. Linux opens the containing directory because desktop file
+    /// managers do not provide one portable file-selection command.
+    /// </remarks>
+    public static bool ShowFileInFileManager(string filePath)
+    {
+        return Start(CreateShowExistingFileStartInfo(filePath));
+    }
+
+    /// <summary>
+    /// Asynchronously shows an existing file in the host's file manager.
+    /// </summary>
+    /// <param name="filePath">The file to show.</param>
+    /// <param name="cancellationToken">The token used to cancel the request before it starts.</param>
+    /// <returns>
+    /// A task containing <see langword="true"/> if the request was started; otherwise,
+    /// <see langword="false"/>.
+    /// </returns>
+    /// <remarks>
+    /// Windows Explorer and macOS Finder select the file. Linux opens the containing directory because desktop file
+    /// managers do not provide one portable file-selection command.
+    /// </remarks>
+    public static Task<bool> ShowFileInFileManagerAsync(
+        string filePath,
+        CancellationToken cancellationToken = default)
+    {
+        return StartAsync(CreateShowExistingFileStartInfo(filePath), cancellationToken);
+    }
+
+    /// <summary>
     /// Normalize the executable extension for the current OS.
     /// </summary>
     /// <param name="path"></param>
@@ -24,6 +139,38 @@ public static class HostSystem
         return OperatingSystem.IsWindows() && !path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
             ? string.Concat(path, ".exe")
             : path;
+    }
+
+    internal static ProcessStartInfo? CreateOpenTargetStartInfo(string target)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return new ProcessStartInfo(target)
+            {
+                UseShellExecute = true
+            };
+        }
+
+        if (OperatingSystem.IsMacOS())
+            return CreateLauncherStartInfo("/usr/bin/open", target);
+
+        return OperatingSystem.IsLinux()
+            ? CreateLauncherStartInfo("xdg-open", target)
+            : null;
+    }
+
+    internal static ProcessStartInfo? CreateShowFileInFileManagerStartInfo(string filePath)
+    {
+        if (OperatingSystem.IsWindows())
+            return CreateLauncherStartInfo("explorer.exe", string.Concat("/select,", filePath));
+
+        if (OperatingSystem.IsMacOS())
+            return CreateLauncherStartInfo("/usr/bin/open", "-R", filePath);
+
+        var directoryPath = Path.GetDirectoryName(filePath);
+        return OperatingSystem.IsLinux() && directoryPath is not null
+            ? CreateLauncherStartInfo("xdg-open", directoryPath)
+            : null;
     }
 
     /// <summary>
@@ -222,5 +369,82 @@ public static class HostSystem
             .ToArray();
 
         return executableExtensions.Length > 0 ? executableExtensions : defaultExecutableExtensions;
+    }
+
+    private static ProcessStartInfo CreateLauncherStartInfo(string launcher, params ReadOnlySpan<string> arguments)
+    {
+        var startInfo = new ProcessStartInfo(launcher)
+        {
+            UseShellExecute = false
+        };
+
+        foreach (var argument in arguments)
+            startInfo.ArgumentList.Add(argument);
+
+        return startInfo;
+    }
+
+    private static ProcessStartInfo? CreateUrlStartInfo(string url)
+    {
+        return Uri.TryCreate(url, UriKind.Absolute, out var uri) && !uri.IsFile
+            ? CreateOpenTargetStartInfo(uri.AbsoluteUri)
+            : null;
+    }
+
+    private static ProcessStartInfo? CreateExistingPathStartInfo(string path, bool isDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(path) ||
+            (isDirectory ? !Directory.Exists(path) : !File.Exists(path)))
+        {
+            return null;
+        }
+
+        try
+        {
+            return CreateOpenTargetStartInfo(Path.GetFullPath(path));
+        }
+        catch (Exception exception) when (exception is ArgumentException or
+                                          IOException or
+                                          UnauthorizedAccessException or
+                                          NotSupportedException)
+        {
+            Debug.WriteLine(exception);
+            return null;
+        }
+    }
+
+    private static ProcessStartInfo? CreateShowExistingFileStartInfo(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+            return null;
+
+        try
+        {
+            return CreateShowFileInFileManagerStartInfo(Path.GetFullPath(filePath));
+        }
+        catch (Exception exception) when (exception is ArgumentException or
+                                          IOException or
+                                          UnauthorizedAccessException or
+                                          NotSupportedException)
+        {
+            Debug.WriteLine(exception);
+            return null;
+        }
+    }
+
+    private static bool Start(ProcessStartInfo? startInfo)
+    {
+        return startInfo is not null && ProcessHelper.StartProcess(startInfo) == 0;
+    }
+
+    private static async Task<bool> StartAsync(
+        ProcessStartInfo? startInfo,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return startInfo is not null &&
+               await ProcessHelper.StartProcessAsync(startInfo, cancellationToken: cancellationToken)
+                   .ConfigureAwait(false) == 0;
     }
 }

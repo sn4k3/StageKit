@@ -121,4 +121,28 @@ public sealed class UpdatumInstallScriptTests
             < script.IndexOf("\"$STAGED_PATH\" \"$DEST_PATH\"", StringComparison.Ordinal));
         Assert.Contains("\"$BACKUP_PATH\" \"$DEST_PATH\"", script);
     }
+
+    [Fact]
+    public void CreateMacOSRelaunchProcessStartInfo_WaitsForCurrentProcessThenOpensInstalledBundle()
+    {
+        var startInfo = UpdatumInstallScript.CreateMacOSRelaunchProcessStartInfo(
+            1234,
+            "/Applications/Test App.app",
+            "--updated true");
+
+        Assert.Equal("/usr/bin/nohup", startInfo.FileName);
+        Assert.Equal("/bin/bash", startInfo.ArgumentList[0]);
+        Assert.Equal("-c", startInfo.ArgumentList[1]);
+        Assert.Equal("stagekit-updatum-relaunch", startInfo.ArgumentList[3]);
+        Assert.Equal("1234", startInfo.ArgumentList[4]);
+        Assert.Equal("/Applications/Test App.app", startInfo.ArgumentList[5]);
+        Assert.Equal("--updated true", startInfo.ArgumentList[6]);
+
+        var script = startInfo.ArgumentList[2];
+        var waitIndex = script.IndexOf("/bin/kill -0 \"$1\"", StringComparison.Ordinal);
+        var openIndex = script.IndexOf("/usr/bin/open \"$2\"", StringComparison.Ordinal);
+        Assert.True(waitIndex >= 0);
+        Assert.True(openIndex > waitIndex);
+        Assert.Contains("--args $3", script, StringComparison.Ordinal);
+    }
 }

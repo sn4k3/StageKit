@@ -29,7 +29,7 @@ applications those packages ship in.
 - Pending debounce tracking with timeout-aware wait support
 - Single-instance process guard based on a named mutex
 - Atomic file writes, profile backup/restore, support bundle export, and retention helpers
-- Dependency-light primitives package for atomic file writes and disposable/resource helpers
+- Dependency-light primitives package for atomic file writes, host URL/file-manager launching, and disposable/resource helpers
 - First-run and onboarding state persistence
 - Serializable crash reports with exception chains, stack traces, runtime information, and process stats
 - AppDomain and task scheduler unhandled exception helpers
@@ -38,7 +38,8 @@ applications those packages ship in.
 - Portable profile path parsing with `ApplicationKit.IsPortable` state
 - Small application "birthday" helpers for version/about screens
 - GitHub release discovery, secure asset downloads, and staged cross-platform application updates
-- Reusable build pipeline that publishes and bundles applications for Windows, Linux, and macOS
+- Reusable build pipeline that publishes and bundles applications for Windows, Linux, and macOS, and generates Bash and
+  Windows PowerShell GitHub Releases installation scripts from the selected package formats
 
 ## Repository Layout
 
@@ -90,7 +91,7 @@ dotnet add package StageKit.Updatum
 |-----------------------|--------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `StageKit`            | [![Nuget](https://img.shields.io/nuget/v/StageKit?style=flat-square)](https://www.nuget.org/packages/StageKit)                       | This file                                   | Application infrastructure: settings, crash reports, retention, backups, support bundles, single-instance guards, and app metadata.                                                     |
 | `StageKit.Primitives` | [![Nuget](https://img.shields.io/nuget/v/StageKit.Primitives?style=flat-square)](https://www.nuget.org/packages/StageKit.Primitives) | [README](src/StageKit.Primitives/README.md) | Dependency-light primitives: atomic file writes, path and shell helpers, temporary resources, disposable base types, GC handles, and unmanaged memory wrappers. |
-| `StageKit.Runtime`    | [![Nuget](https://img.shields.io/nuget/v/StageKit.Runtime?style=flat-square)](https://www.nuget.org/packages/StageKit.Runtime)       | [README](src/StageKit.Runtime/README.md)    | Entry-application and runtime helpers: assembly metadata, process paths, bundle detection, relaunch utilities, and combined diagnostics through `RuntimeDiagnostics`.                   |
+| `StageKit.Runtime`    | [![Nuget](https://img.shields.io/nuget/v/StageKit.Runtime?style=flat-square)](https://www.nuget.org/packages/StageKit.Runtime)       | [README](src/StageKit.Runtime/README.md)    | Entry-application and runtime helpers: assembly metadata, process paths, build manifests, bundle detection, relaunch utilities, and combined diagnostics through `RuntimeDiagnostics`.  |
 | `StageKit.Updatum`    | [![Nuget](https://img.shields.io/nuget/v/StageKit.Updatum?style=flat-square)](https://www.nuget.org/packages/StageKit.Updatum)       | [README](src/StageKit.Updatum/README.md)    | GitHub release discovery, optional SHA-256 and platform-signature verification, download progress, and staged Windows/Linux/macOS update installation.                                  |
 | `StageKit.Fallout`    | [![Nuget](https://img.shields.io/nuget/v/StageKit.Fallout?style=flat-square)](https://www.nuget.org/packages/StageKit.Fallout)       | [README](src/StageKit.Fallout/README.md)    | Build-time only: reusable Fallout build pipeline with restore/compile/run/publish targets and portable, single-file, WiX installer, macOS `.app`, and Linux AppImage bundling.          |
 
@@ -659,10 +660,12 @@ restore the pinned `fallout` global tool, then run the build project in `builds/
 ./build.ps1 Print
 ./build.ps1 Compile
 ./build.ps1 Publish
+./build.ps1 GenerateInstallScript
 ```
 
 ```bash
 ./build.sh Publish
+./build.sh GenerateInstallScript
 ```
 
 `Publish` builds every runtime identifier in `RIds` (`win`/`osx`/`linux` × `x64`/`arm64` by default) as self-contained
@@ -670,6 +673,8 @@ ReadyToRun output, then creates the selected bundles in `artifacts/publish/`. Po
 installer, macOS `.app`, and Linux AppImage are enabled by default. Bundles whose host requirement is unmet are skipped
 with a warning. See the
 [`StageKit.Fallout` README](src/StageKit.Fallout/README.md) for targets, parameters, and customization points.
+`GenerateInstallScript` creates standalone Bash and Windows PowerShell installers under `scripts/` that resolve the best
+compatible selected package from a GitHub release.
 
 ## Security
 

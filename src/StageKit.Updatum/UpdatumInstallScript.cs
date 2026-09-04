@@ -1,7 +1,47 @@
+using System.Diagnostics;
+using System.Globalization;
+using StageKit.Primitives.System;
+
 namespace StageKit.Updatum;
 
 internal static class UpdatumInstallScript
 {
+    private const string MacOSRelaunchScript =
+        """
+        while /bin/kill -0 "$1" 2>/dev/null; do
+            /bin/sleep 0.1
+        done
+
+        if [[ -n "$3" ]]; then
+            /usr/bin/open "$2" --args $3 >/dev/null 2>&1
+        else
+            /usr/bin/open "$2" >/dev/null 2>&1
+        fi
+        """;
+
+    internal static ProcessStartInfo CreateMacOSRelaunchProcessStartInfo(
+        int currentProcessId,
+        string appBundlePath,
+        string? runArguments)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(currentProcessId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(appBundlePath);
+
+        var startInfo = ProcessHelper.CreateProcessStartInfo(
+            "/usr/bin/nohup",
+            [
+                "/bin/bash",
+                "-c",
+                MacOSRelaunchScript,
+                "stagekit-updatum-relaunch",
+                currentProcessId.ToString(CultureInfo.InvariantCulture),
+                appBundlePath,
+                runArguments ?? string.Empty
+            ]);
+        startInfo.CreateNoWindow = true;
+        return startInfo;
+    }
+
     public static void WriteWindowsFileReplacement(TextWriter writer)
     {
         writer.WriteLine("echo - Staging replacement file");

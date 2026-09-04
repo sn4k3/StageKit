@@ -2442,10 +2442,9 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                         stream.WriteLine();
 
                         // Mount and resolve the target before anything with side effects, so a privilege-escalation
-                        // retry never terminates instances or runs the custom script twice.
+                        // retry never runs the custom script twice.
                         if (!isPkgPackage) UpdatumInstallScript.WriteMacOSDmgPreparation(stream);
 
-                        if (forceTerminate) WriteLinuxScriptKillInstances(stream);
                         WriteLinuxScriptInjectCustomScript(stream);
 
                         if (isPkgPackage) UpdatumInstallScript.WriteMacOSPkgInstallation(stream);
@@ -2479,7 +2478,29 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
 
                     cancellationToken.ThrowIfCancellationRequested();
                     RaiseEvent(InstallUpdateCompleted, downloadedAsset);
-                    if (runArguments != NoRunAfterUpgradeToken) EntryApplication.LaunchNewInstance(runArguments);
+                    if (runArguments != NoRunAfterUpgradeToken)
+                    {
+                        if (forceTerminate)
+                        {
+                            var appBundlePath = EntryApplication.MacOSAppBundlePath;
+                            if (string.IsNullOrWhiteSpace(appBundlePath))
+                            {
+                                throw new IOException(
+                                    "The installed macOS application bundle path could not be determined for relaunch.");
+                            }
+
+                            var relaunchStartInfo = UpdatumInstallScript.CreateMacOSRelaunchProcessStartInfo(
+                                Environment.ProcessId,
+                                appBundlePath,
+                                runArguments);
+                            if (ProcessHelper.StartProcess(relaunchStartInfo) != 0)
+                                throw new IOException("The macOS application relaunch helper could not be started.");
+                        }
+                        else
+                        {
+                            EntryApplication.LaunchNewInstance(runArguments);
+                        }
+                    }
 
                     downloadedAsset.SafeDeleteFile();
                     if (forceTerminate)

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using StageKit.Runtime;
 
 namespace StageKit.Tests;
@@ -110,9 +111,9 @@ public sealed class RuntimeTests
 
         try
         {
-            File.WriteAllText(
-                Path.Combine(directory, "build-runtime.json"),
-                "{\"PackagingType\":\"" + expected + "\"}");
+            WriteBuildRuntimeManifest(
+                Path.Combine(directory, BuildRuntime.DefaultManifestFileName),
+                expected);
 
             var detected = EntryApplication.DetectRuntimeManifestPackagingType(directory, null, null);
 
@@ -122,5 +123,105 @@ public sealed class RuntimeTests
         {
             Directory.Delete(directory, recursive: true);
         }
+    }
+
+    [Fact]
+    public void BuildRuntime_TryLoad_UsesSourceGeneratedMetadata()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        var manifestPath = Path.Combine(directory, BuildRuntime.DefaultManifestFileName);
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            var expected = WriteBuildRuntimeManifest(
+                manifestPath,
+                ApplicationPackagingType.LinuxAppImage);
+
+            var loaded = BuildRuntime.TryLoad(manifestPath, out var actual);
+
+            Assert.True(loaded);
+            Assert.Equal(expected, actual);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void BuildRuntime_TryLoad_ReturnsFalseForMissingOrInvalidManifest()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        var manifestPath = Path.Combine(directory, BuildRuntime.DefaultManifestFileName);
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            Assert.False(BuildRuntime.TryLoad(manifestPath, out var missing));
+            Assert.Null(missing);
+
+            File.WriteAllText(manifestPath, "not-json");
+
+            Assert.False(BuildRuntime.TryLoad(manifestPath, out var invalid));
+            Assert.Null(invalid);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void BuildRuntime_LoadFromApplicationDirectories_ContinuesAfterInvalidManifest()
+    {
+        var rootDirectory = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        var baseDirectory = Path.Combine(rootDirectory, "base");
+        var assemblyDirectory = Path.Combine(rootDirectory, "assembly");
+        Directory.CreateDirectory(baseDirectory);
+        Directory.CreateDirectory(assemblyDirectory);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(baseDirectory, BuildRuntime.DefaultManifestFileName), "not-json");
+            var expected = WriteBuildRuntimeManifest(
+                Path.Combine(assemblyDirectory, BuildRuntime.DefaultManifestFileName),
+                ApplicationPackagingType.LinuxRpm);
+
+            var actual = BuildRuntime.LoadFromApplicationDirectories(
+                baseDirectory,
+                Path.Combine(assemblyDirectory, "StageKit.Tests.dll"),
+                null);
+
+            Assert.Equal(expected, actual);
+        }
+        finally
+        {
+            Directory.Delete(rootDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void BuildRuntime_Instance_IsCached()
+    {
+        var first = BuildRuntime.Instance;
+        var second = BuildRuntime.Instance;
+
+        Assert.True(BuildRuntime.IsInstanceCreated);
+        Assert.Same(first, second);
+    }
+
+    private static BuildRuntime WriteBuildRuntimeManifest(
+        string manifestPath,
+        ApplicationPackagingType packagingType)
+    {
+        var runtime = new BuildRuntime("test-x64", "1.2.3", true, packagingType)
+        {
+            BuildDateTimeUtc = new DateTime(2026, 9, 4, 12, 34, 56, DateTimeKind.Utc),
+            BuildOSDescription = "Test OS"
+        };
+        var json = JsonSerializer.Serialize(runtime, BuildRuntimeJsonContext.Default.BuildRuntime);
+        File.WriteAllText(manifestPath, json);
+        return runtime;
     }
 }

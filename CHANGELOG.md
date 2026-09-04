@@ -1,4 +1,15 @@
-# v0.3.1 (/09/2026)
+# v0.3.1 (04/09/2026)
+
+- Add Fallout's `GenerateInstallScript` target, which creates GitHub Releases Bash and Windows PowerShell installers
+  from the selected `PackagingTypes`, exposes command help and explicit downgrade/version selection, prioritizes native
+  installers over generic bundles, keeps Portable last, lists all published release versions or their release-note
+  changelogs (limited to 20 releases by default), reports clean PowerShell release-resolution errors, and falls back
+  when an asset or package tool is unavailable.
+- Fix macOS PKG and DMG auto-updates leaving the application closed by deferring relaunch to a non-elevated helper that
+  waits for the old process to exit. Set the StageKit demo's Avalonia application name so its macOS menu uses
+  `StageKit`.
+- Add an `/Applications` shortcut to macOS DMG images for drag-and-drop installation; PKG installers continue to install
+  their application directly in `/Applications`.
 - Add opt-in `LinuxAppBundleOptions.FlatpakAllowHostCommandExecution` manifest configuration for applications that need
   the `org.freedesktop.Flatpak` host-command service.
 - Stage `libicu74` in Snap packages by default so self-contained .NET applications have globalization support, with a
@@ -8,6 +19,10 @@
   host-visible application cache for downloaded bundles.
 - Add `HostSystem.TryFindExecutable` for subprocess-free executable lookup with Windows `PATHEXT` support and Unix
   execute-permission validation.
+- Add synchronous and asynchronous `HostSystem` helpers to open URLs, directories, and files with their default host
+  applications, or reveal a file in Windows Explorer and macOS Finder (with containing-directory fallback on Linux).
+- Add lazy `BuildRuntime.Instance` manifest loading and `BuildRuntime.TryLoad(...)` to `StageKit.Runtime`, using
+  source-generated JSON metadata and the generic enum converter for trimming and Native AOT compatibility.
 
 # v0.3.0 (02/09/2026)
 
@@ -25,12 +40,13 @@
 - Add Linux `PackagingTypes` for Flatpak, Debian, RPM, Arch Linux binary, and Snap packages, plus macOS DMG and PKG
   output. Package creation uses the platform-native `flatpak-builder`, `dpkg-deb`, `rpmbuild`, `makepkg`, `snapcraft`,
   `hdiutil`, and `pkgbuild` tools.
-- Extend Updatum asset selection and installation to Linux Flatpak, Debian, RPM, Arch Linux binary, and Snap packages, plus
-  macOS PKG and DMG packages. Flatpak updates preserve the current user/system installation scope, privileged package installs
-  use `ProcessHelper` elevation, and post-install completion or relaunch only continues after a successful installer exit code.
-  DMG installation mounts images read-only, always detaches them, and installs an embedded PKG or atomically replaces an
-  embedded app bundle with rollback. A DMG runs unprivileged first and only re-runs with the administrator prompt when it
-  wraps a PKG or targets a directory the current user cannot write, so instance termination and
+- Extend Updatum asset selection and installation to Linux Flatpak, Debian, RPM, Arch Linux binary, and Snap packages,
+  plus macOS PKG and DMG packages. Flatpak updates preserve the current user/system installation scope, privileged
+  package installs use `ProcessHelper` elevation, and post-install completion or relaunch only continues after a
+  successful installer exit code. DMG installation mounts images read-only, always detaches them, and installs an
+  embedded PKG or atomically replaces an embedded app bundle with rollback. A DMG runs unprivileged first and only
+  re-runs with the administrator prompt when it wraps a PKG or targets a directory the current user cannot write, so
+  instance termination and
   `InstallUpdateInjectCustomScript` still run exactly once.
 - Update the release workflow to build runtime assets for supported platforms, attach packages and assets to a GitHub
   release, and omit Winget publishing.

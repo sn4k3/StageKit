@@ -211,7 +211,8 @@ public partial class StageKitBuild
     protected virtual void CreateMacOSDmg(PublishRidContext context)
     {
         CreateMacOSPackage(context, ApplicationPackagingType.MacOSDmg, ".dmg",
-            (appPath, outputPath) => MacPackage.GetDmgCommand(SoftwareName, appPath, outputPath));
+            (appPath, outputPath) => MacPackage.GetDmgCommand(
+                SoftwareName, appPath.Parent, appPath.Parent / "Applications", outputPath));
     }
 
     /// <summary>Creates one macOS component installer package.</summary>
@@ -227,7 +228,8 @@ public partial class StageKitBuild
         PublishRidContext arm64Context)
     {
         CreateMultiArchMacOSPackage(x64Context, arm64Context, ApplicationPackagingType.MacOSDmg, ".dmg",
-            (appPath, outputPath) => MacPackage.GetDmgCommand(SoftwareName, appPath, outputPath));
+            (appPath, outputPath) => MacPackage.GetDmgCommand(
+                SoftwareName, appPath.Parent, appPath.Parent / "Applications", outputPath));
     }
 
     /// <summary>Creates one multi-architecture macOS component installer package.</summary>
@@ -240,7 +242,7 @@ public partial class StageKitBuild
     }
 
     private void CreateMacOSPackage(PublishRidContext context, ApplicationPackagingType packagingType,
-        string extension, Func<string, string, string> createCommand)
+        string extension, Func<AbsolutePath, AbsolutePath, string> createCommand)
     {
         var stagingPath = PublishStagingDirectory / Guid.NewGuid().ToString("N");
         var outputPath = (AbsolutePath)$"{context.BundleOutputPath}{extension}";
@@ -260,7 +262,8 @@ public partial class StageKitBuild
     }
 
     private void CreateMultiArchMacOSPackage(PublishRidContext x64Context, PublishRidContext arm64Context,
-        ApplicationPackagingType packagingType, string extension, Func<string, string, string> createCommand)
+        ApplicationPackagingType packagingType, string extension,
+        Func<AbsolutePath, AbsolutePath, string> createCommand)
     {
         var stagingPath = PublishStagingDirectory / Guid.NewGuid().ToString("N");
         var outputPath = (AbsolutePath)$"{GetMultiArchMacOSBundleOutputPath(x64Context)}{extension}";

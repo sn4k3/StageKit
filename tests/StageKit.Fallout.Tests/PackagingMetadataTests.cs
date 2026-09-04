@@ -159,11 +159,14 @@ public class PackagingMetadataTests
     [Fact]
     public void GetDmgCommand_ValidPaths_CreatesCompressedDiskImage()
     {
-        var command = MacPackage.GetDmgCommand("Test App", "/tmp/Test App.app", "/tmp/Test App.dmg");
+        var command = MacPackage.GetDmgCommand(
+            "Test App", "/tmp/dmg-root", "/tmp/dmg-root/Applications", "/tmp/Test App.dmg");
 
+        Assert.StartsWith("ln -s '/Applications' '/tmp/dmg-root/Applications' && ", command,
+            StringComparison.Ordinal);
         Assert.Contains("hdiutil create", command, StringComparison.Ordinal);
         Assert.Contains("-format UDZO", command, StringComparison.Ordinal);
-        Assert.Contains("-srcfolder '/tmp/Test App.app'", command, StringComparison.Ordinal);
+        Assert.Contains("-srcfolder '/tmp/dmg-root'", command, StringComparison.Ordinal);
         Assert.EndsWith("'/tmp/Test App.dmg'", command, StringComparison.Ordinal);
     }
 

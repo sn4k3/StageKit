@@ -27,6 +27,17 @@
       "triggers": []
     },
     {
+      "name": "GenerateInstallScript",
+      "description": null,
+      "declaredIn": "StageKitBuild",
+      "default": false,
+      "listed": true,
+      "dependsOn": [],
+      "after": [],
+      "triggeredBy": [],
+      "triggers": []
+    },
+    {
       "name": "Print",
       "description": null,
       "declaredIn": "StageKitBuild",

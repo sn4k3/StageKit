@@ -7,12 +7,15 @@ namespace StageKit.Fallout;
 /// </summary>
 internal static class MacPackage
 {
-    internal static string GetDmgCommand(string volumeName, string appPath, string outputPath)
+    internal static string GetDmgCommand(string volumeName, string sourceFolderPath, string applicationsLinkPath,
+        string outputPath)
     {
         ValidateValue(volumeName, nameof(volumeName));
-        ValidateValue(appPath, nameof(appPath));
+        ValidateValue(sourceFolderPath, nameof(sourceFolderPath));
+        ValidateValue(applicationsLinkPath, nameof(applicationsLinkPath));
         ValidateValue(outputPath, nameof(outputPath));
-        return $"hdiutil create -volname {volumeName.QuoteShell()} -srcfolder {appPath.QuoteShell()} " +
+        return $"ln -s {"/Applications".QuoteShell()} {applicationsLinkPath.QuoteShell()} && " +
+               $"hdiutil create -volname {volumeName.QuoteShell()} -srcfolder {sourceFolderPath.QuoteShell()} " +
                $"-ov -format UDZO {outputPath.QuoteShell()}";
     }
 

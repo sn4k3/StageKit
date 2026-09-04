@@ -27,6 +27,10 @@ public record ApplicationPackagingInfo(
     /// <summary>
     /// Gets a dictionary of known application packaging types and their corresponding information.
     /// </summary>
+    /// <remarks>
+    /// Enumeration order is the preferred package order for consumers that must choose between multiple formats:
+    /// platform-native installers precede generic bundles, and portable packages are last.
+    /// </remarks>
     [field: MaybeNull]
     [field: AllowNull]
     public static IReadOnlyDictionary<ApplicationPackagingType, ApplicationPackagingInfo> KnownPackagingTypes =>
@@ -38,37 +42,9 @@ public record ApplicationPackagingInfo(
                     new ApplicationPackagingInfo(ApplicationPackagingType.None, "None", [], OSPlatform.Create("None"))
                 },
                 {
-                    ApplicationPackagingType.Portable,
-                    new ApplicationPackagingInfo(ApplicationPackagingType.Portable, "Portable",
-                        [".zip", ".tar", ".tar.gz", ".tar.bz2", ".tar.xz"], null)
-                },
-                {
-                    ApplicationPackagingType.DotNetSingleFile,
-                    new ApplicationPackagingInfo(ApplicationPackagingType.DotNetSingleFile, ".NET Single File",
-                    [
-                        ".exe", ".bin",
-                        string.Empty // Last two for linux/macOS single-file executables without extensions
-                    ], null)
-                },
-                {
                     ApplicationPackagingType.WindowsInstaller,
                     new ApplicationPackagingInfo(ApplicationPackagingType.WindowsInstaller, "Windows Installer (MSI)",
                         [".msi", ".exe"], OSPlatform.Windows)
-                },
-                {
-                    ApplicationPackagingType.LinuxAppImage,
-                    new ApplicationPackagingInfo(ApplicationPackagingType.LinuxAppImage, "Linux AppImage",
-                        [".AppImage"], OSPlatform.Linux)
-                },
-                {
-                    ApplicationPackagingType.LinuxFlatpak,
-                    new ApplicationPackagingInfo(ApplicationPackagingType.LinuxFlatpak, "Linux Flatpak", [".flatpak"],
-                        OSPlatform.Linux)
-                },
-                {
-                    ApplicationPackagingType.LinuxSnap,
-                    new ApplicationPackagingInfo(ApplicationPackagingType.LinuxSnap, "Linux Snap", [".snap"],
-                        OSPlatform.Linux)
                 },
                 {
                     ApplicationPackagingType.LinuxDeb,
@@ -86,8 +62,28 @@ public record ApplicationPackagingInfo(
                         [".pkg.tar.zst"], OSPlatform.Linux, true)
                 },
                 {
+                    ApplicationPackagingType.LinuxAppImage,
+                    new ApplicationPackagingInfo(ApplicationPackagingType.LinuxAppImage, "Linux AppImage",
+                        [".AppImage"], OSPlatform.Linux)
+                },
+                {
+                    ApplicationPackagingType.LinuxFlatpak,
+                    new ApplicationPackagingInfo(ApplicationPackagingType.LinuxFlatpak, "Linux Flatpak", [".flatpak"],
+                        OSPlatform.Linux)
+                },
+                {
+                    ApplicationPackagingType.LinuxSnap,
+                    new ApplicationPackagingInfo(ApplicationPackagingType.LinuxSnap, "Linux Snap", [".snap"],
+                        OSPlatform.Linux)
+                },
+                {
                     ApplicationPackagingType.MacOSAppBundle,
                     new ApplicationPackagingInfo(ApplicationPackagingType.MacOSAppBundle, "macOS App Bundle", [".zip"],
+                        OSPlatform.OSX)
+                },
+                {
+                    ApplicationPackagingType.MacOSPkg,
+                    new ApplicationPackagingInfo(ApplicationPackagingType.MacOSPkg, "macOS PKG", [".pkg"],
                         OSPlatform.OSX)
                 },
                 {
@@ -96,9 +92,17 @@ public record ApplicationPackagingInfo(
                         OSPlatform.OSX)
                 },
                 {
-                    ApplicationPackagingType.MacOSPkg,
-                    new ApplicationPackagingInfo(ApplicationPackagingType.MacOSPkg, "macOS PKG", [".pkg"],
-                        OSPlatform.OSX)
-                }
+                    ApplicationPackagingType.DotNetSingleFile,
+                    new ApplicationPackagingInfo(ApplicationPackagingType.DotNetSingleFile, ".NET Single File",
+                    [
+                        ".exe", ".bin",
+                        string.Empty // Linux/macOS single-file executables may not have an extension
+                    ], null)
+                },
+                {
+                    ApplicationPackagingType.Portable,
+                    new ApplicationPackagingInfo(ApplicationPackagingType.Portable, "Portable",
+                        [".zip", ".tar", ".tar.gz", ".tar.bz2", ".tar.xz"], null)
+                },
             };
 }

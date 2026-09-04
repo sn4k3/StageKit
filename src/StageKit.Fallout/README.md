@@ -17,7 +17,7 @@ exposes ready-made targets to restore, compile, run, and publish an application 
 - Solution and main-project discovery, preferring `.slnx` over `.sln`
 - Software metadata (name, company, RDNS, version, license, repository URL, tags) resolved from the main project's
   MSBuild properties
-- Ready-made `Print`, `Clean`, `Restore`, `Compile`, `Run`, and `Publish` targets
+- Ready-made `Print`, `Clean`, `Restore`, `Compile`, `Run`, `Publish`, and `GenerateInstallScript` targets
 - Self-contained + ReadyToRun publish by default, with optional framework-dependent deployment
 - Bundle creation: portable zip, .NET single-file, WiX installer, macOS `.app`/DMG/PKG, Linux AppImage, Flatpak, Debian,
   RPM, Arch Linux, and Snap packages
@@ -115,6 +115,7 @@ Run a target:
 ./build.ps1 Print
 ./build.ps1 Compile
 ./build.ps1 Publish
+./build.ps1 GenerateInstallScript
 ```
 
 ```bash
@@ -123,14 +124,15 @@ Run a target:
 
 ## Targets
 
-| Target    | Depends on            | Description                                                                                                            |
-|-----------|-----------------------|------------------------------------------------------------------------------------------------------------------------|
-| `Print`   | —                     | Logs every public build variable, including resolved metadata and bundle options. Useful for diagnosing configuration. |
-| `Clean`   | runs before `Restore` | `dotnet clean` plus deletion of `ArtifactsDirectory`.                                                                  |
-| `Restore` | —                     | `dotnet restore` on `MainProject`.                                                                                     |
-| `Compile` | `Restore`             | `dotnet build` on `MainProject`. Default target.                                                                       |
-| `Run`     | `Compile`             | `dotnet run` on `MainProject` with `--no-build --no-restore`.                                                          |
-| `Publish` | `Restore`             | Publishes every runtime identifier in `RIds` and creates the packaging formats selected by `PackagingTypes`.           |
+| Target                  | Depends on            | Description                                                                                                            |
+|-------------------------|-----------------------|------------------------------------------------------------------------------------------------------------------------|
+| `Print`                 | —                     | Logs every public build variable, including resolved metadata and bundle options. Useful for diagnosing configuration. |
+| `Clean`                 | runs before `Restore` | `dotnet clean` plus deletion of `ArtifactsDirectory`.                                                                  |
+| `Restore`               | —                     | `dotnet restore` on `MainProject`.                                                                                     |
+| `Compile`               | `Restore`             | `dotnet build` on `MainProject`. Default target.                                                                       |
+| `Run`                   | `Compile`             | `dotnet run` on `MainProject` with `--no-build --no-restore`.                                                          |
+| `Publish`               | `Restore`             | Publishes every runtime identifier in `RIds` and creates the packaging formats selected by `PackagingTypes`.           |
+| `GenerateInstallScript` | —                     | Generates Bash `.sh` and Windows PowerShell `.ps1` installers for compatible GitHub release assets.                   |
 
 `DependOnTargets` lets a derived build inject extra targets into `Compile`, `Run`, and `Publish`.
 
@@ -221,8 +223,67 @@ Duplicate values and `None` are removed while preserving selection order. Format
 skipped with a warning rather than failing the build. Set `PackagingTypes` to `[]` to publish runtime outputs without
 creating packages.
 
-DMG and PKG creation stage and sign the same `.app` layout used by `MacOSAppBundle`; PKG output installs that app in
-`/Applications`. With `PublishMultiArch`, both native formats contain the combined `osx-x64` and `osx-arm64` app.
+### Installation script
+
+Run `GenerateInstallScript` to create `scripts/install-<software-name>.sh` and
+`scripts/install-<software-name>.ps1`. The target is independent of `Publish`, so it can describe packages produced by
+separate Windows, Linux, and macOS runners without trying to build them locally. A script is omitted when none of its
+supported formats are selected. Every run prints a command header, its help command shows detailed usage, `list` shows
+all published GitHub release versions, and `list-changelog` shows GitHub release notes for up to 20 versions by default.
+Pass a different positive limit when needed. Install the latest version or select an older release to downgrade:
+
+```bash
+./scripts/install-myapp.sh
+./scripts/install-myapp.sh install v1.2.3
+./scripts/install-myapp.sh --version 1.2.3
+./scripts/install-myapp.sh --list
+./scripts/install-myapp.sh --list-changelog
+./scripts/install-myapp.sh --list-changelog 5
+./scripts/install-myapp.sh help
+```
+
+```powershell
+.\scripts\install-myapp.ps1
+.\scripts\install-myapp.ps1 install v1.2.3
+.\scripts\install-myapp.ps1 -Version 1.2.3
+.\scripts\install-myapp.ps1 -List
+.\scripts\install-myapp.ps1 -ListChangelog
+.\scripts\install-myapp.ps1 -ListChangelog -ChangelogLimit 5
+.\scripts\install-myapp.ps1 -Help
+```
+
+The Bash `list-changelog` command uses `jq` when available and otherwise falls back to `python3` to decode GitHub's
+release-note JSON.
+
+Only formats present in `PackagingTypes` are emitted. Their priority follows the insertion order of
+`ApplicationPackagingInfo.KnownPackagingTypes`. Linux first tries the package native to the detected distribution
+(DEB, RPM, or Arch), followed by AppImage, Flatpak, Snap, .NET single-file, and finally Portable. macOS tries the
+app-bundle archive, followed by PKG and DMG. Incompatible formats are skipped and the next selected format is tried. The
+release asset must contain Fallout's runtime identifier (`linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64`, or
+`osx-multiarch`) and use the standard extension for its packaging type. This is automatic with the default `AssetName`
+callback.
+
+Windows PowerShell first tries a Windows installer (`.msi`, then `.exe`), followed by the .NET single-file executable
+and finally the Portable zip. Single-file and Portable packages install under `%LOCALAPPDATA%\Programs\<package>` and
+add the executable directory to the current user's `PATH`. MSI packages run passively and request elevation when
+needed; whether an MSI permits installing an older version is controlled by that installer project. Missing release
+versions and GitHub request failures are reported as concise script errors instead of raw PowerShell exceptions.
+
+Explicit version selection accepts tags with or without the leading `v` and enables package-manager downgrade options
+for DEB and RPM installation. Arch, Flatpak, Snap, portable, and application-bundle formats replace or update the
+currently installed package with the selected release according to their native tool behavior.
+
+The repository metadata must identify GitHub through an HTTPS URL such as `https://github.com/owner/repository` or an
+SSH URL such as `git@github.com:owner/repository.git`. Override `InstallScriptFile`, `WindowsInstallScriptFile`,
+`CreateInstallScript()`, `CreateWindowsInstallScript()`, or `ExecuteGenerateInstallScript()` in a derived build to
+customize the output paths, contents, or write step.
+
+DMG and PKG creation stage and sign the same `.app` layout used by `MacOSAppBundle`. DMG output includes an
+`Applications` symlink for drag-and-drop installation, while PKG output installs the app directly in `/Applications`.
+With `PublishMultiArch`, both native formats contain the combined `osx-x64` and `osx-arm64` app.
+Avalonia applications should also set `Application.Name` in `App.axaml` to the same value as `SoftwareName`; otherwise,
+Avalonia may replace the macOS menu title at runtime with its `Avalonia Application` fallback despite the generated
+`CFBundleName` and `CFBundleDisplayName` values.
 
 Debian, RPM, and Arch Linux payloads install the application under `/usr/lib/<package>` and a launcher under
 `/usr/bin/<package>`. When selecting `LinuxDeb`, set
@@ -250,8 +311,8 @@ scalable hicolor directory, while PNG icons are installed in `256x256/apps`. App
 
 Each distributable receives a `BuildRuntime` JSON manifest named by `BuildRuntimeManifestFileName`. Portable archives,
 installer payloads, macOS bundles, and AppImages stage it beside the application payload; single-file publishing embeds
-it as bundled content. The manifest is intended for diagnostics and release tooling and is not read automatically by
-`StageKit.Runtime`.
+it as bundled content. `StageKit.Runtime` automatically exposes the default `build-runtime.json` file through
+`BuildRuntime.Instance`; use `BuildRuntime.TryLoad(...)` when this Fallout file name is customized.
 
 The schema is versioned independently through `SchemaVersion` so consumers can reject or migrate future layouts:
 

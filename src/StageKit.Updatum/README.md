@@ -149,7 +149,8 @@ through `/usr/sbin/installer`, which always installs into the system domain and 
 mounted read-only and always detached; an embedded PKG is installed with `installer`, while an embedded app bundle is staged
 and atomically replaced in its current location (or `/Applications` when no current bundle is known), with rollback on failure.
 A DMG runs unprivileged first and only re-runs with the administrator prompt when it wraps a PKG or targets a directory the
-current user cannot write, so instance termination and `InstallUpdateInjectCustomScript` still run exactly once.
+current user cannot write. After a successful forced update, a non-elevated detached helper waits for the old process to exit
+before reopening the installed application bundle, avoiding Launch Services activating the old instance instead.
 
 Call `SafeDeleteFile()` on a downloaded asset when installation is not attempted. It removes the downloaded file and its empty
 managed workspace on a best-effort basis.

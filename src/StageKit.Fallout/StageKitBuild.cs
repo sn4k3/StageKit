@@ -10,7 +10,8 @@ namespace StageKit.Fallout;
 
 /// <summary>
 /// Provides the StageKit build pipeline: solution and project discovery, software metadata resolved from
-/// MSBuild properties, and the restore/compile/run/publish targets together with their platform bundles.
+/// MSBuild properties, restore/compile/run/publish targets and platform bundles, plus GitHub installation-script
+/// generation.
 /// </summary>
 public abstract partial class StageKitBuild : FalloutBuild
 {

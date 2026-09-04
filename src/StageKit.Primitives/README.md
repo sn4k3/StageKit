@@ -20,7 +20,7 @@ All public helpers are exposed from the `StageKit.Primitives` namespace. IO-rela
 - Stream-based atomic file writes through `SafeFileStream`
 - Path, leaf-name validation, temporary file, and temporary directory helpers
 - Bash ANSI-C and Windows batch value quoting helpers through `StringExtensions`
-- Host-aware path comparison and Unix executable-permission helpers
+- Host-aware path comparison, URL/file-manager launching, and Unix executable-permission helpers
 - Disposable base type with thread-safe idempotent disposal through `DisposableObject`
 - Finalizable disposable base type through `UnmanagedDisposableObject`
 - Leave-open lifecycle base type through `LeaveOpenDisposableObject`
@@ -173,6 +173,20 @@ on Windows and requires an execute permission bit on Unix:
 if (HostSystem.TryFindExecutable("git", out string? gitPath))
     Console.WriteLine(gitPath);
 ```
+
+Open URLs, directories, and files with the host's default applications. `ShowFileInFileManager(...)` selects the file
+in Windows Explorer or macOS Finder; on Linux it opens the containing directory because there is no portable selection
+command:
+
+```csharp
+HostSystem.OpenUrl("https://example.com");
+HostSystem.OpenDirectory(profileDirectory);
+HostSystem.OpenFile(reportPath);
+HostSystem.ShowFileInFileManager(reportPath);
+```
+
+Async counterparts such as `OpenUrlAsync(...)` and `ShowFileInFileManagerAsync(...)` accept a cancellation token. All
+open methods return `false` for invalid or missing targets, unsupported hosts, and launcher failures.
 
 Use `UnixSystem.SetUnix755Executable(...)` to grant owner write/execute and group/other execute permissions to a Unix
 launcher. The method is a no-op on Windows.
