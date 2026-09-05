@@ -1,6 +1,11 @@
 # v0.3.2 (/09/2026)
 
 - Fall back to `wget` in Bash build and generated installation scripts when `curl` is unavailable.
+- Fix arch installer warnings from an unnecessary `awk` regex escape and accept `/help` and `/?` aliases.
+- Add Bash `--portable [PATH]` extraction into an application-named directory and generate a package-aware Bash
+  uninstaller that probes all supported Linux and macOS formats.
+- Generate a Windows PowerShell uninstaller that probes an exact configured WinGet package, exact registered installer
+  display names, and the known per-user Portable/single-file directory and `PATH` entries.
 
 # v0.3.1 (04/09/2026)
 

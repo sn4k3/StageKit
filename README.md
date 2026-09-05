@@ -673,8 +673,9 @@ ReadyToRun output, then creates the selected bundles in `artifacts/publish/`. Po
 installer, macOS `.app`, and Linux AppImage are enabled by default. Bundles whose host requirement is unmet are skipped
 with a warning. See the
 [`StageKit.Fallout` README](src/StageKit.Fallout/README.md) for targets, parameters, and customization points.
-`GenerateInstallScript` creates standalone Bash and Windows PowerShell installers under `scripts/` that resolve the best
-compatible selected package from a GitHub release.
+`GenerateInstallScript` creates standalone Bash and Windows PowerShell installers and uninstallers under `scripts/`.
+The Bash installer can force Portable ZIP extraction into an application-named directory with `--portable [PATH]`;
+the uninstallers probe supported native and standalone installation forms and remove detected installations.
 
 ## Security
 

@@ -132,7 +132,7 @@ Run a target:
 | `Compile`               | `Restore`             | `dotnet build` on `MainProject`. Default target.                                                                       |
 | `Run`                   | `Compile`             | `dotnet run` on `MainProject` with `--no-build --no-restore`.                                                          |
 | `Publish`               | `Restore`             | Publishes every runtime identifier in `RIds` and creates the packaging formats selected by `PackagingTypes`.           |
-| `GenerateInstallScript` | —                     | Generates Bash `.sh` and Windows PowerShell `.ps1` installers for compatible GitHub release assets.                   |
+| `GenerateInstallScript` | —                     | Generates Bash and Windows PowerShell install/uninstall scripts for compatible GitHub release assets.                 |
 
 `DependOnTargets` lets a derived build inject extra targets into `Compile`, `Run`, and `Publish`.
 
@@ -225,12 +225,14 @@ creating packages.
 
 ### Installation script
 
-Run `GenerateInstallScript` to create `scripts/install-<software-name>.sh` and
-`scripts/install-<software-name>.ps1`. The target is independent of `Publish`, so it can describe packages produced by
+Run `GenerateInstallScript` to create `scripts/install-<software-name>.sh`,
+`scripts/uninstall-<software-name>.sh`, `scripts/install-<software-name>.ps1`, and
+`scripts/uninstall-<software-name>.ps1`. The target is independent of `Publish`, so it can describe packages produced by
 separate Windows, Linux, and macOS runners without trying to build them locally. A script is omitted when none of its
-supported formats are selected. Every run prints a command header, its help command shows detailed usage, `list` shows
-all published GitHub release versions, and `list-changelog` shows GitHub release notes for up to 20 versions by default.
-Pass a different positive limit when needed. Install the latest version or select an older release to downgrade:
+supported formats are selected. Every installer run prints a command header, its help command shows detailed usage,
+`list` shows all published GitHub release versions, and `list-changelog` shows GitHub release notes for up to 20 versions
+by default. Pass a different positive limit when needed. Install the latest version or select an older release to
+downgrade:
 
 ```bash
 ./scripts/install-myapp.sh
@@ -239,7 +241,23 @@ Pass a different positive limit when needed. Install the latest version or selec
 ./scripts/install-myapp.sh --list
 ./scripts/install-myapp.sh --list-changelog
 ./scripts/install-myapp.sh --list-changelog 5
+./scripts/install-myapp.sh --portable
+./scripts/install-myapp.sh --portable /home/user/apps
 ./scripts/install-myapp.sh help
+```
+
+`--portable` forces selection of the Linux Portable ZIP and extracts it to `<current-directory>/<software-name>`.
+Passing a path extracts to `<path>/<software-name>` instead. This extraction mode does not create a launcher in
+`~/.local/bin`.
+
+The generated Bash uninstaller checks every supported package format and removes all installations it detects through
+the appropriate system tool. It covers user and system Flatpak installations, Snap, DEB, RPM, Arch Linux, AppImage,
+single-file, Portable, and macOS application/PKG installations. Use the matching portable parent path to also remove a
+custom extraction:
+
+```bash
+./scripts/uninstall-myapp.sh
+./scripts/uninstall-myapp.sh --portable /home/user/apps
 ```
 
 ```powershell
@@ -250,6 +268,7 @@ Pass a different positive limit when needed. Install the latest version or selec
 .\scripts\install-myapp.ps1 -ListChangelog
 .\scripts\install-myapp.ps1 -ListChangelog -ChangelogLimit 5
 .\scripts\install-myapp.ps1 -Help
+.\scripts\uninstall-myapp.ps1
 ```
 
 The Bash `list-changelog` command uses `jq` when available and otherwise falls back to `python3` to decode GitHub's
@@ -271,15 +290,19 @@ versions and GitHub request failures are reported as concise script errors inste
 Set `WindowsInstallScriptWinGetPackageId` to an exact WinGet package identifier to make the Windows script try a silent
 WinGet install first. If WinGet is unavailable or returns an error, the script falls back to its normal GitHub release
 asset selection and installation. Explicit versions are passed to WinGet without a leading `v` and use its force option.
+The generated Windows uninstaller tries that exact WinGet package ID, then exact application-name entries in the Windows
+uninstall registry, and finally removes StageKit's known `%LOCALAPPDATA%\Programs\<package>` directory and corresponding
+user `PATH` entries. It continues checking the other installation forms if one removal fails.
 
 Explicit version selection accepts tags with or without the leading `v` and enables package-manager downgrade options
 for DEB and RPM installation. Arch, Flatpak, Snap, portable, and application-bundle formats replace or update the
 currently installed package with the selected release according to their native tool behavior.
 
 The repository metadata must identify GitHub through an HTTPS URL such as `https://github.com/owner/repository` or an
-SSH URL such as `git@github.com:owner/repository.git`. Override `InstallScriptFile`, `WindowsInstallScriptFile`,
-`CreateInstallScript()`, `CreateWindowsInstallScript()`, or `ExecuteGenerateInstallScript()` in a derived build to
-customize the output paths, contents, or write step.
+SSH URL such as `git@github.com:owner/repository.git`. Override `InstallScriptFile`, `UninstallScriptFile`,
+`WindowsInstallScriptFile`, `WindowsUninstallScriptFile`, `CreateInstallScript()`, `CreateUninstallScript()`,
+`CreateWindowsInstallScript()`, `CreateWindowsUninstallScript()`, or `ExecuteGenerateInstallScript()` in a derived build
+to customize the output paths, contents, or write step.
 
 DMG and PKG creation stage and sign the same `.app` layout used by `MacOSAppBundle`. DMG output contains the application
 bundle alone, while PKG output installs the app directly in `/Applications`. The application bundle is passed to

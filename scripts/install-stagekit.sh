@@ -27,6 +27,7 @@ show_header() {
   printf '  %s --version VERSION\n' "$script_name"
   printf '  %s --list\n' "$script_name"
   printf '  %s --list-changelog [LIMIT]\n' "$script_name"
+  printf '  %s --portable [PATH]\n' "$script_name"
   printf '  %s help\n' "$script_name"
   printf 'Commands:\n'
   printf '  install [VERSION]   Install or downgrade to the latest or selected version.\n'
@@ -37,6 +38,7 @@ show_header() {
   printf '  -v, --version VERSION  Pick a release version, including an older version.\n'
   printf '  -l, --list             Show the available published release versions.\n'
   printf '  --list-changelog [LIMIT]  Show release changelogs (default: 20 versions).\n'
+  printf '  --portable [PATH]      Extract the Portable ZIP to PATH/%s (default: current directory).\n' "$APPLICATION_NAME"
   printf '  -h, --help             Show detailed help.\n'
   printf '============================================================\n\n'
 }
@@ -52,6 +54,8 @@ show_help() {
   printf '  %s --list\n' "${0##*/}"
   printf '  %s --list-changelog\n' "${0##*/}"
   printf '  %s --list-changelog 5\n' "${0##*/}"
+  printf '  %s --portable\n' "${0##*/}"
+  printf '  %s --portable /opt\n' "${0##*/}"
   printf '  %s help\n' "${0##*/}"
 }
 
@@ -109,7 +113,7 @@ normalize_architecture() {
 detect_linux_native_package() {
   local distribution_ids=''
   if [ -r /etc/os-release ]; then
-    distribution_ids="$(awk -F= '/^(ID|ID_LIKE)=/ { gsub(/\"/, "", $2); printf "%s ", tolower($2) }' /etc/os-release)"
+    distribution_ids="$(awk -F= '/^(ID|ID_LIKE)=/ { gsub(/"/, "", $2); printf "%s ", tolower($2) }' /etc/os-release)"
   fi
 
   case "$distribution_ids" in
@@ -237,14 +241,18 @@ parse_arguments() {
   ACTION='install'
   VERSION='latest'
   CHANGELOG_LIMIT='20'
+  FORCE_PORTABLE='false'
+  PORTABLE_PARENT=''
   case "$#" in
     0) ;;
     1)
       case "$1" in
-        help|-h|--help) show_help; exit 0 ;;
+        help|-h|--help|/help|'/?') show_help; exit 0 ;;
         list|-l|--list) ACTION='list' ;;
         list-changelog|--list-changelog) ACTION='list-changelog' ;;
         --list-changelog=*) ACTION='list-changelog'; CHANGELOG_LIMIT="${1#*=}" ;;
+        --portable) FORCE_PORTABLE='true'; PORTABLE_PARENT="$PWD" ;;
+        --portable=*) FORCE_PORTABLE='true'; PORTABLE_PARENT="${1#*=}" ;;
         install) ;;
         -v|--version) fail "$1 requires a VERSION." ;;
         --version=*) VERSION="${1#*=}" ;;
@@ -255,6 +263,7 @@ parse_arguments() {
       case "$1" in
         install|-v|--version) VERSION="$2" ;;
         list-changelog|--list-changelog) ACTION='list-changelog'; CHANGELOG_LIMIT="$2" ;;
+        --portable) FORCE_PORTABLE='true'; PORTABLE_PARENT="$2" ;;
         *) fail "Unknown command or option: $1" ;;
       esac
       ;;
@@ -262,6 +271,9 @@ parse_arguments() {
   esac
 
   [ -n "$VERSION" ] || fail 'VERSION cannot be empty.'
+  if [ "$FORCE_PORTABLE" = 'true' ]; then
+    [ -n "$PORTABLE_PARENT" ] || fail 'Portable destination path cannot be empty.'
+  fi
   if [ "$ACTION" = 'list-changelog' ]; then
     [[ "$CHANGELOG_LIMIT" =~ ^[1-9][0-9]*$ ]] &&
       [ "${#CHANGELOG_LIMIT}" -le 9 ] ||
@@ -327,6 +339,9 @@ find_asset_url() {
 select_package() {
   local package_type candidate
   for package_type in "${PACKAGE_TYPES[@]}"; do
+    if [ "$FORCE_PORTABLE" = 'true' ] && [ "$package_type" != 'portable' ]; then
+      continue
+    fi
     package_is_compatible "$package_type" || continue
     if candidate="$(find_asset_url "$package_type")"; then
       SELECTED_PACKAGE_TYPE="$package_type"
@@ -340,16 +355,26 @@ select_package() {
 
 install_portable() {
   command_exists unzip || fail 'unzip is required to install the portable archive.'
-  local destination="${XDG_DATA_HOME:-$HOME/.local/share}/${APPLICATION_SLUG}"
+  local destination
   local executable_path
+  if [ "$FORCE_PORTABLE" = 'true' ]; then
+    destination="${PORTABLE_PARENT%/}/${APPLICATION_NAME}"
+  else
+    destination="${XDG_DATA_HOME:-$HOME/.local/share}/${APPLICATION_SLUG}"
+  fi
   rm -rf "${destination}.new"
-  mkdir -p "${destination}.new" "$HOME/.local/bin"
+  mkdir -p "${destination}.new"
   unzip -q "$ASSET_FILE" -d "${destination}.new"
   executable_path="$(find "${destination}.new" -type f -name "$EXECUTABLE_NAME" -print -quit)"
   [ -n "$executable_path" ] || fail "The archive does not contain ${EXECUTABLE_NAME}."
   chmod +x "$executable_path"
   rm -rf "$destination"
   mv "${destination}.new" "$destination"
+  if [ "$FORCE_PORTABLE" = 'true' ]; then
+    printf 'Extracted %s to %s.\n' "$APPLICATION_NAME" "$destination"
+    return
+  fi
+  mkdir -p "$HOME/.local/bin"
   executable_path="$(find "$destination" -type f -name "$EXECUTABLE_NAME" -print -quit)"
   ln -sfn "$executable_path" "$HOME/.local/bin/$EXECUTABLE_NAME"
 }
@@ -490,8 +515,12 @@ ASSET_URLS="$(printf '%s\n' "$RELEASE_JSON" |
 
 SELECTED_PACKAGE_TYPE=''
 SELECTED_ASSET_URL=''
-select_package ||
+if ! select_package; then
+  if [ "$FORCE_PORTABLE" = 'true' ]; then
+    fail "No Portable package is available for ${PLATFORM}-${ARCHITECTURE}."
+  fi
   fail "No selected package is available for ${PLATFORM}-${ARCHITECTURE} with the installed package tools."
+fi
 
 TEMP_DIRECTORY="$(mktemp -d)"
 MOUNT_DIRECTORY=''

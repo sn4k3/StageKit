@@ -87,6 +87,60 @@ public class InstallScriptTests
         Assert.Contains("--force-downgrade", script, StringComparison.Ordinal);
         Assert.Contains("--oldpackage", script, StringComparison.Ordinal);
         Assert.Contains("ID_LIKE", script, StringComparison.Ordinal);
+        Assert.Contains("--portable [PATH]", script, StringComparison.Ordinal);
+        Assert.Contains("help|-h|--help|/help|'/?'", script, StringComparison.Ordinal);
+        Assert.Contains("gsub(/\"/, \"\", $2)", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("gsub(/\\\"/", script, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Verifies that Portable extraction forces the ZIP package and uses an application-named destination.
+    /// </summary>
+    [Fact]
+    public void Create_PortableOption_ExtractsToApplicationDirectory()
+    {
+        var script = InstallScript.Create(
+            "https://github.com/example/sample",
+            "Sample App",
+            "sample",
+            [ApplicationPackagingType.LinuxDeb, ApplicationPackagingType.Portable]);
+
+        Assert.Contains("--portable) FORCE_PORTABLE='true'; PORTABLE_PARENT=\"$PWD\"", script,
+            StringComparison.Ordinal);
+        Assert.Contains("--portable) FORCE_PORTABLE='true'; PORTABLE_PARENT=\"$2\"", script,
+            StringComparison.Ordinal);
+        Assert.Contains("[ \"$package_type\" != 'portable' ]", script, StringComparison.Ordinal);
+        Assert.Contains("destination=\"${PORTABLE_PARENT%/}/${APPLICATION_NAME}\"", script,
+            StringComparison.Ordinal);
+        Assert.Contains("No Portable package is available", script, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Verifies that the generated uninstaller probes every selected Unix package format.
+    /// </summary>
+    [Fact]
+    public void UninstallCreate_SelectedPackages_ProbesEveryPackageType()
+    {
+        var script = UninstallScript.Create(
+            "Sample App",
+            "sample",
+            "com.example.Sample",
+            "com.example.Sample");
+
+        Assert.Contains("LINUX_APPLICATION_ID='com.example.Sample'", script, StringComparison.Ordinal);
+        Assert.Contains("SNAP_NAME='sample-app'", script, StringComparison.Ordinal);
+        Assert.Contains("flatpak uninstall --user", script, StringComparison.Ordinal);
+        Assert.Contains("snap remove", script, StringComparison.Ordinal);
+        Assert.Contains("apt-get remove", script, StringComparison.Ordinal);
+        Assert.Contains("dnf remove", script, StringComparison.Ordinal);
+        Assert.Contains("pacman -R", script, StringComparison.Ordinal);
+        Assert.Contains("${XDG_DATA_HOME:-$HOME/.local/share}/${APPLICATION_SLUG}", script,
+            StringComparison.Ordinal);
+        Assert.Contains("$HOME/Applications/${APPLICATION_SLUG}.AppImage", script, StringComparison.Ordinal);
+        Assert.Contains("/Applications/${APPLICATION_NAME}.app", script, StringComparison.Ordinal);
+        Assert.Contains("pkgutil --forget", script, StringComparison.Ordinal);
+        Assert.Contains("for package_type in \"${PACKAGE_TYPES[@]}\"", script, StringComparison.Ordinal);
+        Assert.Contains("--portable [PATH]", script, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -288,6 +342,33 @@ public class InstallScriptTests
     }
 
     /// <summary>
+    /// Verifies that the Windows uninstaller probes exact registered packages and local application files.
+    /// </summary>
+    [Fact]
+    public void WindowsUninstallCreate_UsesExactPackageAndPathDetection()
+    {
+        var script = WindowsUninstallScript.Create("Sample App", "Example.Sample");
+
+        Assert.Contains("$ApplicationName = 'Sample App'", script, StringComparison.Ordinal);
+        Assert.Contains("$ApplicationSlug = 'sample-app'", script, StringComparison.Ordinal);
+        Assert.Contains("$WinGetPackageId = 'Example.Sample'", script, StringComparison.Ordinal);
+        Assert.Contains("& $winGetCommand.Source 'uninstall'", script, StringComparison.Ordinal);
+        Assert.Contains("$displayNameProperty = $_.PSObject.Properties['DisplayName']", script,
+            StringComparison.Ordinal);
+        Assert.Contains("$displayNameProperty.Value -eq $ApplicationName", script, StringComparison.Ordinal);
+        Assert.Contains("-FilePath \"$env:SystemRoot\\System32\\msiexec.exe\"", script,
+            StringComparison.Ordinal);
+        Assert.Contains("Join-Path $env:LOCALAPPDATA \"Programs\\$ApplicationSlug\"", script,
+            StringComparison.Ordinal);
+        Assert.Contains("Remove-UserPathEntries $installDirectory", script, StringComparison.Ordinal);
+        Assert.Contains("foreach ($packageType in $PackageTypes)", script, StringComparison.Ordinal);
+        Assert.Contains("'windows-installer'", script, StringComparison.Ordinal);
+        Assert.Contains("'dotnet-single-file'", script, StringComparison.Ordinal);
+        Assert.Contains("'portable'", script, StringComparison.Ordinal);
+        Assert.EndsWith("\r\n", script, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// Verifies that a Windows script requires at least one Windows-compatible selected format.
     /// </summary>
     [Fact]
@@ -308,7 +389,9 @@ public class InstallScriptTests
     {
         Assert.NotNull(typeof(StageKitBuild).GetProperty(nameof(StageKitBuild.GenerateInstallScript)));
         Assert.NotNull(typeof(StageKitBuild).GetProperty(nameof(StageKitBuild.InstallScriptFile)));
+        Assert.NotNull(typeof(StageKitBuild).GetProperty(nameof(StageKitBuild.UninstallScriptFile)));
         Assert.NotNull(typeof(StageKitBuild).GetProperty(nameof(StageKitBuild.WindowsInstallScriptFile)));
+        Assert.NotNull(typeof(StageKitBuild).GetProperty(nameof(StageKitBuild.WindowsUninstallScriptFile)));
         Assert.NotNull(typeof(StageKitBuild).GetProperty(nameof(StageKitBuild.WindowsInstallScriptWinGetPackageId)));
     }
 
@@ -320,15 +403,23 @@ public class InstallScriptTests
     {
         var rootDirectory = Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}");
         var scriptPath = Path.Combine(rootDirectory, "nested", "install-sample.sh");
+        var uninstallScriptPath = Path.Combine(rootDirectory, "nested", "uninstall-sample.sh");
         var windowsScriptPath = Path.Combine(rootDirectory, "nested", "install-sample.ps1");
+        var windowsUninstallScriptPath = Path.Combine(rootDirectory, "nested", "uninstall-sample.ps1");
         try
         {
-            var build = new TestBuild(scriptPath, windowsScriptPath);
+            var build = new TestBuild(
+                scriptPath,
+                uninstallScriptPath,
+                windowsScriptPath,
+                windowsUninstallScriptPath);
 
             build.InvokeExecuteGenerateInstallScript();
 
             Assert.Equal("#!/usr/bin/env bash\n", File.ReadAllText(scriptPath));
+            Assert.Equal("#!/usr/bin/env bash\n", File.ReadAllText(uninstallScriptPath));
             Assert.Equal("# PowerShell\r\n", File.ReadAllText(windowsScriptPath));
+            Assert.Equal("# PowerShell\r\n", File.ReadAllText(windowsUninstallScriptPath));
         }
         finally
         {
@@ -345,16 +436,20 @@ public class InstallScriptTests
     {
         var rootDirectory = Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}");
         var scriptPath = Path.Combine(rootDirectory, "install-sample.sh");
+        var uninstallScriptPath = Path.Combine(rootDirectory, "uninstall-sample.sh");
         var windowsScriptPath = Path.Combine(rootDirectory, "install-sample.ps1");
+        var windowsUninstallScriptPath = Path.Combine(rootDirectory, "uninstall-sample.ps1");
         try
         {
-            var build = new TestBuild(scriptPath, windowsScriptPath,
+            var build = new TestBuild(scriptPath, uninstallScriptPath, windowsScriptPath, windowsUninstallScriptPath,
                 [ApplicationPackagingType.WindowsInstaller]);
 
             build.InvokeExecuteGenerateInstallScript();
 
             Assert.False(File.Exists(scriptPath));
+            Assert.False(File.Exists(uninstallScriptPath));
             Assert.Equal("# PowerShell\r\n", File.ReadAllText(windowsScriptPath));
+            Assert.Equal("# PowerShell\r\n", File.ReadAllText(windowsUninstallScriptPath));
         }
         finally
         {
@@ -366,29 +461,49 @@ public class InstallScriptTests
     private sealed class TestBuild : StageKitBuild
     {
         private readonly string _installScriptFile;
+        private readonly string _uninstallScriptFile;
         private readonly string _windowsInstallScriptFile;
+        private readonly string _windowsUninstallScriptFile;
 
         public TestBuild(
             string installScriptFile,
+            string uninstallScriptFile,
             string windowsInstallScriptFile,
+            string windowsUninstallScriptFile,
             ApplicationPackagingType[]? packagingTypes = null)
         {
             _installScriptFile = installScriptFile;
+            _uninstallScriptFile = uninstallScriptFile;
             _windowsInstallScriptFile = windowsInstallScriptFile;
+            _windowsUninstallScriptFile = windowsUninstallScriptFile;
             if (packagingTypes is not null)
                 PackagingTypes = packagingTypes;
         }
 
         public override AbsolutePath InstallScriptFile => _installScriptFile;
 
+        public override AbsolutePath UninstallScriptFile => _uninstallScriptFile;
+
         public override AbsolutePath WindowsInstallScriptFile => _windowsInstallScriptFile;
+
+        public override AbsolutePath WindowsUninstallScriptFile => _windowsUninstallScriptFile;
 
         protected override string CreateInstallScript()
         {
             return "#!/usr/bin/env bash\n";
         }
 
+        protected override string CreateUninstallScript()
+        {
+            return "#!/usr/bin/env bash\n";
+        }
+
         protected override string CreateWindowsInstallScript()
+        {
+            return "# PowerShell\r\n";
+        }
+
+        protected override string CreateWindowsUninstallScript()
         {
             return "# PowerShell\r\n";
         }
