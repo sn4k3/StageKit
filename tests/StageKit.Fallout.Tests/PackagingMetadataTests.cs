@@ -157,7 +157,7 @@ public class PackagingMetadataTests
     }
 
     [Fact]
-    public void GetDmgCommand_ValidPaths_CreatesCompressedDiskImage()
+    public void GetDmgCommand_ValidPaths_CreatesReadOnlyDiskImageWithoutCompression()
     {
         var command = MacPackage.GetDmgCommand(
             "Test App", "/tmp/dmg-root", "/tmp/dmg-root/Applications", "/tmp/Test App.dmg");
@@ -165,16 +165,11 @@ public class PackagingMetadataTests
         Assert.StartsWith("ln -s '/Applications' '/tmp/dmg-root/Applications' && ", command,
             StringComparison.Ordinal);
         Assert.Contains("hdiutil create", command, StringComparison.Ordinal);
-        Assert.Contains("-format UDRW \"$uncompressed_image\"", command, StringComparison.Ordinal);
-        Assert.Contains("hdiutil convert \"$uncompressed_image\" -ov -format UDZO -tasks 1", command,
-            StringComparison.Ordinal);
-        Assert.Contains("trap 'rm -f \"$uncompressed_image\"' EXIT", command, StringComparison.Ordinal);
-        Assert.Contains("conversion_status=$?", command, StringComparison.Ordinal);
-        Assert.Contains("[ \"$conversion_status\" -eq 137 ] && [ -s '/tmp/Test App.dmg' ]", command,
-            StringComparison.Ordinal);
-        Assert.Contains("hdiutil verify '/tmp/Test App.dmg'", command, StringComparison.Ordinal);
+        Assert.Contains("-format UDRO", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("hdiutil convert", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("UDZO", command, StringComparison.Ordinal);
         Assert.Contains("-srcfolder '/tmp/dmg-root'", command, StringComparison.Ordinal);
-        Assert.EndsWith("else exit \"$conversion_status\"; fi", command, StringComparison.Ordinal);
+        Assert.EndsWith("'/tmp/Test App.dmg'", command, StringComparison.Ordinal);
     }
 
     [Fact]

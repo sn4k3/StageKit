@@ -283,11 +283,10 @@ customize the output paths, contents, or write step.
 
 DMG and PKG creation stage and sign the same `.app` layout used by `MacOSAppBundle`. DMG output includes an
 `Applications` symlink for drag-and-drop installation, while PKG output installs the app directly in `/Applications`.
-DMG compression uses one worker to keep peak memory bounded on hosted macOS runners. If `hdiutil` is killed with exit
-code 137 after writing the compressed image, Fallout accepts it only when `hdiutil verify` confirms that the completed
-DMG is valid. Native macOS packages are created before the application ZIP so managed ZIP compression does not increase
-the process working set before `hdiutil` runs. With `PublishMultiArch`, both native formats contain the combined
-`osx-x64` and `osx-arm64` app.
+DMGs use the read-only uncompressed `UDRO` format because GitHub-hosted macOS runners can kill `hdiutil` during compressed
+`UDZO` image finalization with exit code 137, even after it reports that the output was created. Native macOS packages
+are created before the application ZIP to keep peak packaging memory lower. With `PublishMultiArch`, both native formats
+contain the combined `osx-x64` and `osx-arm64` app.
 Avalonia applications should also set `Application.Name` in `App.axaml` to the same value as `SoftwareName`; otherwise,
 Avalonia may replace the macOS menu title at runtime with its `Avalonia Application` fallback despite the generated
 `CFBundleName` and `CFBundleDisplayName` values.
