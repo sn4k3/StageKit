@@ -90,6 +90,31 @@ public class InstallScriptTests
     }
 
     /// <summary>
+    /// Verifies that downloads prefer curl and fall back to wget when curl is unavailable.
+    /// </summary>
+    [Fact]
+    public void Create_DownloadTools_UsesWgetWhenCurlIsUnavailable()
+    {
+        var script = InstallScript.Create(
+            "https://github.com/example/sample",
+            "Sample",
+            "sample",
+            [ApplicationPackagingType.LinuxDeb]);
+
+        AssertInOrder(script,
+            "if command_exists curl; then",
+            "DOWNLOAD_TOOL='curl'",
+            "elif command_exists wget; then",
+            "DOWNLOAD_TOOL='wget'");
+        Assert.Contains("curl -fsSL", script, StringComparison.Ordinal);
+        Assert.Contains("wget -qO-", script, StringComparison.Ordinal);
+        Assert.Contains("curl -fL --retry 3", script, StringComparison.Ordinal);
+        Assert.Contains("wget -q -t 3 -O", script, StringComparison.Ordinal);
+        Assert.Contains("download_file \"$SELECTED_ASSET_URL\" \"$ASSET_FILE\"", script, StringComparison.Ordinal);
+        Assert.Contains("curl or wget is required", script, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// Verifies repository and application metadata are safely embedded in the script.
     /// </summary>
     [Fact]

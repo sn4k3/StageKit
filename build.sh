@@ -32,7 +32,14 @@ if [ -x "$(command -v dotnet)" ] && dotnet --version &>/dev/null; then
 else
     DOTNET_INSTALL_FILE="$TEMP_DIRECTORY/dotnet-install.sh"
     mkdir -p "$TEMP_DIRECTORY"
-    curl -Lsfo "$DOTNET_INSTALL_FILE" "$DOTNET_INSTALL_URL"
+    if command -v curl >/dev/null 2>&1; then
+        curl -Lsfo "$DOTNET_INSTALL_FILE" "$DOTNET_INSTALL_URL"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -q -O "$DOTNET_INSTALL_FILE" "$DOTNET_INSTALL_URL"
+    else
+        echo 'Error: curl or wget is required to download the .NET installer.' >&2
+        exit 1
+    fi
     chmod +x "$DOTNET_INSTALL_FILE"
 
     if [[ -f "$DOTNET_GLOBAL_FILE" ]]; then

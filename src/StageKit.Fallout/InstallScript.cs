@@ -165,6 +165,29 @@ internal static class InstallScript
                                               command -v "$1" >/dev/null 2>&1
                                             }
 
+                                            get_url() {
+                                              local url="$1"
+                                              case "$DOWNLOAD_TOOL" in
+                                                curl)
+                                                  curl -fsSL -H 'Accept: application/vnd.github+json' \
+                                                    -H 'X-GitHub-Api-Version: 2022-11-28' "$url"
+                                                  ;;
+                                                wget)
+                                                  wget -qO- --header='Accept: application/vnd.github+json' \
+                                                    --header='X-GitHub-Api-Version: 2022-11-28' "$url"
+                                                  ;;
+                                              esac
+                                            }
+
+                                            download_file() {
+                                              local url="$1"
+                                              local output_file="$2"
+                                              case "$DOWNLOAD_TOOL" in
+                                                curl) curl -fL --retry 3 --output "$output_file" "$url" ;;
+                                                wget) wget -q -t 3 -O "$output_file" "$url" ;;
+                                              esac
+                                            }
+
                                             run_elevated() {
                                               if [ "$(id -u)" -eq 0 ]; then
                                                 "$@"
@@ -227,8 +250,7 @@ internal static class InstallScript
                                               versions=''
                                               page=1
                                               while true; do
-                                                if ! releases_json="$(curl -fsSL -H 'Accept: application/vnd.github+json' \
-                                                  -H 'X-GitHub-Api-Version: 2022-11-28' \
+                                                if ! releases_json="$(get_url \
                                                   "https://api.github.com/repos/${REPOSITORY}/releases?per_page=100&page=${page}")"; then
                                                   fail "Unable to retrieve available versions from ${REPOSITORY}."
                                                 fi
@@ -287,8 +309,7 @@ internal static class InstallScript
                                               fi
                                               printf 'Published changelog for %s:\n' "$APPLICATION_NAME"
                                               while [ "$shown_count" -lt "$CHANGELOG_LIMIT" ]; do
-                                                if ! releases_json="$(curl -fsSL -H 'Accept: application/vnd.github+json' \
-                                                  -H 'X-GitHub-Api-Version: 2022-11-28' \
+                                                if ! releases_json="$(get_url \
                                                   "https://api.github.com/repos/${REPOSITORY}/releases?per_page=${page_size}&page=${page}")"; then
                                                   fail "Unable to retrieve release changelogs from ${REPOSITORY}."
                                                 fi
@@ -518,7 +539,13 @@ internal static class InstallScript
 
                                             parse_arguments "$@"
                                             show_header
-                                            command_exists curl || fail 'curl is required to download GitHub release assets.'
+                                            if command_exists curl; then
+                                              DOWNLOAD_TOOL='curl'
+                                            elif command_exists wget; then
+                                              DOWNLOAD_TOOL='wget'
+                                            else
+                                              fail 'curl or wget is required to download GitHub release assets.'
+                                            fi
                                             if [ "$ACTION" = 'list' ]; then
                                               list_versions
                                               exit 0
@@ -548,12 +575,10 @@ internal static class InstallScript
                                               RELEASE_API_URL="https://api.github.com/repos/${REPOSITORY}/releases/tags/${VERSION}"
                                             fi
 
-                                            if ! RELEASE_JSON="$(curl -fsSL -H 'Accept: application/vnd.github+json' \
-                                              -H 'X-GitHub-Api-Version: 2022-11-28' "$RELEASE_API_URL")"; then
+                                            if ! RELEASE_JSON="$(get_url "$RELEASE_API_URL")"; then
                                               if [ "$VERSION" != 'latest' ] && [[ "$VERSION" != v* ]]; then
                                                 RELEASE_API_URL="https://api.github.com/repos/${REPOSITORY}/releases/tags/v${VERSION}"
-                                                RELEASE_JSON="$(curl -fsSL -H 'Accept: application/vnd.github+json' \
-                                                  -H 'X-GitHub-Api-Version: 2022-11-28' "$RELEASE_API_URL")" ||
+                                                RELEASE_JSON="$(get_url "$RELEASE_API_URL")" ||
                                                   fail "Unable to resolve release '${VERSION}' from ${REPOSITORY}."
                                               else
                                                 fail "Unable to resolve release '${VERSION}' from ${REPOSITORY}."
@@ -581,7 +606,7 @@ internal static class InstallScript
                                             ASSET_FILE="$TEMP_DIRECTORY/$ASSET_NAME"
 
                                             printf 'Downloading %s (%s)...\n' "$APPLICATION_NAME" "$SELECTED_PACKAGE_TYPE"
-                                            curl -fL --retry 3 --output "$ASSET_FILE" "$SELECTED_ASSET_URL"
+                                            download_file "$SELECTED_ASSET_URL" "$ASSET_FILE"
                                             install_selected_package
                                             printf '%s was installed successfully.\n' "$APPLICATION_NAME"
                                             """;

@@ -1,3 +1,7 @@
+# v0.3.2 (/09/2026)
+
+- Fall back to `wget` in Bash build and generated installation scripts when `curl` is unavailable.
+
 # v0.3.1 (04/09/2026)
 
 - Add Fallout's `GenerateInstallScript` target, which creates GitHub Releases Bash and Windows PowerShell installers
