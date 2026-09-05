@@ -1,4 +1,4 @@
-# v0.3.2 (/09/2026)
+# v0.3.2 (05/09/2026)
 
 - Fix macOS ZIP, PKG, and DMG auto-updates leaving the application closed. ZIP updates now replace the extracted `.app`
   instead of its parent directory, and relaunch uses a new Launch Services instance with startup verification and a
