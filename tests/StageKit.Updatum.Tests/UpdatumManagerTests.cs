@@ -9,6 +9,55 @@ namespace StageKit.Updatum.Tests;
 public sealed class UpdatumManagerTests
 {
     [Fact]
+    public void ResolveExtractedMacOSAppBundlePath_SelectsOnlyTopLevelAppBundle()
+    {
+        var extractionRoot = Directory.CreateTempSubdirectory("StageKit.Updatum.MacZip-").FullName;
+        try
+        {
+            var expectedBundlePath = Directory.CreateDirectory(Path.Combine(extractionRoot, "Test App.app")).FullName;
+            Directory.CreateDirectory(Path.Combine(
+                expectedBundlePath,
+                "Contents",
+                "Frameworks",
+                "Helper.app"));
+
+            var result = UpdatumManager.ResolveExtractedMacOSAppBundlePath(extractionRoot);
+
+            Assert.Equal(expectedBundlePath, result);
+        }
+        finally
+        {
+            Directory.Delete(extractionRoot, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(0, "does not contain a top-level app bundle")]
+    [InlineData(2, "contains multiple top-level app bundles")]
+    public void ResolveExtractedMacOSAppBundlePath_RejectsAmbiguousArchive(
+        int appBundleCount,
+        string expectedMessage)
+    {
+        var extractionRoot = Directory.CreateTempSubdirectory("StageKit.Updatum.MacZip-").FullName;
+        try
+        {
+            for (var index = 0; index < appBundleCount; index++)
+            {
+                Directory.CreateDirectory(Path.Combine(extractionRoot, $"Test App {index}.app"));
+            }
+
+            var exception = Assert.Throws<InvalidDataException>(() =>
+                UpdatumManager.ResolveExtractedMacOSAppBundlePath(extractionRoot));
+
+            Assert.Contains(expectedMessage, exception.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(extractionRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task DownloadUpdateAsync_RestoresIdleState_WhenReleaseHasNoCompatibleAsset()
     {
         using var manager = CreateManager();

@@ -137,12 +137,19 @@ public sealed class UpdatumInstallScriptTests
         Assert.Equal("1234", startInfo.ArgumentList[4]);
         Assert.Equal("/Applications/Test App.app", startInfo.ArgumentList[5]);
         Assert.Equal("--updated true", startInfo.ArgumentList[6]);
+        Assert.EndsWith("StageKit.Updatum.Relaunch-1234.log", startInfo.ArgumentList[7],
+            StringComparison.Ordinal);
 
         var script = startInfo.ArgumentList[2];
         var waitIndex = script.IndexOf("/bin/kill -0 \"$1\"", StringComparison.Ordinal);
-        var openIndex = script.IndexOf("/usr/bin/open \"$2\"", StringComparison.Ordinal);
+        var openIndex = script.IndexOf("/usr/bin/open -n -W \"$2\"", StringComparison.Ordinal);
         Assert.True(waitIndex >= 0);
         Assert.True(openIndex > waitIndex);
+        Assert.Contains("exec </dev/null >\"$4\" 2>&1", script, StringComparison.Ordinal);
+        Assert.Contains("if [[ ! -d \"$2\" ]]", script, StringComparison.Ordinal);
         Assert.Contains("--args $3", script, StringComparison.Ordinal);
+        Assert.Contains("open_wait_pid=$!", script, StringComparison.Ordinal);
+        Assert.Contains("open_exit_code=$?", script, StringComparison.Ordinal);
+        Assert.Contains("exit \"$open_exit_code\"", script, StringComparison.Ordinal);
     }
 }

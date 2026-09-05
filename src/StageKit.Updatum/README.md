@@ -111,6 +111,8 @@ When you call the install path, Updatum:
 - If the asset is a **zip** with a single entry, extracts it to a temporary folder and continues the other checks.
   - If the zip contains multiple files, it is treated as a **portable application**. A generated script performs checks, kills
     running instances, merges files, renames the version in the folder name, and starts the new instance.
+  - On macOS, a zip update for an application bundle must contain exactly one top-level `.app`. Updatum stages and replaces
+    that bundle itself, rather than treating its parent directory as the portable application directory.
 - If the asset is a **single-file application** (.NET single-file executable or Linux AppImage), it is moved into the current
   folder and renamed to the current name and version.
 - If the asset is an **installer**, it is executed and follows its normal installation process.
@@ -144,13 +146,15 @@ elevation through `ProcessHelper`; Updatum waits for a zero exit code before rep
 relaunching, or terminating the current process. Denied elevation, timeout, cancellation, or installer failure stops that
 continuation.
 
-macOS PKG and DMG installation uses the native administrator prompt when privileges are actually required. PKG assets run
+macOS app bundle, PKG, and DMG updates relaunch through Launch Services. The relaunch uses `open -n -W` to request a new
+instance and confirm that it remains active after startup. PKG and DMG installation uses the native administrator prompt when privileges are actually required. PKG assets run
 through `/usr/sbin/installer`, which always installs into the system domain and therefore always prompts. DMG assets are
 mounted read-only and always detached; an embedded PKG is installed with `installer`, while an embedded app bundle is staged
 and atomically replaced in its current location (or `/Applications` when no current bundle is known), with rollback on failure.
 A DMG runs unprivileged first and only re-runs with the administrator prompt when it wraps a PKG or targets a directory the
 current user cannot write. After a successful forced update, a non-elevated detached helper waits for the old process to exit
-before reopening the installed application bundle, avoiding Launch Services activating the old instance instead.
+before reopening the installed application bundle, avoiding Launch Services activating the old instance instead. The helper
+writes launch diagnostics to `StageKit.Updatum.Relaunch-<process-id>.log` in the system temporary directory.
 
 Call `SafeDeleteFile()` on a downloaded asset when installation is not attempted. It removes the downloaded file and its empty
 managed workspace on a best-effort basis.

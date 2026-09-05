@@ -1431,6 +1431,24 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
             ?.PackagingType;
     }
 
+    internal static string ResolveExtractedMacOSAppBundlePath(string extractionRoot)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(extractionRoot);
+
+        var appBundlePaths = Directory
+            .EnumerateDirectories(extractionRoot, "*", SearchOption.TopDirectoryOnly)
+            .Where(path => path.EndsWith(".app", StringComparison.OrdinalIgnoreCase))
+            .Take(2)
+            .ToArray();
+
+        return appBundlePaths.Length switch
+        {
+            1 => appBundlePaths[0],
+            0 => throw new InvalidDataException("The macOS update archive does not contain a top-level app bundle."),
+            _ => throw new InvalidDataException("The macOS update archive contains multiple top-level app bundles.")
+        };
+    }
+
     private static string ResolvePackageInstallerExecutable(LinuxPackageInstallCommand command)
     {
         if (command.Executable == "flatpak" && EntryApplication.IsLinuxFlatpak)
@@ -2054,16 +2072,29 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                         fileNameNoExt = Path.GetFileNameWithoutExtension(filePath);
                         fileExtension = Path.GetExtension(fileName);
                     }
-                    else // Portable app
+                    else // Portable app or macOS application bundle
                     {
                         // Extract the archive to a temporary directory
                         var extractDirectoryPath = Path.Combine(installWorkspacePath, $"extracted-{Guid.NewGuid():N}");
                         Directory.CreateDirectory(extractDirectoryPath);
                         archive.ExtractToDirectory(extractDirectoryPath, false);
 
+                        var sourceDirectoryPath = extractDirectoryPath;
                         var targetDirectoryPath = EntryApplication.BaseDirectory;
                         var currentExecutablePath = EntryApplication.ExecutablePath;
                         var newExecutingFilePath = currentExecutablePath;
+                        var currentMacOSAppBundlePath = OperatingSystem.IsMacOS()
+                            ? EntryApplication.MacOSAppBundlePath
+                            : null;
+                        var isMacOSAppBundleUpdate = !string.IsNullOrWhiteSpace(currentMacOSAppBundlePath);
+
+                        if (isMacOSAppBundleUpdate)
+                        {
+                            sourceDirectoryPath = ResolveExtractedMacOSAppBundlePath(extractDirectoryPath);
+                            targetDirectoryPath = currentMacOSAppBundlePath;
+                            currentExecutablePath = currentMacOSAppBundlePath;
+                            newExecutingFilePath = currentMacOSAppBundlePath;
+                        }
 
                         if (string.IsNullOrWhiteSpace(targetDirectoryPath))
                         {
@@ -2095,7 +2126,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                                 WriteWindowsScriptHeader(stream);
 
                                 stream.WriteLine(
-                                    $"set \"SOURCE_PATH={extractDirectoryPath.EscapeWindowsBatchValue()}\"");
+                                    $"set \"SOURCE_PATH={sourceDirectoryPath.EscapeWindowsBatchValue()}\"");
                                 stream.WriteLine(
                                     $"set \"DEST_PATH={targetDirectoryPath.EscapeWindowsBatchValue()}\"");
                                 stream.WriteLine(
@@ -2201,7 +2232,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                             using (stream)
                             {
                                 WriteLinuxScriptHeader(stream);
-                                stream.WriteLine($"SOURCE_PATH={extractDirectoryPath.QuoteBashAnsiCString()}");
+                                stream.WriteLine($"SOURCE_PATH={sourceDirectoryPath.QuoteBashAnsiCString()}");
                                 stream.WriteLine($"DEST_PATH={targetDirectoryPath.QuoteBashAnsiCString()}");
                                 stream.WriteLine($"STAGED_PATH={stagedDirectoryPath.QuoteBashAnsiCString()}");
                                 stream.WriteLine($"BACKUP_PATH={backupDirectoryPath.QuoteBashAnsiCString()}");
@@ -2284,31 +2315,43 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                                 // Execute the upgraded application
                                 stream.WriteLine(
                                     $"if [ -n \"${nameof(EntryApplication.ExecutablePath)}\" ] && [ \"${{RUN_AFTER_UPGRADE:-False}}\" = \"True\" ]; then");
-                                stream.WriteLine("  echo \"- Execute the upgraded application\"");
-                                stream.WriteLine($"  if [ -f \"${nameof(EntryApplication.ExecutablePath)}\" ]; then");
-                                if (EntryApplication.IsRunningFromDotNetProcess)
+                                if (isMacOSAppBundleUpdate)
                                 {
-                                    stream.WriteLine(
-                                        $"    nohup \"{Environment.ProcessPath}\" \"${nameof(EntryApplication.ExecutablePath)}\" $RUN_ARGUMENTS >/dev/null 2>&1 &");
+                                    UpdatumInstallScript.WriteMacOSAppBundleLaunch(
+                                        stream,
+                                        $"${nameof(EntryApplication.ExecutablePath)}",
+                                        "$RUN_ARGUMENTS");
                                 }
                                 else
                                 {
-                                    // Make executable if it's not
-                                    stream.WriteLine($"    chmod +x \"${nameof(EntryApplication.ExecutablePath)}\"");
+                                    stream.WriteLine("  echo \"- Execute the upgraded application\"");
                                     stream.WriteLine(
-                                        $"    nohup \"${nameof(EntryApplication.ExecutablePath)}\" $RUN_ARGUMENTS >/dev/null 2>&1 &");
-                                }
+                                        $"  if [ -f \"${nameof(EntryApplication.ExecutablePath)}\" ]; then");
+                                    if (EntryApplication.IsRunningFromDotNetProcess)
+                                    {
+                                        stream.WriteLine(
+                                            $"    nohup \"{Environment.ProcessPath}\" \"${nameof(EntryApplication.ExecutablePath)}\" $RUN_ARGUMENTS >/dev/null 2>&1 &");
+                                    }
+                                    else
+                                    {
+                                        // Make executable if it's not
+                                        stream.WriteLine(
+                                            $"    chmod +x \"${nameof(EntryApplication.ExecutablePath)}\"");
+                                        stream.WriteLine(
+                                            $"    nohup \"${nameof(EntryApplication.ExecutablePath)}\" $RUN_ARGUMENTS >/dev/null 2>&1 &");
+                                    }
 
-                                stream.WriteLine("    sleep 1"); // Let the process start
-                                stream.WriteLine("    if ps -p $! >/dev/null; then");
-                                stream.WriteLine("      echo \"- Success: Application running (PID: $!)\"");
-                                stream.WriteLine("    else");
-                                stream.WriteLine("      echo \"- Error: Process failed to start\"");
-                                stream.WriteLine("    fi");
-                                stream.WriteLine("  else");
-                                stream.WriteLine(
-                                    $"    echo \"- File not found: ${nameof(EntryApplication.ExecutablePath)}, not executing!\"");
-                                stream.WriteLine("  fi");
+                                    stream.WriteLine("    sleep 1"); // Let the process start
+                                    stream.WriteLine("    if ps -p $! >/dev/null; then");
+                                    stream.WriteLine("      echo \"- Success: Application running (PID: $!)\"");
+                                    stream.WriteLine("    else");
+                                    stream.WriteLine("      echo \"- Error: Process failed to start\"");
+                                    stream.WriteLine("    fi");
+                                    stream.WriteLine("  else");
+                                    stream.WriteLine(
+                                        $"    echo \"- File not found: ${nameof(EntryApplication.ExecutablePath)}, not executing!\"");
+                                    stream.WriteLine("  fi");
+                                }
                                 stream.WriteLine("else");
                                 stream.WriteLine(
                                     "  echo \"- Skip execution of application (RUN_AFTER_UPGRADE is not true).\"");

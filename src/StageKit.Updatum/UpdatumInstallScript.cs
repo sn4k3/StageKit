@@ -6,19 +6,6 @@ namespace StageKit.Updatum;
 
 internal static class UpdatumInstallScript
 {
-    private const string MacOSRelaunchScript =
-        """
-        while /bin/kill -0 "$1" 2>/dev/null; do
-            /bin/sleep 0.1
-        done
-
-        if [[ -n "$3" ]]; then
-            /usr/bin/open "$2" --args $3 >/dev/null 2>&1
-        else
-            /usr/bin/open "$2" >/dev/null 2>&1
-        fi
-        """;
-
     internal static ProcessStartInfo CreateMacOSRelaunchProcessStartInfo(
         int currentProcessId,
         string appBundlePath,
@@ -27,19 +14,68 @@ internal static class UpdatumInstallScript
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(currentProcessId);
         ArgumentException.ThrowIfNullOrWhiteSpace(appBundlePath);
 
+        using var scriptWriter = new StringWriter(CultureInfo.InvariantCulture) { NewLine = "\n" };
+        scriptWriter.WriteLine("exec </dev/null >\"$4\" 2>&1 || exit 1");
+        scriptWriter.WriteLine("echo \"macOS relaunch helper started at $(/bin/date -u '+%Y-%m-%dT%H:%M:%SZ')\"");
+        scriptWriter.WriteLine("while /bin/kill -0 \"$1\" 2>/dev/null; do");
+        scriptWriter.WriteLine("  /bin/sleep 0.1");
+        scriptWriter.WriteLine("done");
+        scriptWriter.WriteLine();
+        WriteMacOSAppBundleLaunch(scriptWriter, "$2", "$3");
+
+        var logFilePath = Path.Combine(
+            Path.GetTempPath(),
+            $"StageKit.Updatum.Relaunch-{currentProcessId.ToString(CultureInfo.InvariantCulture)}.log");
+
         var startInfo = ProcessHelper.CreateProcessStartInfo(
             "/usr/bin/nohup",
             [
                 "/bin/bash",
                 "-c",
-                MacOSRelaunchScript,
+                scriptWriter.ToString(),
                 "stagekit-updatum-relaunch",
                 currentProcessId.ToString(CultureInfo.InvariantCulture),
                 appBundlePath,
-                runArguments ?? string.Empty
+                runArguments ?? string.Empty,
+                logFilePath
             ]);
         startInfo.CreateNoWindow = true;
         return startInfo;
+    }
+
+    internal static void WriteMacOSAppBundleLaunch(
+        TextWriter writer,
+        string appBundlePathExpression,
+        string runArgumentsExpression)
+    {
+        ArgumentNullException.ThrowIfNull(writer);
+        ArgumentException.ThrowIfNullOrWhiteSpace(appBundlePathExpression);
+        ArgumentException.ThrowIfNullOrWhiteSpace(runArgumentsExpression);
+
+        writer.WriteLine($"if [[ ! -d \"{appBundlePathExpression}\" ]]; then");
+        writer.WriteLine($"  echo \"- Error: Application bundle not found: {appBundlePathExpression}\" >&2");
+        writer.WriteLine("  exit 1");
+        writer.WriteLine("fi");
+        writer.WriteLine($"echo \"- Launching application bundle: {appBundlePathExpression}\"");
+        writer.WriteLine($"if [[ -n \"{runArgumentsExpression}\" ]]; then");
+        writer.WriteLine($"  /usr/bin/open -n -W \"{appBundlePathExpression}\" --args {runArgumentsExpression} &");
+        writer.WriteLine("else");
+        writer.WriteLine($"  /usr/bin/open -n -W \"{appBundlePathExpression}\" &");
+        writer.WriteLine("fi");
+        writer.WriteLine("open_wait_pid=$!");
+        writer.WriteLine("/bin/sleep 1");
+        writer.WriteLine("if /bin/kill -0 \"$open_wait_pid\" 2>/dev/null; then");
+        writer.WriteLine("  /bin/kill \"$open_wait_pid\" 2>/dev/null || true");
+        writer.WriteLine("  wait \"$open_wait_pid\" 2>/dev/null || true");
+        writer.WriteLine("  echo \"- Success: LaunchServices started the application\"");
+        writer.WriteLine("else");
+        writer.WriteLine("  open_exit_code=0");
+        writer.WriteLine("  wait \"$open_wait_pid\"");
+        writer.WriteLine("  open_exit_code=$?");
+        writer.WriteLine("  if [[ $open_exit_code -eq 0 ]]; then open_exit_code=1; fi");
+        writer.WriteLine("  echo \"- Error: LaunchServices did not keep the application running (exit code: $open_exit_code)\" >&2");
+        writer.WriteLine("  exit \"$open_exit_code\"");
+        writer.WriteLine("fi");
     }
 
     public static void WriteWindowsFileReplacement(TextWriter writer)
