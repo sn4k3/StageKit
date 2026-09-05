@@ -283,8 +283,9 @@ customize the output paths, contents, or write step.
 
 DMG and PKG creation stage and sign the same `.app` layout used by `MacOSAppBundle`. DMG output includes an
 `Applications` symlink for drag-and-drop installation, while PKG output installs the app directly in `/Applications`.
-DMGs use the read-only uncompressed `UDRO` format because GitHub-hosted macOS runners can kill `hdiutil` during compressed
-`UDZO` image finalization with exit code 137, even after it reports that the output was created. Native macOS packages
+DMGs are built with `hdiutil makehybrid -hfs`, which writes the read-only HFS+ image directly instead of attaching a new
+image and copying into it. GitHub-hosted macOS runners kill the attach-and-copy path used by `hdiutil create -srcfolder`
+with exit code 137 during image finalization, even after it reports that the output was created. Native macOS packages
 are created before the application ZIP to keep peak packaging memory lower. With `PublishMultiArch`, both native formats
 contain the combined `osx-x64` and `osx-arm64` app.
 Avalonia applications should also set `Application.Name` in `App.axaml` to the same value as `SoftwareName`; otherwise,

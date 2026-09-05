@@ -15,8 +15,9 @@ internal static class MacPackage
         ValidateValue(applicationsLinkPath, nameof(applicationsLinkPath));
         ValidateValue(outputPath, nameof(outputPath));
         return $"ln -s {"/Applications".QuoteShell()} {applicationsLinkPath.QuoteShell()} && " +
-               $"hdiutil create -volname {volumeName.QuoteShell()} -srcfolder {sourceFolderPath.QuoteShell()} " +
-               $"-ov -format UDRO {outputPath.QuoteShell()}";
+               $"rm -f {outputPath.QuoteShell()} && " +
+               $"hdiutil makehybrid -hfs -hfs-volume-name {volumeName.QuoteShell()} " +
+               $"-o {outputPath.QuoteShell()} {sourceFolderPath.QuoteShell()}";
     }
 
     internal static string GetPkgCommand(string appPath, string bundleIdentifier, string version, string outputPath)
