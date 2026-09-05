@@ -207,12 +207,11 @@ public partial class StageKitBuild
         }
     }
 
-    /// <summary>Creates one read-only macOS disk image.</summary>
+    /// <summary>Creates one compressed macOS disk image.</summary>
     protected virtual void CreateMacOSDmg(PublishRidContext context)
     {
         CreateMacOSPackage(context, ApplicationPackagingType.MacOSDmg, ".dmg",
-            (appPath, outputPath) => MacPackage.GetDmgCommand(
-                SoftwareName, appPath.Parent, appPath.Parent / "Applications", outputPath));
+            (appPath, outputPath) => MacPackage.GetDmgCommand(SoftwareName, appPath, outputPath));
     }
 
     /// <summary>Creates one macOS component installer package.</summary>
@@ -223,13 +222,12 @@ public partial class StageKitBuild
                 SoftwareVersion, outputPath));
     }
 
-    /// <summary>Creates one multi-architecture read-only macOS disk image.</summary>
+    /// <summary>Creates one multi-architecture compressed macOS disk image.</summary>
     protected virtual void CreateMultiArchMacOSDmg(PublishRidContext x64Context,
         PublishRidContext arm64Context)
     {
         CreateMultiArchMacOSPackage(x64Context, arm64Context, ApplicationPackagingType.MacOSDmg, ".dmg",
-            (appPath, outputPath) => MacPackage.GetDmgCommand(
-                SoftwareName, appPath.Parent, appPath.Parent / "Applications", outputPath));
+            (appPath, outputPath) => MacPackage.GetDmgCommand(SoftwareName, appPath, outputPath));
     }
 
     /// <summary>Creates one multi-architecture macOS component installer package.</summary>

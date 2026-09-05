@@ -281,13 +281,13 @@ SSH URL such as `git@github.com:owner/repository.git`. Override `InstallScriptFi
 `CreateInstallScript()`, `CreateWindowsInstallScript()`, or `ExecuteGenerateInstallScript()` in a derived build to
 customize the output paths, contents, or write step.
 
-DMG and PKG creation stage and sign the same `.app` layout used by `MacOSAppBundle`. DMG output includes an
-`Applications` symlink for drag-and-drop installation, while PKG output installs the app directly in `/Applications`.
-DMGs are built with `hdiutil makehybrid -hfs`, which writes the read-only HFS+ image directly instead of attaching a new
-image and copying into it. GitHub-hosted macOS runners kill the attach-and-copy path used by `hdiutil create -srcfolder`
-with exit code 137 during image finalization, even after it reports that the output was created. Native macOS packages
-are created before the application ZIP to keep peak packaging memory lower. With `PublishMultiArch`, both native formats
-contain the combined `osx-x64` and `osx-arm64` app.
+DMG and PKG creation stage and sign the same `.app` layout used by `MacOSAppBundle`. DMG output contains the application
+bundle alone, while PKG output installs the app directly in `/Applications`. The application bundle is passed to
+`hdiutil create -srcfolder` directly, and the DMG deliberately carries no `/Applications` drag-and-drop symlink: hdiutil
+follows such a symlink while scanning the source tree, walks the whole host `/Applications` directory, and gets killed
+with exit code 137 on GitHub-hosted macOS runners. Native macOS packages are created before the application ZIP to keep
+peak packaging memory lower. With `PublishMultiArch`, both native formats contain the combined `osx-x64` and
+`osx-arm64` app.
 Avalonia applications should also set `Application.Name` in `App.axaml` to the same value as `SoftwareName`; otherwise,
 Avalonia may replace the macOS menu title at runtime with its `Avalonia Application` fallback despite the generated
 `CFBundleName` and `CFBundleDisplayName` values.

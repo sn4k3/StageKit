@@ -7,17 +7,17 @@ namespace StageKit.Fallout;
 /// </summary>
 internal static class MacPackage
 {
-    internal static string GetDmgCommand(string volumeName, string sourceFolderPath, string applicationsLinkPath,
-        string outputPath)
+    internal static string GetDmgCommand(string volumeName, string appPath, string outputPath)
     {
         ValidateValue(volumeName, nameof(volumeName));
-        ValidateValue(sourceFolderPath, nameof(sourceFolderPath));
-        ValidateValue(applicationsLinkPath, nameof(applicationsLinkPath));
+        ValidateValue(appPath, nameof(appPath));
         ValidateValue(outputPath, nameof(outputPath));
-        return $"ln -s {"/Applications".QuoteShell()} {applicationsLinkPath.QuoteShell()} && " +
-               $"rm -f {outputPath.QuoteShell()} && " +
-               $"hdiutil makehybrid -hfs -hfs-volume-name {volumeName.QuoteShell()} " +
-               $"-o {outputPath.QuoteShell()} {sourceFolderPath.QuoteShell()}";
+
+        // The application bundle is passed directly as the source folder. Staging the bundle alongside an
+        // '/Applications' symlink makes hdiutil follow that symlink while it scans the source tree, which walks the
+        // whole host '/Applications' directory and gets hdiutil killed with exit code 137 on hosted macOS runners.
+        return $"hdiutil create -volname {volumeName.QuoteShell()} -srcfolder {appPath.QuoteShell()} " +
+               $"-ov -format UDZO {outputPath.QuoteShell()}";
     }
 
     internal static string GetPkgCommand(string appPath, string bundleIdentifier, string version, string outputPath)

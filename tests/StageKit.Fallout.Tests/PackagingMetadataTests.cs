@@ -157,22 +157,27 @@ public class PackagingMetadataTests
     }
 
     [Fact]
-    public void GetDmgCommand_ValidPaths_CreatesReadOnlyDiskImageWithoutMountingTheImage()
+    public void GetDmgCommand_ValidPaths_CreatesCompressedDiskImageFromTheApplicationBundle()
     {
-        var command = MacPackage.GetDmgCommand(
-            "Test App", "/tmp/dmg-root", "/tmp/dmg-root/Applications", "/tmp/Test App.dmg");
+        var command = MacPackage.GetDmgCommand("Test App", "/tmp/dmg-root/Test App.app", "/tmp/Test App.dmg");
 
-        Assert.StartsWith("ln -s '/Applications' '/tmp/dmg-root/Applications' && ", command,
-            StringComparison.Ordinal);
-        Assert.Contains("rm -f '/tmp/Test App.dmg'", command, StringComparison.Ordinal);
-        Assert.Contains("hdiutil makehybrid -hfs", command, StringComparison.Ordinal);
-        Assert.Contains("-hfs-volume-name 'Test App'", command, StringComparison.Ordinal);
-        Assert.Contains("-o '/tmp/Test App.dmg'", command, StringComparison.Ordinal);
-        Assert.DoesNotContain("hdiutil create", command, StringComparison.Ordinal);
+        Assert.StartsWith("hdiutil create -volname 'Test App'", command, StringComparison.Ordinal);
+        Assert.Contains("-srcfolder '/tmp/dmg-root/Test App.app'", command, StringComparison.Ordinal);
+        Assert.Contains("-ov -format UDZO", command, StringComparison.Ordinal);
+        Assert.EndsWith("'/tmp/Test App.dmg'", command, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GetDmgCommand_ValidPaths_DoesNotStageAnApplicationsSymbolicLink()
+    {
+        var command = MacPackage.GetDmgCommand("Test App", "/tmp/dmg-root/Test App.app", "/tmp/Test App.dmg");
+
+        // hdiutil follows an '/Applications' symlink while scanning the source tree, which walks the whole host
+        // '/Applications' directory and gets it killed with exit code 137 on hosted macOS runners.
+        Assert.DoesNotContain("ln -s", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("'/Applications'", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("makehybrid", command, StringComparison.Ordinal);
         Assert.DoesNotContain("hdiutil convert", command, StringComparison.Ordinal);
-        Assert.DoesNotContain("UDZO", command, StringComparison.Ordinal);
-        Assert.DoesNotContain("UDRO", command, StringComparison.Ordinal);
-        Assert.EndsWith("'/tmp/dmg-root'", command, StringComparison.Ordinal);
     }
 
     [Fact]

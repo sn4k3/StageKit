@@ -9,10 +9,10 @@
 - Fix macOS PKG and DMG auto-updates leaving the application closed by deferring relaunch to a non-elevated helper that
   waits for the old process to exit. Set the StageKit demo's Avalonia application name so its macOS menu uses
   `StageKit`.
-- Add an `/Applications` shortcut to macOS DMG images for drag-and-drop installation; PKG installers continue to install
-  their application directly in `/Applications`. Create native packages before the application ZIP and build DMGs with
-  `hdiutil makehybrid`, which writes the read-only HFS+ image without attaching it, to avoid GitHub-hosted macOS runners
-  killing `hdiutil` with exit code 137 during image finalization.
+- Fix macOS DMG creation being killed with exit code 137 on GitHub-hosted runners. The image is built from the
+  application bundle alone again, without the `/Applications` drag-and-drop symlink, because `hdiutil` follows that
+  symlink while scanning the source tree and walks the whole host `/Applications` directory. PKG installers continue to
+  install their application directly in `/Applications`. Native packages are still created before the application ZIP.
 - Add opt-in `LinuxAppBundleOptions.FlatpakAllowHostCommandExecution` manifest configuration for applications that need
   the `org.freedesktop.Flatpak` host-command service.
 - Stage `libicu74` in Snap packages by default so self-contained .NET applications have globalization support, with a
