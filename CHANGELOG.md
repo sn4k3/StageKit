@@ -11,7 +11,8 @@
   `StageKit`.
 - Add an `/Applications` shortcut to macOS DMG images for drag-and-drop installation; PKG installers continue to install
   their application directly in `/Applications`. Limit DMG compression to one worker to reduce peak memory use on
-  hosted macOS runners.
+  hosted macOS runners, create native packages before the application ZIP, and recover from `hdiutil` exit code 137 only
+  when its completed output passes verification.
 - Add opt-in `LinuxAppBundleOptions.FlatpakAllowHostCommandExecution` manifest configuration for applications that need
   the `org.freedesktop.Flatpak` host-command service.
 - Stage `libicu74` in Snap packages by default so self-contained .NET applications have globalization support, with a

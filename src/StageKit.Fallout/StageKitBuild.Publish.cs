@@ -446,13 +446,13 @@ public partial class StageKitBuild
                 }
             }
 
-            if (HasPackagingType(ApplicationPackagingType.MacOSAppBundle))
-                CreateMacOSApps(bundleContexts);
-
             if (HasAnyPackagingType(ApplicationPackagingType.MacOSDmg, ApplicationPackagingType.MacOSPkg))
             {
                 CreateMacOSPackages(bundleContexts);
             }
+
+            if (HasPackagingType(ApplicationPackagingType.MacOSAppBundle))
+                CreateMacOSApps(bundleContexts);
 
             if (HasPackagingType(ApplicationPackagingType.LinuxAppImage))
                 CreateLinuxAppImages(bundleContexts);

@@ -2504,6 +2504,30 @@ public class PublishPipelineTests
     }
 
     /// <summary>
+    /// Verifies native macOS packages run before ZIP compression to minimize peak packaging memory.
+    /// </summary>
+    [Fact]
+    public void CreateBundles_MacOSAppAndPackagesSelected_DispatchesNativePackagesBeforeAppArchive()
+    {
+        var build = new TestBuild
+        {
+            UseDefaultBundlePipeline = true,
+            RecordMacOSApp = true,
+            RecordMacOSPackages = true,
+            TestMacOSHost = true,
+            TestUnixHost = true
+        };
+        build.SetPackagingTypes(
+            ApplicationPackagingType.MacOSAppBundle,
+            ApplicationPackagingType.MacOSDmg,
+            ApplicationPackagingType.MacOSPkg);
+
+        build.InvokeCreateBundles([CreateContext(build, "osx-x64")]);
+
+        Assert.Equal(["dmg:osx-x64", "pkg:osx-x64", "mac:osx-x64"], build.Calls);
+    }
+
+    /// <summary>
     /// Verifies multi-architecture native macOS packages combine the Intel and Apple Silicon payloads once.
     /// </summary>
     [Fact]
