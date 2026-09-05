@@ -13,6 +13,7 @@ public sealed record RuntimeValue(string Label, string Value);
 
 public partial class MainWindowViewModel : ObservableObject, IDisposable
 {
+    private const string StageKitRepositoryUrl = "https://github.com/sn4k3/StageKit";
     private readonly UpdatumManager _updater = DemoUpdateManager.Create();
     private CancellationTokenSource? _updateCancellation;
     private UpdatumDownloadedAsset? _downloadedAsset;
@@ -206,6 +207,44 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         OpenDirectory(ApplicationKit.ProfilePath, "profile directory", "[StageKit.Demo.ProfileDirectory]");
     }
 
+    [RelayCommand]
+    private void OpenSettingsFile()
+    {
+        RunHostSystemAction(
+            () =>
+            {
+                Settings.Save();
+                return HostSystem.OpenFile(Settings.FilePath);
+            },
+            $"Opened settings file: {Settings.FilePath}",
+            "open the settings file",
+            "[StageKit.Demo.OpenSettingsFile]");
+    }
+
+    [RelayCommand]
+    private void ShowSettingsFileInFileManager()
+    {
+        RunHostSystemAction(
+            () =>
+            {
+                Settings.Save();
+                return HostSystem.ShowFileInFileManager(Settings.FilePath);
+            },
+            $"Showed settings file in the file manager: {Settings.FilePath}",
+            "show the settings file in the file manager",
+            "[StageKit.Demo.ShowSettingsFile]");
+    }
+
+    [RelayCommand]
+    private void OpenStageKitWebsite()
+    {
+        RunHostSystemAction(
+            () => HostSystem.OpenUrl(StageKitRepositoryUrl),
+            $"Opened StageKit website: {StageKitRepositoryUrl}",
+            "open the StageKit website",
+            "[StageKit.Demo.OpenWebsite]");
+    }
+
     private void OpenDirectory(string path, string description, string category)
     {
         try
@@ -220,6 +259,26 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         catch (Exception exception)
         {
             StatusMessage = $"Could not open the {description}: {exception.Message}";
+            UnhandledExceptions.HandleSafeException(exception, category);
+        }
+    }
+
+    private void RunHostSystemAction(
+        Func<bool> action,
+        string successMessage,
+        string failureDescription,
+        string category)
+    {
+        try
+        {
+            if (!action())
+                throw new InvalidOperationException($"The host could not {failureDescription}.");
+
+            StatusMessage = successMessage;
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"Could not {failureDescription}: {exception.Message}";
             UnhandledExceptions.HandleSafeException(exception, category);
         }
     }

@@ -1,3 +1,9 @@
+# v0.3.3 (/09/2026)
+- Add `LinuxRpm` and `DotNetSingleFile` to `StageKit` releases
+- Set `CreateNoWindow = true` on `ProcessHelper` by default to avoid a console window on Linux
+- Add `ProcessHelper.StartProcessWithShellExecute` and `StartProcessWithShellExecuteAsync` overloads for targets that
+  must be opened through the operating system shell
+
 # v0.3.2 (05/09/2026)
 
 - Fix macOS ZIP, PKG, and DMG auto-updates leaving the application closed. ZIP updates now replace the extracted `.app`

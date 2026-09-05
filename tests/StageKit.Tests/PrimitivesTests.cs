@@ -210,6 +210,69 @@ public sealed class PrimitivesTests
     }
 
     [Fact]
+    public void ProcessHelper_StartProcessWithShellExecute_OverloadsReturnExitCodes()
+    {
+        var name = OperatingSystem.IsWindows() ? "cmd.exe" : "/bin/sh";
+        var rawArguments = OperatingSystem.IsWindows() ? "/d /c \"exit /b 9\"" : "-c \"exit 9\"";
+        var argumentList = OperatingSystem.IsWindows()
+            ? new[] { "/d", "/c", "exit 10" }
+            : ["-c", "exit 10"];
+        var startInfo = new ProcessStartInfo(name);
+        startInfo.ArgumentList.Add(OperatingSystem.IsWindows() ? "/d" : "-c");
+        if (OperatingSystem.IsWindows()) startInfo.ArgumentList.Add("/c");
+        startInfo.ArgumentList.Add("exit 11");
+
+        var rawArgumentsExitCode = ProcessHelper.StartProcessWithShellExecute(
+            name,
+            rawArguments,
+            waitForCompletion: true);
+        var argumentListExitCode = ProcessHelper.StartProcessWithShellExecute(
+            name,
+            argumentList,
+            waitForCompletion: true);
+        var startInfoExitCode = ProcessHelper.StartProcessWithShellExecute(startInfo, waitForCompletion: true);
+
+        Assert.Equal(9, rawArgumentsExitCode);
+        Assert.Equal(10, argumentListExitCode);
+        Assert.True(startInfo.UseShellExecute);
+        Assert.Equal(11, startInfoExitCode);
+    }
+
+    [Fact]
+    public async Task ProcessHelper_StartProcessWithShellExecuteAsync_OverloadsReturnExitCodes()
+    {
+        var name = OperatingSystem.IsWindows() ? "cmd.exe" : "/bin/sh";
+        var rawArguments = OperatingSystem.IsWindows() ? "/d /c \"exit /b 12\"" : "-c \"exit 12\"";
+        var argumentList = OperatingSystem.IsWindows()
+            ? new[] { "/d", "/c", "exit 13" }
+            : ["-c", "exit 13"];
+        var startInfo = new ProcessStartInfo(name);
+        startInfo.ArgumentList.Add(OperatingSystem.IsWindows() ? "/d" : "-c");
+        if (OperatingSystem.IsWindows()) startInfo.ArgumentList.Add("/c");
+        startInfo.ArgumentList.Add("exit 14");
+
+        var rawArgumentsExitCode = await ProcessHelper.StartProcessWithShellExecuteAsync(
+            name,
+            rawArguments,
+            waitForCompletion: true,
+            cancellationToken: TestContext.Current.CancellationToken);
+        var argumentListExitCode = await ProcessHelper.StartProcessWithShellExecuteAsync(
+            name,
+            argumentList,
+            waitForCompletion: true,
+            cancellationToken: TestContext.Current.CancellationToken);
+        var startInfoExitCode = await ProcessHelper.StartProcessWithShellExecuteAsync(
+            startInfo,
+            waitForCompletion: true,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(12, rawArgumentsExitCode);
+        Assert.Equal(13, argumentListExitCode);
+        Assert.True(startInfo.UseShellExecute);
+        Assert.Equal(14, startInfoExitCode);
+    }
+
+    [Fact]
     public void ProcessHelper_StartShell_ReturnsShellExitCodeWhenWaitingForCompletion()
     {
         var command = OperatingSystem.IsWindows() ? "exit /b 6" : "exit 6";

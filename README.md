@@ -477,6 +477,9 @@ int exitCode = ProcessHelper.StartProcess(
     requireElevation: true,
     waitForCompletion: true);
 
+ProcessHelper.StartProcessWithShellExecute(reportPath);
+await ProcessHelper.StartProcessWithShellExecuteAsync(reportPath, cancellationToken: cancellationToken);
+
 ProcessOutput output = ProcessHelper.GetShellOutput("system-tool --status", requireElevation: true);
 Console.Write(output.StandardOutput);
 

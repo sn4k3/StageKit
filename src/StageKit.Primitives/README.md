@@ -207,6 +207,21 @@ int exitCode = ProcessHelper.StartProcess(
     waitForCompletion: true);
 ```
 
+Use `StartProcessWithShellExecute(...)` or `StartProcessWithShellExecuteAsync(...)` when the operating system shell must
+resolve the target, such as a document associated with its default application. Both families mirror all
+`StartProcess(...)` overloads and otherwise have the same elevation, wait, timeout, exit-code, failure, and cancellation
+behavior:
+
+```csharp
+int exitCode = ProcessHelper.StartProcessWithShellExecute(reportPath);
+int asyncExitCode = await ProcessHelper.StartProcessWithShellExecuteAsync(
+    reportPath,
+    cancellationToken: cancellationToken);
+```
+
+The `ProcessStartInfo` overloads set `UseShellExecute` to `true` on the supplied instance. Shell execution does not
+support redirected standard input, output, or error streams.
+
 Use `StartHostProcess(...)` or `StartHostProcessAsync(...)` when a command must run on the host from a Flatpak app.
 Inside Flatpak these methods route argument lists through `flatpak-spawn --host`; elsewhere they behave like the normal
 start helpers. Host execution requires the Flatpak manifest permission `--talk-name=org.freedesktop.Flatpak`:

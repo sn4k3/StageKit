@@ -19,14 +19,16 @@ internal class Build : StageKitBuild
         [
             ApplicationPackagingType.Portable,
             ApplicationPackagingType.WindowsInstaller,
+            ApplicationPackagingType.LinuxDeb,
+            ApplicationPackagingType.LinuxRpm,
+            ApplicationPackagingType.LinuxArchPackage,
             ApplicationPackagingType.LinuxAppImage,
             ApplicationPackagingType.LinuxFlatpak,
-            ApplicationPackagingType.LinuxDeb,
-            ApplicationPackagingType.LinuxArchPackage,
             ApplicationPackagingType.LinuxSnap,
             ApplicationPackagingType.MacOSAppBundle,
             ApplicationPackagingType.MacOSDmg,
-            ApplicationPackagingType.MacOSPkg
+            ApplicationPackagingType.MacOSPkg,
+            ApplicationPackagingType.DotNetSingleFile
         ];
     }
 

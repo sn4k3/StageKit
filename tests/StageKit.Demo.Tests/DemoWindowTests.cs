@@ -48,6 +48,9 @@ public class DemoWindowTests
             Assert.NotNull(window.FindControl<Button>("ThrowFatalExceptionButton"));
             Assert.NotNull(window.FindControl<Button>("RunPrivilegedProcessOutputButton"));
             Assert.NotNull(window.FindControl<TextBox>("PrivilegedProcessOutputTextBox"));
+            Assert.NotNull(window.FindControl<Button>("OpenSettingsFileButton"));
+            Assert.NotNull(window.FindControl<Button>("ShowSettingsFileInFileManagerButton"));
+            Assert.NotNull(window.FindControl<Button>("OpenStageKitWebsiteButton"));
         }
         finally
         {

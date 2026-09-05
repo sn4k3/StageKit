@@ -169,6 +169,29 @@
                         </Border>
 
                         <Border Classes="card">
+                            <StackPanel Spacing="10">
+                                <TextBlock Classes="section-title" Text="Host system launchers" />
+                                <TextBlock Classes="muted" TextWrapping="Wrap"
+                                           Text="Use HostSystem to open the live settings JSON, reveal it in the file manager, or launch the StageKit website with the host's default applications." />
+                                <WrapPanel>
+                                    <Button x:Name="OpenSettingsFileButton"
+                                            Classes="primary"
+                                            Margin="0,0,8,8"
+                                            Command="{Binding OpenSettingsFileCommand}"
+                                            Content="Open settings file" />
+                                    <Button x:Name="ShowSettingsFileInFileManagerButton"
+                                            Margin="0,0,8,8"
+                                            Command="{Binding ShowSettingsFileInFileManagerCommand}"
+                                            Content="Show in file manager" />
+                                    <Button x:Name="OpenStageKitWebsiteButton"
+                                            Margin="0,0,8,8"
+                                            Command="{Binding OpenStageKitWebsiteCommand}"
+                                            Content="Open StageKit website" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
                             <Grid ColumnDefinitions="300,*" ColumnSpacing="18">
                                 <StackPanel Spacing="10">
                                     <TextBlock Classes="section-title" Text="Privileged process output" />

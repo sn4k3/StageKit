@@ -421,6 +421,221 @@ public static class ProcessHelper
     }
 
     /// <summary>
+    /// Starts a process with the given name and arguments using the operating system shell.
+    /// </summary>
+    /// <param name="name">The executable, document, or URL to start.</param>
+    /// <param name="arguments">The arguments to pass to the process.</param>
+    /// <param name="requireElevation">
+    /// <see langword="true"/> to request administrator elevation, unless the current process is already privileged.
+    /// </param>
+    /// <param name="waitForCompletion"><see langword="true"/> to wait for the process to complete.</param>
+    /// <param name="waitTimeout">The number of milliseconds to wait for completion.</param>
+    /// <returns>
+    /// The exit code when waiting for completion, zero when the process starts without waiting, or <c>-1</c> when
+    /// startup fails or the wait times out.
+    /// </returns>
+    public static int StartProcessWithShellExecute(
+        string name,
+        string? arguments = null,
+        bool requireElevation = false,
+        bool waitForCompletion = false,
+        int waitTimeout = Timeout.Infinite)
+    {
+        try
+        {
+            return StartProcessWithShellExecute(
+                CreateProcessStartInfo(name, arguments, requireElevation),
+                waitForCompletion,
+                waitTimeout);
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            return -1;
+        }
+    }
+
+    /// <summary>
+    /// Asynchronously starts a process with the given name and arguments using the operating system shell.
+    /// </summary>
+    /// <param name="name">The executable, document, or URL to start.</param>
+    /// <param name="arguments">The arguments to pass to the process.</param>
+    /// <param name="requireElevation">
+    /// <see langword="true"/> to request administrator elevation, unless the current process is already privileged.
+    /// </param>
+    /// <param name="waitForCompletion"><see langword="true"/> to asynchronously wait for the process to complete.</param>
+    /// <param name="waitTimeout">The number of milliseconds to wait for completion.</param>
+    /// <param name="cancellationToken">The token used to cancel waiting for completion.</param>
+    /// <returns>
+    /// A task containing the exit code when waiting for completion, zero when the process starts without waiting, or
+    /// <c>-1</c> when startup fails or the wait times out.
+    /// </returns>
+    public static async Task<int> StartProcessWithShellExecuteAsync(
+        string name,
+        string? arguments = null,
+        bool requireElevation = false,
+        bool waitForCompletion = false,
+        int waitTimeout = Timeout.Infinite,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await StartProcessWithShellExecuteAsync(
+                    CreateProcessStartInfo(name, arguments, requireElevation),
+                    waitForCompletion,
+                    waitTimeout,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            return -1;
+        }
+    }
+
+    /// <summary>
+    /// Starts a process with the given name and argument list using the operating system shell.
+    /// </summary>
+    /// <param name="name">The executable, document, or URL to start.</param>
+    /// <param name="arguments">The arguments to pass to the process.</param>
+    /// <param name="requireElevation">
+    /// <see langword="true"/> to request administrator elevation, unless the current process is already privileged.
+    /// </param>
+    /// <param name="waitForCompletion"><see langword="true"/> to wait for the process to complete.</param>
+    /// <param name="waitTimeout">The number of milliseconds to wait for completion.</param>
+    /// <returns>
+    /// The exit code when waiting for completion, zero when the process starts without waiting, or <c>-1</c> when
+    /// startup fails or the wait times out.
+    /// </returns>
+    public static int StartProcessWithShellExecute(
+        string name,
+        IEnumerable<string> arguments,
+        bool requireElevation = false,
+        bool waitForCompletion = false,
+        int waitTimeout = Timeout.Infinite)
+    {
+        try
+        {
+            return StartProcessWithShellExecute(
+                CreateProcessStartInfo(name, arguments, requireElevation),
+                waitForCompletion,
+                waitTimeout);
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            return -1;
+        }
+    }
+
+    /// <summary>
+    /// Asynchronously starts a process with the given name and argument list using the operating system shell.
+    /// </summary>
+    /// <param name="name">The executable, document, or URL to start.</param>
+    /// <param name="arguments">The arguments to pass to the process.</param>
+    /// <param name="requireElevation">
+    /// <see langword="true"/> to request administrator elevation, unless the current process is already privileged.
+    /// </param>
+    /// <param name="waitForCompletion"><see langword="true"/> to asynchronously wait for the process to complete.</param>
+    /// <param name="waitTimeout">The number of milliseconds to wait for completion.</param>
+    /// <param name="cancellationToken">The token used to cancel waiting for completion.</param>
+    /// <returns>
+    /// A task containing the exit code when waiting for completion, zero when the process starts without waiting, or
+    /// <c>-1</c> when startup fails or the wait times out.
+    /// </returns>
+    public static async Task<int> StartProcessWithShellExecuteAsync(
+        string name,
+        IEnumerable<string> arguments,
+        bool requireElevation = false,
+        bool waitForCompletion = false,
+        int waitTimeout = Timeout.Infinite,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await StartProcessWithShellExecuteAsync(
+                    CreateProcessStartInfo(name, arguments, requireElevation),
+                    waitForCompletion,
+                    waitTimeout,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            return -1;
+        }
+    }
+
+    /// <summary>
+    /// Starts a process using the supplied start information and the operating system shell.
+    /// </summary>
+    /// <param name="processStartInfo">
+    /// The process configuration, including its working directory, environment, and window settings.
+    /// </param>
+    /// <param name="waitForCompletion"><see langword="true"/> to wait for the process to complete.</param>
+    /// <param name="waitTimeout">The number of milliseconds to wait for completion.</param>
+    /// <returns>
+    /// The exit code when waiting for completion, zero when the process starts without waiting, or <c>-1</c> when
+    /// startup fails or the wait times out.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="processStartInfo"/> is <see langword="null"/>.</exception>
+    /// <remarks>
+    /// Sets <see cref="ProcessStartInfo.UseShellExecute"/> to <see langword="true"/> on the supplied instance before
+    /// starting it. Shell execution does not support redirected standard input, output, or error streams.
+    /// </remarks>
+    public static int StartProcessWithShellExecute(
+        ProcessStartInfo processStartInfo,
+        bool waitForCompletion = false,
+        int waitTimeout = Timeout.Infinite)
+    {
+        ArgumentNullException.ThrowIfNull(processStartInfo);
+
+        processStartInfo.UseShellExecute = true;
+        return StartProcess(processStartInfo, waitForCompletion, waitTimeout);
+    }
+
+    /// <summary>
+    /// Asynchronously starts a process using the supplied start information and the operating system shell.
+    /// </summary>
+    /// <param name="processStartInfo">
+    /// The process configuration, including its working directory, environment, and window settings.
+    /// </param>
+    /// <param name="waitForCompletion"><see langword="true"/> to asynchronously wait for the process to complete.</param>
+    /// <param name="waitTimeout">The number of milliseconds to wait for completion.</param>
+    /// <param name="cancellationToken">The token used to cancel waiting for completion.</param>
+    /// <returns>
+    /// A task containing the exit code when waiting for completion, zero when the process starts without waiting, or
+    /// <c>-1</c> when startup fails or the wait times out.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="processStartInfo"/> is <see langword="null"/>.</exception>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> is cancelled.</exception>
+    /// <remarks>
+    /// Sets <see cref="ProcessStartInfo.UseShellExecute"/> to <see langword="true"/> on the supplied instance before
+    /// starting it. Shell execution does not support redirected standard input, output, or error streams.
+    /// </remarks>
+    public static Task<int> StartProcessWithShellExecuteAsync(
+        ProcessStartInfo processStartInfo,
+        bool waitForCompletion = false,
+        int waitTimeout = Timeout.Infinite,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(processStartInfo);
+
+        processStartInfo.UseShellExecute = true;
+        return StartProcessAsync(processStartInfo, waitForCompletion, waitTimeout, cancellationToken);
+    }
+
+    /// <summary>
     /// Starts a command through the host command shell.
     /// </summary>
     /// <param name="command">The shell command to execute.</param>
@@ -1138,7 +1353,10 @@ public static class ProcessHelper
         string name,
         IEnumerable<string> arguments)
     {
-        var processStartInfo = new ProcessStartInfo(name);
+        var processStartInfo = new ProcessStartInfo(name)
+        {
+            CreateNoWindow = true
+        };
 
         foreach (var argument in arguments)
         {
