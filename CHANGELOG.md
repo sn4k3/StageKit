@@ -2,8 +2,9 @@
 
 - Add `ShellScriptFile`, a `TextWriter` that builds and executes Windows batch or Unix shell scripts with optional
   elevation, cancellation, captured process output, argument lists, platform-conditional writes, comments, and
-  environment variables. `CreateTemporary(...)` assigns a unique temporary path and deletes it on disposal, while an
-  explicit path keeps the script; content is buffered and written atomically by `Flush`, by `Execute`, and on disposal.
+  environment variables. `CreateTemporary(...)` and the pathless constructor assign a unique temporary path and delete
+  it on disposal by default, while an explicit path keeps the script; content is buffered and written atomically by
+  `Flush`, by `Execute`, and on disposal.
   `WriteLines`, `WriteLinesAsync`, `WriteLinesIf`, `WriteLinesIfWindows`/`MacOS`/`Linux`/`Unix`, and `WriteComments`
   write several lines at once, taking `params` or an `IEnumerable<string?>`
 - Add raw and structured script-argument support to `ProcessHelper.CreateShellScriptProcessStartInfo`, plus

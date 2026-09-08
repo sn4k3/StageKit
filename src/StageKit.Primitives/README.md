@@ -230,8 +230,9 @@ script.WriteLineIfUnix("printf %s \"$1\"");
 ProcessOutput output = await script.ExecuteAsync(["Ready"], cancellationToken);
 ```
 
-`CreateTemporary(...)` assigns a unique path with the platform script extension (`ShellScriptFile.ScriptFileExtension`)
-and sets `DeleteOnDispose`. Pass a path to the constructor instead to keep the script:
+`CreateTemporary(...)` and the pathless constructor assign a unique path with the platform script extension
+(`ShellScriptFile.ScriptFileExtension`) and delete it on disposal by default. Pass a path to the constructor to keep a
+script at that path, or explicitly set `deleteOnDispose: false` when a generated path must outlive the writer:
 
 ```csharp
 await using var script = new ShellScriptFile(Path.Combine(profilePath, "install.sh"));
@@ -242,11 +243,11 @@ await script.FlushAsync(cancellationToken);
 
 Content is buffered in memory and written atomically to `FilePath` by `Flush()`/`FlushAsync(...)`, by every `Execute`
 overload, and on disposal when writes are still pending and the file is kept. `IsFlushPending` reports unwritten
-content, `GetScript()` returns the buffer, and `Keep()` clears `DeleteOnDispose`. On Unix the file is marked
-executable after each write; set `SetExecutablePermission` to `false` to skip that.
+content, `GetScript()` returns the buffer, and `Keep()` clears `DeleteOnDispose`. On Unix the file is marked executable
+after each write; set `SetExecutablePermission` to `false` to skip that.
 
 Platform-specific `Write...` and `WriteLine...` methods are available for Windows, macOS, Linux, and Unix. The Unix
-helpers apply to Linux, macOS, and FreeBSD. `Clear()` resets the script while retaining the Windows preamble, and
+helpers apply to Linux, macOS, and FreeBSD. `Clear()` resets the script while restoring the platform preamble, and
 `WriteComment(...)` prefixes every comment line for the selected shell.
 
 The plural `WriteLines`, `WriteLinesAsync`, `WriteLinesIf`, `WriteLinesIfWindows`/`MacOS`/`Linux`/`Unix`, and

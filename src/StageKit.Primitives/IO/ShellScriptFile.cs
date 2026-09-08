@@ -14,9 +14,9 @@ namespace StageKit.Primitives;
 /// any <c>Execute</c> overload, and by disposal when content is still pending and the file is not being deleted.
 /// </p>
 /// <p>
-/// Use <see cref="CreateTemporary(string?, bool)"/> for a throwaway script: it assigns a unique path with the
-/// platform script extension and enables <see cref="DeleteOnDispose"/>. Pass an explicit path to the constructor to
-/// keep the script on disk.
+/// The pathless constructor and <see cref="CreateTemporary(string?, bool)"/> assign a unique path with the platform
+/// script extension and enable <see cref="DeleteOnDispose"/> by default. Pass an explicit path to the constructor to
+/// keep the script on disk, or disable deletion when a generated script must outlive this writer.
 /// </p>
 /// <p>
 /// When elevation is requested from a non-elevated Windows process, the script runs through <c>runas</c> and the
@@ -43,10 +43,8 @@ public sealed class ShellScriptFile : TextWriter
     /// <see langword="true"/> to request administrator elevation when executing the script.
     /// </param>
     /// <param name="deleteOnDispose"><see langword="true"/> to delete the script file when this instance is disposed.</param>
-    /// <exception cref="ArgumentException">
-    /// </exception>
-    /// <remarks>The file is kept on disposal. Set <see cref="DeleteOnDispose"/> to change that.</remarks>
-    public ShellScriptFile(bool requireElevation = false, bool deleteOnDispose = false) : this(
+    /// <remarks>The file is deleted on disposal by default. Set <see cref="DeleteOnDispose"/> to change that.</remarks>
+    public ShellScriptFile(bool requireElevation = false, bool deleteOnDispose = true) : this(
         TemporaryFile.GetTempFilePath(extension: ScriptFileExtension), requireElevation, deleteOnDispose)
     {
     }
@@ -62,7 +60,7 @@ public sealed class ShellScriptFile : TextWriter
     /// <exception cref="ArgumentException">
     /// <paramref name="filePath"/> is <see langword="null"/>, empty, or white space.
     /// </exception>
-    /// <remarks>The file is kept on disposal. Set <see cref="DeleteOnDispose"/> to change that.</remarks>
+    /// <remarks>The file is kept on disposal by default. Set <see cref="DeleteOnDispose"/> to change that.</remarks>
     public ShellScriptFile(string filePath, bool requireElevation = false, bool deleteOnDispose = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
@@ -82,7 +80,8 @@ public sealed class ShellScriptFile : TextWriter
     /// <returns>A script with <see cref="DeleteOnDispose"/> enabled.</returns>
     public static ShellScriptFile CreateTemporary(string? directoryPath = null, bool requireElevation = false)
     {
-        return new ShellScriptFile(TemporaryFile.GetTempFilePath(directoryPath, ScriptFileExtension), requireElevation, true);
+        return new ShellScriptFile(TemporaryFile.GetTempFilePath(directoryPath, ScriptFileExtension), requireElevation,
+            true);
     }
 
     #endregion
@@ -929,7 +928,7 @@ public sealed class ShellScriptFile : TextWriter
     {
         if (UsesWindowsRunAs(startInfo))
         {
-            var exitCode = ProcessHelper.StartProcess(startInfo, true);
+            var exitCode = ProcessHelper.StartProcess(startInfo, waitForCompletion: true);
             return new ProcessOutput(exitCode, string.Empty, string.Empty);
         }
 
@@ -944,7 +943,7 @@ public sealed class ShellScriptFile : TextWriter
         {
             var exitCode = await ProcessHelper.StartProcessAsync(
                     startInfo,
-                    true,
+                    waitForCompletion: true,
                     cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
             return new ProcessOutput(exitCode, string.Empty, string.Empty);

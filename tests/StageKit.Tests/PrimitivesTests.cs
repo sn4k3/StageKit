@@ -77,7 +77,7 @@ public sealed class PrimitivesTests
         }
         finally
         {
-            Directory.Delete(directoryPath, true);
+            Directory.Delete(directoryPath, recursive: true);
         }
     }
 
@@ -268,7 +268,7 @@ public sealed class PrimitivesTests
         if (OperatingSystem.IsWindows()) startInfo.ArgumentList.Add("/c");
         startInfo.ArgumentList.Add("exit 8");
 
-        var exitCode = ProcessHelper.StartProcess(startInfo, true);
+        var exitCode = ProcessHelper.StartProcess(startInfo, waitForCompletion: true);
 
         Assert.Equal(8, exitCode);
     }
@@ -294,7 +294,7 @@ public sealed class PrimitivesTests
             name,
             argumentList,
             waitForCompletion: true);
-        var startInfoExitCode = ProcessHelper.StartProcessWithShellExecute(startInfo, true);
+        var startInfoExitCode = ProcessHelper.StartProcessWithShellExecute(startInfo, waitForCompletion: true);
 
         Assert.Equal(9, rawArgumentsExitCode);
         Assert.Equal(10, argumentListExitCode);
@@ -327,7 +327,7 @@ public sealed class PrimitivesTests
             cancellationToken: TestContext.Current.CancellationToken);
         var startInfoExitCode = await ProcessHelper.StartProcessWithShellExecuteAsync(
             startInfo,
-            true,
+            waitForCompletion: true,
             cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(12, rawArgumentsExitCode);
@@ -434,7 +434,7 @@ public sealed class PrimitivesTests
         }
         finally
         {
-            Directory.Delete(directoryPath, true);
+            Directory.Delete(directoryPath, recursive: true);
         }
     }
 
@@ -641,7 +641,7 @@ public sealed class PrimitivesTests
         }
         finally
         {
-            Directory.Delete(directoryPath, true);
+            Directory.Delete(directoryPath, recursive: true);
         }
     }
 
@@ -652,8 +652,8 @@ public sealed class PrimitivesTests
 
         var startInfo = ProcessHelper.CreateShellProcessStartInfo(
             command,
-            true,
-            false);
+            requireElevation: true,
+            isPrivilegedProcess: false);
 
         if (OperatingSystem.IsWindows())
         {
@@ -682,7 +682,7 @@ public sealed class PrimitivesTests
     [Fact]
     public void ProcessHelper_CreateProcessStartInfo_PreservesArgumentListWithoutElevation()
     {
-        var startInfo = ProcessHelper.CreateProcessStartInfo("tool", ["first", "two words"], false);
+        var startInfo = ProcessHelper.CreateProcessStartInfo("tool", ["first", "two words"], requireElevation: false);
 
         Assert.Equal("tool", startInfo.FileName);
         Assert.Equal(["first", "two words"], startInfo.ArgumentList);
@@ -696,9 +696,9 @@ public sealed class PrimitivesTests
         var startInfo = ProcessHelper.CreateHostProcessStartInfo(
             "tool",
             ["first", "two words"],
-            false,
-            false,
-            false);
+            requireElevation: false,
+            isFlatpakSandbox: false,
+            isPrivilegedProcess: false);
 
         Assert.Equal("tool", startInfo.FileName);
         Assert.Equal(["first", "two words"], startInfo.ArgumentList);
@@ -710,9 +710,9 @@ public sealed class PrimitivesTests
         var startInfo = ProcessHelper.CreateHostProcessStartInfo(
             "tool",
             ["first", "two words"],
-            false,
-            true,
-            false);
+            requireElevation: false,
+            isFlatpakSandbox: true,
+            isPrivilegedProcess: false);
 
         Assert.Equal("flatpak-spawn", startInfo.FileName);
         Assert.Equal(["--host", "tool", "first", "two words"], startInfo.ArgumentList);
@@ -726,9 +726,9 @@ public sealed class PrimitivesTests
         var startInfo = ProcessHelper.CreateHostProcessStartInfo(
             "tool",
             ["first", "two words"],
-            true,
-            true,
-            false);
+            requireElevation: true,
+            isFlatpakSandbox: true,
+            isPrivilegedProcess: false);
 
         Assert.Equal("flatpak-spawn", startInfo.FileName);
         Assert.Equal(["--host", "pkexec", "tool", "first", "two words"], startInfo.ArgumentList);
@@ -740,8 +740,8 @@ public sealed class PrimitivesTests
         var startInfo = ProcessHelper.CreateProcessStartInfo(
             "tool",
             ["first", "two words"],
-            true,
-            false);
+            requireElevation: true,
+            isPrivilegedProcess: false);
 
         if (OperatingSystem.IsWindows())
         {
@@ -773,8 +773,8 @@ public sealed class PrimitivesTests
         var startInfo = ProcessHelper.CreateProcessStartInfo(
             "tool",
             ["first", "two words"],
-            true,
-            true);
+            requireElevation: true,
+            isPrivilegedProcess: true);
 
         Assert.Equal("tool", startInfo.FileName);
         Assert.Equal(["first", "two words"], startInfo.ArgumentList);
@@ -788,8 +788,8 @@ public sealed class PrimitivesTests
         var startInfo = ProcessHelper.CreateProcessStartInfo(
             "tool",
             ["first"],
-            true,
-            false);
+            requireElevation: true,
+            isPrivilegedProcess: false);
 
         if (OperatingSystem.IsWindows())
         {
@@ -810,8 +810,8 @@ public sealed class PrimitivesTests
         var startInfo = ProcessHelper.CreateProcessStartInfo(
             "tool",
             "--first \"two words\"",
-            true,
-            false);
+            requireElevation: true,
+            isPrivilegedProcess: false);
 
         if (OperatingSystem.IsWindows())
         {
@@ -872,7 +872,7 @@ public sealed class PrimitivesTests
         var filePath = Path.Combine(directoryPath, "settings.json");
         File.WriteAllText(filePath, "old");
 
-        using (var stream = new SafeFileStream(filePath, false))
+        using (var stream = new SafeFileStream(filePath, commitOnDispose: false))
         {
             stream.Write("new"u8);
             Assert.True(File.Exists(stream.TemporaryPath));
@@ -889,7 +889,7 @@ public sealed class PrimitivesTests
         var filePath = Path.Combine(directoryPath, "settings.json");
         await File.WriteAllTextAsync(filePath, "old", TestContext.Current.CancellationToken);
 
-        await using (var stream = new SafeFileStream(filePath, false))
+        await using (var stream = new SafeFileStream(filePath, commitOnDispose: false))
         {
             await stream.WriteAsync("new"u8.ToArray(), TestContext.Current.CancellationToken);
             await stream.CommitAsync(TestContext.Current.CancellationToken);
@@ -962,8 +962,27 @@ public sealed class PrimitivesTests
         }
         finally
         {
-            if (Directory.Exists(directoryPath)) Directory.Delete(directoryPath, true);
+            if (Directory.Exists(directoryPath)) Directory.Delete(directoryPath, recursive: true);
         }
+    }
+
+    [Fact]
+    public void ShellScriptFile_DefaultConstructor_DeletesTemporaryScriptOnDispose()
+    {
+        string filePath;
+
+        using (var script = new ShellScriptFile())
+        {
+            filePath = script.FilePath;
+
+            Assert.True(script.DeleteOnDispose);
+            Assert.EndsWith(ShellScriptFile.ScriptFileExtension, filePath);
+
+            script.Flush();
+            Assert.True(script.Exists);
+        }
+
+        Assert.False(File.Exists(filePath));
     }
 
     [Fact]
@@ -1013,7 +1032,7 @@ public sealed class PrimitivesTests
         }
         finally
         {
-            if (Directory.Exists(rootPath)) Directory.Delete(rootPath, true);
+            if (Directory.Exists(rootPath)) Directory.Delete(rootPath, recursive: true);
         }
     }
 
@@ -1053,7 +1072,7 @@ public sealed class PrimitivesTests
         }
         finally
         {
-            if (Directory.Exists(rootPath)) Directory.Delete(rootPath, true);
+            if (Directory.Exists(rootPath)) Directory.Delete(rootPath, recursive: true);
         }
     }
 
@@ -1235,8 +1254,8 @@ public sealed class PrimitivesTests
         }
         finally
         {
-            if (Directory.Exists(rootPath)) Directory.Delete(rootPath, true);
-            if (Directory.Exists(outsidePath)) Directory.Delete(outsidePath, true);
+            if (Directory.Exists(rootPath)) Directory.Delete(rootPath, recursive: true);
+            if (Directory.Exists(outsidePath)) Directory.Delete(outsidePath, recursive: true);
         }
     }
 
