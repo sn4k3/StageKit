@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using Fallout.Common.IO;
+using Fallout.Common.Tooling;
 using Fallout.Common.Tools.DotNet;
 using Fallout.Solutions;
 using StageKit.Primitives.System;
@@ -1333,7 +1334,7 @@ public class PublishPipelineTests
                 ["https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"],
                 build.DownloadUrls);
             Assert.Equal([downloadedPath], build.DownloadDestinations);
-            Assert.Equal([$"'{downloadedPath}' --appimage-extract"], build.ShellCommands);
+            Assert.Equal([$"'{downloadedPath}' --appimage-extract 2>&1"], build.ShellCommands);
             var extractionDirectory = Assert.Single(build.ShellWorkingDirectories);
             Assert.Equal(cacheDirectory, Path.GetDirectoryName(extractionDirectory));
             Assert.StartsWith("extract-", Path.GetFileName(extractionDirectory), StringComparison.Ordinal);
@@ -1380,6 +1381,35 @@ public class PublishPipelineTests
     }
 
     /// <summary>
+    /// Verifies RPM cross-architecture builds explicitly select the target understood by rpmbuild.
+    /// </summary>
+    [Fact]
+    public void CreateRpmBuildCommand_Arm64Target_PassesTargetArchitecture()
+    {
+        var root = OperatingSystem.IsWindows() ? @"C:\rpm-test" : "/rpm-test";
+        var topDirectory = (AbsolutePath)Path.Combine(root, "top directory");
+        var specFile = (AbsolutePath)Path.Combine(root, "spec file.spec");
+
+        var command = new TestBuild().InvokeCreateRpmBuildCommand(topDirectory, specFile, "aarch64");
+
+        Assert.Equal(
+            $"rpmbuild --define '_topdir {topDirectory}' -bb '{specFile}' --target 'aarch64'",
+            command);
+    }
+
+    /// <summary>
+    /// Verifies failed shell commands stop packaging at the original process failure.
+    /// </summary>
+    [Fact]
+    public void ExecuteShell_NonZeroExit_ThrowsProcessException()
+    {
+        var exception = Assert.Throws<ProcessException>(() =>
+            new TestBuild().InvokeBaseExecuteShell("exit 23", Path.GetTempPath()));
+
+        Assert.Equal(23, exception.ExitCode);
+    }
+
+    /// <summary>
     /// Verifies both AppImage shell commands single-quote every hostile path character.
     /// </summary>
     [Fact]
@@ -1400,9 +1430,9 @@ public class PublishPipelineTests
         var expectedToolPath = $"'{toolPath.ToString().Replace("'", "'\"'\"'", StringComparison.Ordinal)}'";
         var expectedAppDirPath = $"'{appDirPath.ToString().Replace("'", "'\"'\"'", StringComparison.Ordinal)}'";
         var expectedOutputPath = $"'{outputPath.ToString().Replace("'", "'\"'\"'", StringComparison.Ordinal)}'";
-        Assert.Equal($"{expectedDownloadedPath} --appimage-extract", extractionCommand);
+        Assert.Equal($"{expectedDownloadedPath} --appimage-extract 2>&1", extractionCommand);
         Assert.Equal(
-            $"ARCH=x86_64 {expectedToolPath} {expectedAppDirPath} {expectedOutputPath}",
+            $"ARCH=x86_64 {expectedToolPath} {expectedAppDirPath} {expectedOutputPath} 2>&1",
             buildCommand);
     }
 
@@ -1772,7 +1802,7 @@ public class PublishPipelineTests
             var appDirPath = build.ShellWorkingDirectories[1];
             Assert.Equal("image", File.ReadAllText(outputPath));
             Assert.Equal(
-                $"ARCH=x86_64 '{extractedAppRun}' '{appDirPath}' '{temporaryOutputPath}'",
+                $"ARCH=x86_64 '{extractedAppRun}' '{appDirPath}' '{temporaryOutputPath}' 2>&1",
                 build.ShellCommands[1]);
             Assert.Equal(appDirPath, build.ShellWorkingDirectories[1]);
             Assert.True(build.AppDirExistedDuringBuild);
@@ -2150,7 +2180,7 @@ public class PublishPipelineTests
             Assert.False(File.Exists(Path.Combine(extractedDirectory, "stale.txt")));
             Assert.Empty(build.DownloadUrls);
             Assert.Equal(
-                [$"'{Path.Combine(rootDirectory, "appimagetool-x86_64.AppImage")}' --appimage-extract"],
+                [$"'{Path.Combine(rootDirectory, "appimagetool-x86_64.AppImage")}' --appimage-extract 2>&1"],
                 build.ShellCommands);
         }
         finally
@@ -3604,6 +3634,17 @@ public class PublishPipelineTests
             return CreateSnapBuildCommand();
         }
 
+        internal string InvokeCreateRpmBuildCommand(AbsolutePath topDirectory, AbsolutePath specFile,
+            string targetArchitecture)
+        {
+            return CreateRpmBuildCommand(topDirectory, specFile, targetArchitecture);
+        }
+
+        internal void InvokeBaseExecuteShell(string command, AbsolutePath workingDirectory)
+        {
+            base.ExecuteShell(command, workingDirectory);
+        }
+
         internal string InvokeCreateAppImageToolExtractionCommand(AbsolutePath downloadedPath)
         {
             return CreateAppImageToolExtractionCommand(downloadedPath);
@@ -3997,7 +4038,7 @@ public class PublishPipelineTests
                 }
             }
 
-            if (command.EndsWith(" --appimage-extract", StringComparison.Ordinal) &&
+            if (command.EndsWith(" --appimage-extract 2>&1", StringComparison.Ordinal) &&
                 (CreateExtractionDirectory || CreateExtractedAppRun))
             {
                 var extractedPath = workingDirectory / "squashfs-root";

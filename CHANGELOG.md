@@ -33,6 +33,9 @@
 - Add a host beep section to the Avalonia demo with frequency and duration editors, single and looping playback through
   `HostSystem.BeepAsync`, and a stop button that cancels the loop
 - Add `LinuxRpm` and `DotNetSingleFile` to `StageKit` releases
+- Fix cross-architecture RPM publishing by passing the target architecture to `rpmbuild`, fail immediately when a
+  packaging command exits unsuccessfully, and report successful AppImage progress as regular output
+- Run Linux and macOS release jobs on matching native x64 or ARM64 GitHub-hosted runners
 - Set `CreateNoWindow = true` on `ProcessHelper` by default to avoid a console window on Linux
 - Add `ProcessHelper.StartProcessWithShellExecute` and `StartProcessWithShellExecuteAsync` overloads for targets that
   must be opened through the operating system shell

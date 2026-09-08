@@ -47,7 +47,7 @@ public partial class StageKitBuild
     /// <returns>The shell-safe extraction command.</returns>
     protected virtual string CreateAppImageToolExtractionCommand(AbsolutePath downloadedPath)
     {
-        return $"{downloadedPath.ToString().QuoteShell()} --appimage-extract";
+        return $"{downloadedPath.ToString().QuoteShell()} --appimage-extract 2>&1";
     }
 
     /// <summary>
@@ -263,7 +263,7 @@ public partial class StageKitBuild
             var rpmVersion = LinuxPackage.GetRpmVersion(SoftwareVersion);
             spec.WriteAllText(LinuxPackage.GetRpmSpec(packageName, rpmVersion,
                 GetRpmArchitecture(architecture), options.License, options.Summary, options.Description, payload));
-            ExecuteShell(CreateRpmBuildCommand(top, spec), staging);
+            ExecuteShell(CreateRpmBuildCommand(top, spec, GetRpmArchitecture(architecture)), staging);
             var rpm = Directory.GetFiles(top, "*.rpm", SearchOption.AllDirectories).SingleOrDefault()
                       ?? throw new FileNotFoundException("rpmbuild did not produce exactly one RPM package.");
             ((AbsolutePath)rpm).Move(temporaryOutput, ExistsPolicy.FileOverwrite);
@@ -408,6 +408,18 @@ public partial class StageKitBuild
     protected virtual string CreateRpmBuildCommand(AbsolutePath topDirectory, AbsolutePath specFile)
     {
         return $"rpmbuild --define {$"_topdir {topDirectory}".QuoteShell()} -bb {specFile.ToString().QuoteShell()}";
+    }
+
+    /// <summary>Composes the RPM build command for a target architecture.</summary>
+    /// <param name="topDirectory">The RPM build root.</param>
+    /// <param name="specFile">The RPM spec file.</param>
+    /// <param name="targetArchitecture">The RPM target architecture.</param>
+    /// <returns>The shell-safe RPM build command.</returns>
+    protected virtual string CreateRpmBuildCommand(AbsolutePath topDirectory, AbsolutePath specFile,
+        string targetArchitecture)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetArchitecture);
+        return $"{CreateRpmBuildCommand(topDirectory, specFile)} --target {targetArchitecture.QuoteShell()}";
     }
 
     /// <summary>Composes the Arch Linux binary-package build command.</summary>
@@ -708,7 +720,7 @@ public partial class StageKitBuild
     {
         return $"ARCH={architecture} {appImageTool.ToString().QuoteShell()} " +
                $"{appDirPath.ToString().QuoteShell()} " +
-               outputPath.ToString().QuoteShell();
+               $"{outputPath.ToString().QuoteShell()} 2>&1";
     }
 
     /// <summary>

@@ -9,7 +9,7 @@ public class ConverterExtension
     /// Translate numeric file size in bytes to a human-readable shorter string format.
     /// </summary>
     /// <param name="size">File size in bytes.</param>
-    /// <param name="roundToDecimals">Round to this number of decimal plates.</param>
+    /// <param name="roundToDecimals">Round to this number of decimal places.</param>
     /// <returns>Returns file size short string.</returns>
     public static string ToFileSizeString(long size, int roundToDecimals = 2)
     {
@@ -83,10 +83,10 @@ public class ConverterExtension
     }
 
     /// <summary>
-    /// 
+    /// Translate numeric time in seconds to a human-readable shorter string format.
     /// </summary>
-    /// <param name="seconds"></param>
-    /// <returns></returns>
+    /// <param name="seconds">Time in seconds.</param>
+    /// <returns>Returns time short string.</returns>
     public static string ToTimeShortString(long seconds)
     {
         if (seconds < 0) return string.Empty;

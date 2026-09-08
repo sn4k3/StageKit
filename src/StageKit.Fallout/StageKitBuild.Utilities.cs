@@ -76,7 +76,7 @@ public partial class StageKitBuild
     protected virtual void ExecuteShell(string command, AbsolutePath workingDirectory)
     {
         using var process = ProcessTasks.StartShell(command, workingDirectory);
-        process.AssertWaitForExit();
+        process.AssertWaitForExit().AssertZeroExitCode();
     }
 
     /// <summary>
