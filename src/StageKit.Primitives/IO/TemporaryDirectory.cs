@@ -14,7 +14,7 @@ public sealed class TemporaryDirectory : DisposableObject
     {
         parentDirectoryPath ??= Path.GetTempPath();
         prefix = string.IsNullOrWhiteSpace(prefix) ? "tmp" : prefix;
-
+        
         DirectoryPath = Path.Combine(
             parentDirectoryPath,
             $"{prefix}-{Guid.NewGuid():N}");

@@ -82,4 +82,23 @@ public sealed class TemporaryFile : DisposableObject
             // Best effort cleanup only.
         }
     }
+
+    /// <summary>
+    /// Gets a temporary file path.
+    /// </summary>
+    /// <param name="directoryPath">The directory path. Uses the system temporary directory when omitted.</param>
+    /// <param name="extension">The optional file extension.</param>
+    /// <returns>The temporary file path.</returns>
+    public static string GetTempFilePath(string? directoryPath = null, string? extension = null)
+    {
+        directoryPath ??= Path.GetTempPath();
+        Directory.CreateDirectory(directoryPath);
+
+        if (!string.IsNullOrWhiteSpace(extension) && !extension.StartsWith('.'))
+        {
+            extension = "." + extension;
+        }
+
+        return Path.Combine(directoryPath, $"{Guid.NewGuid():N}{extension}");
+    }
 }

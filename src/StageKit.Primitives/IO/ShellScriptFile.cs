@@ -14,7 +14,7 @@ namespace StageKit.Primitives;
 /// any <c>Execute</c> overload, and by disposal when content is still pending and the file is not being deleted.
 /// </p>
 /// <p>
-/// Use <see cref="CreateTemporary(bool, string?)"/> for a throwaway script: it assigns a unique path with the
+/// Use <see cref="CreateTemporary(string?, bool)"/> for a throwaway script: it assigns a unique path with the
 /// platform script extension and enables <see cref="DeleteOnDispose"/>. Pass an explicit path to the constructor to
 /// keep the script on disk.
 /// </p>
@@ -27,7 +27,7 @@ public sealed class ShellScriptFile : TextWriter
 {
     #region Fields
 
-    private static readonly Encoding Utf8WithoutBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+    private static readonly Encoding Utf8WithoutBom = new UTF8Encoding(false);
     private readonly StringBuilder _builder = new();
     private bool _isDisposed;
     private bool _isFlushPending;
@@ -37,43 +37,52 @@ public sealed class ShellScriptFile : TextWriter
     #region Constructors
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="ShellScriptFile"/> class with a unique temporary path and the platform script extension.
+    /// </summary>
+    /// <param name="requireElevation">
+    /// <see langword="true"/> to request administrator elevation when executing the script.
+    /// </param>
+    /// <param name="deleteOnDispose"><see langword="true"/> to delete the script file when this instance is disposed.</param>
+    /// <exception cref="ArgumentException">
+    /// </exception>
+    /// <remarks>The file is kept on disposal. Set <see cref="DeleteOnDispose"/> to change that.</remarks>
+    public ShellScriptFile(bool requireElevation = false, bool deleteOnDispose = false) : this(
+        TemporaryFile.GetTempFilePath(extension: ScriptFileExtension), requireElevation, deleteOnDispose)
+    {
+    }
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="ShellScriptFile"/> class for the specified script path.
     /// </summary>
     /// <param name="filePath">The script file path. Missing directories are created when the script is written.</param>
     /// <param name="requireElevation">
     /// <see langword="true"/> to request administrator elevation when executing the script.
     /// </param>
+    /// <param name="deleteOnDispose"><see langword="true"/> to delete the script file when this instance is disposed.</param>
     /// <exception cref="ArgumentException">
     /// <paramref name="filePath"/> is <see langword="null"/>, empty, or white space.
     /// </exception>
     /// <remarks>The file is kept on disposal. Set <see cref="DeleteOnDispose"/> to change that.</remarks>
-    public ShellScriptFile(string filePath, bool requireElevation = false)
+    public ShellScriptFile(string filePath, bool requireElevation = false, bool deleteOnDispose = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
 
+        NewLine = "\n";
         FilePath = Path.GetFullPath(filePath);
         RequireElevation = requireElevation;
+        DeleteOnDispose = deleteOnDispose;
         AppendPlatformPreamble();
     }
 
     /// <summary>
     /// Creates a script that uses a unique temporary path and is deleted when disposed.
     /// </summary>
-    /// <param name="requireElevation">
-    /// <see langword="true"/> to request administrator elevation when executing the script.
-    /// </param>
     /// <param name="directoryPath">The directory path. Uses the system temporary directory when omitted.</param>
+    /// <param name="requireElevation"> <see langword="true"/> to request administrator elevation when executing the script.</param>
     /// <returns>A script with <see cref="DeleteOnDispose"/> enabled.</returns>
-    public static ShellScriptFile CreateTemporary(bool requireElevation = false, string? directoryPath = null)
+    public static ShellScriptFile CreateTemporary(string? directoryPath = null, bool requireElevation = false)
     {
-        directoryPath ??= Path.GetTempPath();
-        Directory.CreateDirectory(directoryPath);
-
-        var filePath = Path.Combine(directoryPath, $"{Guid.NewGuid():N}{ScriptFileExtension}");
-        return new ShellScriptFile(filePath, requireElevation)
-        {
-            DeleteOnDispose = true
-        };
+        return new ShellScriptFile(TemporaryFile.GetTempFilePath(directoryPath, ScriptFileExtension), requireElevation, true);
     }
 
     #endregion
@@ -85,6 +94,11 @@ public sealed class ShellScriptFile : TextWriter
     /// </summary>
     /// <value><c>.bat</c> on Windows or <c>.sh</c> on other operating systems.</value>
     public static string ScriptFileExtension => OperatingSystem.IsWindows() ? ".bat" : ".sh";
+    
+    /// <summary>
+    /// Gets the directory path of the script file.
+    /// </summary>
+    public string DirectoryPath => Path.GetDirectoryName(FilePath) ?? string.Empty;
 
     /// <summary>
     /// Gets the full path of the script file.
@@ -100,7 +114,7 @@ public sealed class ShellScriptFile : TextWriter
     /// Gets or sets a value indicating whether the script file is deleted when this instance is disposed.
     /// </summary>
     /// <remarks>
-    /// Enabled by <see cref="CreateTemporary(bool, string?)"/> and disabled for a script constructed with an explicit
+    /// Enabled by <see cref="CreateTemporary(string?, bool)"/> and disabled for a script constructed with an explicit
     /// path. Deletion is best effort and never throws.
     /// </remarks>
     public bool DeleteOnDispose { get; set; }
@@ -907,14 +921,15 @@ public sealed class ShellScriptFile : TextWriter
 
     private void AppendPlatformPreamble()
     {
-        if (OperatingSystem.IsWindows()) _builder.Append("@echo off").Append(CoreNewLine);
+        _builder.Append(OperatingSystem.IsWindows() ? "@echo off" : "#!/usr/bin/env bash").Append(CoreNewLine);
+        _isFlushPending = true;
     }
 
     private static ProcessOutput GetProcessOutput(ProcessStartInfo startInfo)
     {
         if (UsesWindowsRunAs(startInfo))
         {
-            var exitCode = ProcessHelper.StartProcess(startInfo, waitForCompletion: true);
+            var exitCode = ProcessHelper.StartProcess(startInfo, true);
             return new ProcessOutput(exitCode, string.Empty, string.Empty);
         }
 
@@ -929,7 +944,7 @@ public sealed class ShellScriptFile : TextWriter
         {
             var exitCode = await ProcessHelper.StartProcessAsync(
                     startInfo,
-                    waitForCompletion: true,
+                    true,
                     cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
             return new ProcessOutput(exitCode, string.Empty, string.Empty);
