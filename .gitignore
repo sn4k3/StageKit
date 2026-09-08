@@ -463,5 +463,6 @@ $RECYCLE.BIN/
 .dotnet-home
 
 # AI
+.claude
 .serena
 .github/tdd
