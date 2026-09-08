@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.IO.Compression;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -7,6 +8,10 @@ using Fallout.Common.IO;
 using Fallout.Common.Tooling;
 using Fallout.Common.Tools.DotNet;
 using Fallout.Solutions;
+using Serilog;
+using Serilog.Core;
+using Serilog.Events;
+using StageKit.Primitives;
 using StageKit.Primitives.System;
 using StageKit.Runtime;
 using Xunit;
@@ -1334,7 +1339,7 @@ public class PublishPipelineTests
                 ["https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"],
                 build.DownloadUrls);
             Assert.Equal([downloadedPath], build.DownloadDestinations);
-            Assert.Equal([$"'{downloadedPath}' --appimage-extract 2>&1"], build.ShellCommands);
+            Assert.Equal([$"'{downloadedPath}' --appimage-extract"], build.ShellCommands);
             var extractionDirectory = Assert.Single(build.ShellWorkingDirectories);
             Assert.Equal(cacheDirectory, Path.GetDirectoryName(extractionDirectory));
             Assert.StartsWith("extract-", Path.GetFileName(extractionDirectory), StringComparison.Ordinal);
@@ -1410,6 +1415,55 @@ public class PublishPipelineTests
     }
 
     /// <summary>
+    /// Verifies successful standard-error output is logged as information because the stream does not indicate severity.
+    /// </summary>
+    [Fact]
+    public void ExecuteShell_SuccessfulStandardError_LogsAtInformationLevel()
+    {
+        const string Marker = "stagekit-successful-stderr";
+        var sink = new CollectingLogEventSink();
+        var previousLogger = Log.Logger;
+        using var logger = new LoggerConfiguration().MinimumLevel.Verbose().WriteTo.Sink(sink).CreateLogger();
+        try
+        {
+            Log.Logger = logger;
+            var command = OperatingSystem.IsWindows()
+                ? $"echo {Marker} 1>&2"
+                : $"printf '{Marker}\\n' >&2";
+
+            new TestBuild().InvokeBaseExecuteShell(command, Path.GetTempPath());
+
+            Assert.Contains(sink.Events,
+                item => item.Level == LogEventLevel.Information && item.RenderMessage().Contains(Marker));
+            Assert.DoesNotContain(sink.Events,
+                item => item.Level >= LogEventLevel.Warning && item.RenderMessage().Contains(Marker));
+        }
+        finally
+        {
+            Log.Logger = previousLogger;
+        }
+    }
+
+    /// <summary>
+    /// Verifies a transient resource-busy failure from hdiutil removes partial output and retries DMG creation.
+    /// </summary>
+    [Fact]
+    public void ExecuteMacOSPackageCommand_ResourceBusy_RetriesDmgCreation()
+    {
+        using var directory = new TemporaryDirectory(prefix: "stagekit-fallout-dmg-retry");
+        var outputPath = (AbsolutePath)Path.Combine(directory.DirectoryPath, "temporary.dmg");
+        File.WriteAllText(outputPath, "partial");
+        var build = new TestBuild { MacOSDmgResourceBusyFailuresRemaining = 1 };
+
+        build.ExecuteMacOSPackageCommand("hdiutil create test", directory.DirectoryPath, outputPath,
+            ApplicationPackagingType.MacOSDmg);
+
+        Assert.Equal(2, build.ShellCommands.Count);
+        Assert.False(File.Exists(outputPath));
+        Assert.Equal(0, build.MacOSDmgResourceBusyFailuresRemaining);
+    }
+
+    /// <summary>
     /// Verifies both AppImage shell commands single-quote every hostile path character.
     /// </summary>
     [Fact]
@@ -1430,9 +1484,9 @@ public class PublishPipelineTests
         var expectedToolPath = $"'{toolPath.ToString().Replace("'", "'\"'\"'", StringComparison.Ordinal)}'";
         var expectedAppDirPath = $"'{appDirPath.ToString().Replace("'", "'\"'\"'", StringComparison.Ordinal)}'";
         var expectedOutputPath = $"'{outputPath.ToString().Replace("'", "'\"'\"'", StringComparison.Ordinal)}'";
-        Assert.Equal($"{expectedDownloadedPath} --appimage-extract 2>&1", extractionCommand);
+        Assert.Equal($"{expectedDownloadedPath} --appimage-extract", extractionCommand);
         Assert.Equal(
-            $"ARCH=x86_64 {expectedToolPath} {expectedAppDirPath} {expectedOutputPath} 2>&1",
+            $"ARCH=x86_64 {expectedToolPath} {expectedAppDirPath} {expectedOutputPath}",
             buildCommand);
     }
 
@@ -1444,7 +1498,7 @@ public class PublishPipelineTests
     {
         var command = new TestBuild().InvokeCreateArchPackageBuildCommand();
 
-        Assert.Equal("PKGDEST=\"$PWD\" PKGEXT=.pkg.tar.zst makepkg --force --noconfirm --ignorearch", command);
+        Assert.Equal("PKGDEST=\"$PWD\" PKGEXT=.pkg.tar.zst makepkg --force --noconfirm --ignorearch --nodeps", command);
         Assert.DoesNotContain("--source", command, StringComparison.Ordinal);
     }
 
@@ -1802,7 +1856,7 @@ public class PublishPipelineTests
             var appDirPath = build.ShellWorkingDirectories[1];
             Assert.Equal("image", File.ReadAllText(outputPath));
             Assert.Equal(
-                $"ARCH=x86_64 '{extractedAppRun}' '{appDirPath}' '{temporaryOutputPath}' 2>&1",
+                $"ARCH=x86_64 '{extractedAppRun}' '{appDirPath}' '{temporaryOutputPath}'",
                 build.ShellCommands[1]);
             Assert.Equal(appDirPath, build.ShellWorkingDirectories[1]);
             Assert.True(build.AppDirExistedDuringBuild);
@@ -2180,7 +2234,7 @@ public class PublishPipelineTests
             Assert.False(File.Exists(Path.Combine(extractedDirectory, "stale.txt")));
             Assert.Empty(build.DownloadUrls);
             Assert.Equal(
-                [$"'{Path.Combine(rootDirectory, "appimagetool-x86_64.AppImage")}' --appimage-extract 2>&1"],
+                [$"'{Path.Combine(rootDirectory, "appimagetool-x86_64.AppImage")}' --appimage-extract"],
                 build.ShellCommands);
         }
         finally
@@ -3424,6 +3478,8 @@ public class PublishPipelineTests
 
         internal bool ThrowAfterAppImageBuild { get; set; }
 
+        internal int MacOSDmgResourceBusyFailuresRemaining { get; set; }
+
         internal bool UseConfiguredTemporaryAppImageOutputPath { get; set; }
 
         internal bool ThrowOnFinalTemporaryOutputCleanup { get; set; }
@@ -4020,6 +4076,14 @@ public class PublishPipelineTests
         {
             ShellCommands.Add(command);
             ShellWorkingDirectories.Add(workingDirectory);
+            if (MacOSDmgResourceBusyFailuresRemaining > 0 &&
+                command.StartsWith("hdiutil create ", StringComparison.Ordinal))
+            {
+                MacOSDmgResourceBusyFailuresRemaining--;
+                throw new ProcessException(new FailedProcess(command, workingDirectory,
+                    "hdiutil: create failed - Resource busy"));
+            }
+
             if (command.StartsWith("dpkg-deb --build ", StringComparison.Ordinal))
             {
                 var controlDirectory = workingDirectory / "root" / "DEBIAN";
@@ -4038,7 +4102,7 @@ public class PublishPipelineTests
                 }
             }
 
-            if (command.EndsWith(" --appimage-extract 2>&1", StringComparison.Ordinal) &&
+            if (command.EndsWith(" --appimage-extract", StringComparison.Ordinal) &&
                 (CreateExtractionDirectory || CreateExtractedAppRun))
             {
                 var extractedPath = workingDirectory / "squashfs-root";
@@ -4105,6 +4169,49 @@ public class PublishPipelineTests
             }
 
             Calls.Add("prepare");
+        }
+    }
+
+    private sealed class FailedProcess(string arguments, string workingDirectory, string error) : IProcess
+    {
+        public string FileName => "bash";
+
+        public string Arguments => arguments;
+
+        public string WorkingDirectory => workingDirectory;
+
+        public IReadOnlyCollection<Output> Output { get; } =
+        [
+            new() { Type = OutputType.Err, Text = error }
+        ];
+
+        public int ExitCode => 1;
+
+        public bool HasExited => true;
+
+        public int Id => 0;
+
+        public void Dispose()
+        {
+        }
+
+        public void Kill()
+        {
+        }
+
+        public bool WaitForExit()
+        {
+            return true;
+        }
+    }
+
+    private sealed class CollectingLogEventSink : ILogEventSink
+    {
+        internal ConcurrentQueue<LogEvent> Events { get; } = new();
+
+        public void Emit(LogEvent logEvent)
+        {
+            Events.Enqueue(logEvent);
         }
     }
 }

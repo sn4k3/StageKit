@@ -47,7 +47,7 @@ public partial class StageKitBuild
     /// <returns>The shell-safe extraction command.</returns>
     protected virtual string CreateAppImageToolExtractionCommand(AbsolutePath downloadedPath)
     {
-        return $"{downloadedPath.ToString().QuoteShell()} --appimage-extract 2>&1";
+        return $"{downloadedPath.ToString().QuoteShell()} --appimage-extract";
     }
 
     /// <summary>
@@ -340,7 +340,8 @@ public partial class StageKitBuild
             snapDirectory.CreateDirectory();
             (snapDirectory / "snapcraft.yaml").WriteAllText(LinuxPackage.GetSnapcraftManifest(packageName,
                  SoftwareVersion, GetSnapArchitecture(HostArchitecture), GetSnapArchitecture(architecture),
-                 options.ExecutableName!, options.Summary, options.Description, options.SnapBase,
+                 options.ProductName, options.ExecutableName!, options.Summary, options.Description, options.License,
+                 options.RepositoryUrl, options.SnapBase,
                  options.SnapConfinement, options.SnapPlugs, options.SnapStagePackages));
             ExecuteShell(CreateSnapBuildCommand(), staging);
             var snap = Directory.GetFiles(staging, "*.snap", SearchOption.TopDirectoryOnly).SingleOrDefault()
@@ -425,7 +426,7 @@ public partial class StageKitBuild
     /// <summary>Composes the Arch Linux binary-package build command.</summary>
     protected virtual string CreateArchPackageBuildCommand()
     {
-        return "PKGDEST=\"$PWD\" PKGEXT=.pkg.tar.zst makepkg --force --noconfirm --ignorearch";
+        return "PKGDEST=\"$PWD\" PKGEXT=.pkg.tar.zst makepkg --force --noconfirm --ignorearch --nodeps";
     }
 
     private bool CanBuildFlatpakArchitecture(string architecture)
@@ -720,7 +721,7 @@ public partial class StageKitBuild
     {
         return $"ARCH={architecture} {appImageTool.ToString().QuoteShell()} " +
                $"{appDirPath.ToString().QuoteShell()} " +
-               $"{outputPath.ToString().QuoteShell()} 2>&1";
+               outputPath.ToString().QuoteShell();
     }
 
     /// <summary>

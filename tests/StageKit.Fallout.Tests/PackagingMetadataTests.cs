@@ -103,10 +103,16 @@ public class PackagingMetadataTests
     public void GetSnapcraftManifest_ValidMetadata_DeclaresPayloadAndApplication()
     {
         var manifest = LinuxPackage.GetSnapcraftManifest(
-            "test-app", "1.2.3", "amd64", "amd64", "TestApp", "Test summary", "Long description", "core24", "strict",
-            ["desktop", "network"], ["libicu74"]);
+            "test-app", "1.2.3", "amd64", "amd64", "Test App", "TestApp", "Test summary", "Long description",
+            "MIT", "https://example.test/project", "core24", "strict", ["desktop", "network"], ["libicu74"]);
 
         Assert.Contains("name: 'test-app'", manifest, StringComparison.Ordinal);
+        Assert.Contains("title: 'Test App'", manifest, StringComparison.Ordinal);
+        Assert.Contains("license: 'MIT'", manifest, StringComparison.Ordinal);
+        Assert.Contains("contact: 'https://example.test/project'", manifest, StringComparison.Ordinal);
+        Assert.Contains("issues: 'https://example.test/project'", manifest, StringComparison.Ordinal);
+        Assert.Contains("source-code: 'https://example.test/project'", manifest, StringComparison.Ordinal);
+        Assert.Contains("website: 'https://example.test/project'", manifest, StringComparison.Ordinal);
         Assert.Contains("command: 'TestApp'", manifest, StringComparison.Ordinal);
         Assert.Contains("plugin: dump", manifest, StringComparison.Ordinal);
         Assert.Contains("source: payload", manifest, StringComparison.Ordinal);
@@ -119,8 +125,8 @@ public class PackagingMetadataTests
     public void GetSnapcraftManifest_Arm64TargetOnAmd64Host_DeclaresCrossArchitectureBuild()
     {
         var manifest = LinuxPackage.GetSnapcraftManifest(
-            "test-app", "1.2.3", "amd64", "arm64", "TestApp", "Test summary", "Long description", "core24",
-            "strict", ["desktop"], ["libicu74"]);
+            "test-app", "1.2.3", "amd64", "arm64", "Test App", "TestApp", "Test summary", "Long description",
+            "MIT", "https://example.test/project", "core24", "strict", ["desktop"], ["libicu74"]);
 
         Assert.Contains("platforms:\n  arm64:\n    build-on: ['amd64']\n    build-for: ['arm64']\n", manifest,
             StringComparison.Ordinal);
@@ -130,8 +136,8 @@ public class PackagingMetadataTests
     public void GetSnapcraftManifest_Core22_UsesLegacyArchitectureSchema()
     {
         var manifest = LinuxPackage.GetSnapcraftManifest(
-            "test-app", "1.2.3", "amd64", "arm64", "TestApp", "Test summary", "Long description", "core22", "strict",
-            ["desktop"], ["libicu70"]);
+            "test-app", "1.2.3", "amd64", "arm64", "Test App", "TestApp", "Test summary", "Long description",
+            "MIT", "https://example.test/project", "core22", "strict", ["desktop"], ["libicu70"]);
 
         Assert.Contains("architectures:\n  - build-on: ['amd64']\n    build-for: ['arm64']\n", manifest,
             StringComparison.Ordinal);
@@ -142,16 +148,16 @@ public class PackagingMetadataTests
     public void GetSnapcraftManifest_PlugContainsLineBreak_Throws()
     {
         Assert.Throws<ArgumentException>(() => LinuxPackage.GetSnapcraftManifest(
-            "test-app", "1.2.3", "amd64", "amd64", "TestApp", "Test summary", "Long description", "core24", "strict",
-            ["desktop\napps:"], ["libicu74"]));
+            "test-app", "1.2.3", "amd64", "amd64", "Test App", "TestApp", "Test summary", "Long description",
+            "MIT", "https://example.test/project", "core24", "strict", ["desktop\napps:"], ["libicu74"]));
     }
 
     [Fact]
     public void GetSnapcraftManifest_NoStagePackages_OmitsStagePackagesBlock()
     {
         var manifest = LinuxPackage.GetSnapcraftManifest(
-            "test-app", "1.2.3", "amd64", "amd64", "TestApp", "Test summary", "Long description", "core24", "strict",
-            ["desktop"], []);
+            "test-app", "1.2.3", "amd64", "amd64", "Test App", "TestApp", "Test summary", "Long description",
+            "MIT", "https://example.test/project", "core24", "strict", ["desktop"], []);
 
         Assert.DoesNotContain("stage-packages:", manifest, StringComparison.Ordinal);
     }

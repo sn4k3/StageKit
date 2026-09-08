@@ -10,6 +10,8 @@ namespace StageKit.Fallout;
 
 public partial class StageKitBuild
 {
+    private const int MacOSDmgCreateMaxAttempts = 3;
+
     /// <summary>
     /// The synthetic runtime identifier reported for multi-architecture macOS artifacts.
     /// </summary>
@@ -249,7 +251,8 @@ public partial class StageKitBuild
         {
             stagingPath.DeleteDirectory();
             var appPath = StageMacOSApp(context, stagingPath, packagingType);
-            ExecuteShell(createCommand(appPath, temporaryOutputPath), stagingPath);
+            ExecuteMacOSPackageCommand(createCommand(appPath, temporaryOutputPath), stagingPath,
+                temporaryOutputPath, packagingType);
             MoveMacOSPackageOutput(temporaryOutputPath, outputPath, extension);
         }
         finally
@@ -270,7 +273,8 @@ public partial class StageKitBuild
         {
             stagingPath.DeleteDirectory();
             var appPath = StageMultiArchMacOSApp(x64Context, arm64Context, stagingPath, packagingType);
-            ExecuteShell(createCommand(appPath, temporaryOutputPath), stagingPath);
+            ExecuteMacOSPackageCommand(createCommand(appPath, temporaryOutputPath), stagingPath,
+                temporaryOutputPath, packagingType);
             MoveMacOSPackageOutput(temporaryOutputPath, outputPath, extension);
         }
         finally
@@ -333,8 +337,36 @@ public partial class StageKitBuild
         return appPath;
     }
 
-    private static AbsolutePath CreateTemporaryMacOSPackageOutputPath(AbsolutePath outputPath, string extension) =>
-        outputPath.Parent / $".{outputPath.Name}.{Guid.NewGuid():N}{extension}";
+    private static AbsolutePath CreateTemporaryMacOSPackageOutputPath(AbsolutePath outputPath, string extension)
+    {
+        return outputPath.Parent / $".{outputPath.Name}.{Guid.NewGuid():N}{extension}";
+    }
+
+    internal void ExecuteMacOSPackageCommand(string command, AbsolutePath workingDirectory,
+        AbsolutePath temporaryOutputPath, ApplicationPackagingType packagingType)
+    {
+        for (var attempt = 1;; attempt++)
+        {
+            try
+            {
+                ExecuteShell(command, workingDirectory);
+                return;
+            }
+            catch (ProcessException exception) when (
+                packagingType is ApplicationPackagingType.MacOSDmg &&
+                attempt < MacOSDmgCreateMaxAttempts &&
+                exception.Message.Contains("hdiutil: create failed - Resource busy",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                temporaryOutputPath.DeleteFile();
+                var retryDelay = TimeSpan.FromSeconds(attempt);
+                Log.Warning(
+                    "hdiutil could not create {OutputPath} because the resource was busy. Retrying in {DelaySeconds} second(s) (attempt {NextAttempt} of {MaxAttempts}).",
+                    temporaryOutputPath, retryDelay.TotalSeconds, attempt + 1, MacOSDmgCreateMaxAttempts);
+                Thread.Sleep(retryDelay);
+            }
+        }
+    }
 
     private static void MoveMacOSPackageOutput(AbsolutePath temporaryOutputPath, AbsolutePath outputPath,
         string extension)
@@ -415,6 +447,6 @@ public partial class StageKitBuild
     {
         using var process = ProcessTasks.StartProcess("codesign",
             $"--force --deep --sign - {appPath.ToString().QuoteProcessArgument()}");
-        process.AssertWaitForExit();
+        process.AssertWaitForExit().AssertZeroExitCode();
     }
 }

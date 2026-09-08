@@ -87,9 +87,9 @@ internal static partial class LinuxPackage
     }
 
     internal static string GetSnapcraftManifest(string packageName, string version, string buildArchitecture,
-        string targetArchitecture, string executableName,
-        string summary, string description, string snapBase, string confinement, IReadOnlyCollection<string> plugs,
-        IReadOnlyCollection<string> stagePackages)
+        string targetArchitecture, string title, string executableName,
+        string summary, string description, string license, string repositoryUrl, string snapBase, string confinement,
+        IReadOnlyCollection<string> plugs, IReadOnlyCollection<string> stagePackages)
     {
         ValidateSimpleValue(packageName, nameof(packageName));
         ValidateSimpleValue(version, nameof(version));
@@ -98,8 +98,11 @@ internal static partial class LinuxPackage
         ValidateSimpleValue(executableName, nameof(executableName));
         ValidateSimpleValue(snapBase, nameof(snapBase));
         ValidateSimpleValue(confinement, nameof(confinement));
+        title = NormalizeSingleLine(title, nameof(title));
         summary = NormalizeSingleLine(summary, nameof(summary));
         description = NormalizeSingleLine(description, nameof(description));
+        license = NormalizeSingleLine(license, nameof(license));
+        repositoryUrl = NormalizeSingleLine(repositoryUrl, nameof(repositoryUrl));
         ArgumentNullException.ThrowIfNull(plugs);
         if (plugs.Count == 0 || plugs.Any(string.IsNullOrWhiteSpace))
             throw new ArgumentException("At least one non-empty Snap plug is required.", nameof(plugs));
@@ -117,10 +120,16 @@ internal static partial class LinuxPackage
         var architectureBlock = GetSnapArchitectureBlock(snapBase, buildArchitecture, targetArchitecture);
         return $$"""
                  name: {{packageName.SingleQuoteYaml()}}
+                 title: {{title.SingleQuoteYaml()}}
                  base: {{snapBase.SingleQuoteYaml()}}
                  version: {{version.SingleQuoteYaml()}}
                  summary: {{summary.SingleQuoteYaml()}}
                  description: {{description.SingleQuoteYaml()}}
+                 license: {{license.SingleQuoteYaml()}}
+                 contact: {{repositoryUrl.SingleQuoteYaml()}}
+                 issues: {{repositoryUrl.SingleQuoteYaml()}}
+                 source-code: {{repositoryUrl.SingleQuoteYaml()}}
+                 website: {{repositoryUrl.SingleQuoteYaml()}}
                  grade: stable
                  confinement: {{confinement.SingleQuoteYaml()}}
                  {{architectureBlock}}

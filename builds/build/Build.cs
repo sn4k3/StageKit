@@ -43,6 +43,7 @@ internal class Build : StageKitBuild
     protected override LinuxAppBundleOptions CreateLinuxAppBundleOptions()
     {
         var options = base.CreateLinuxAppBundleOptions();
+        options.SnapStagePackages.Add("libfontconfig1");
         options.AppRunScriptBeforeExec = $$"""
                                            function help() {
                                               echo '   _____ __                   __ __ _ __' 

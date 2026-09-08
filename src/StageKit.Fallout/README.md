@@ -36,12 +36,12 @@ exposes ready-made targets to restore, compile, run, and publish an application 
 
 The native Linux package tools are only required when the corresponding value is included in `PackagingTypes`:
 
-| Packaging type     | Required tool                        | Debian/Ubuntu package                  | Fedora package                              | Arch package                |
-|--------------------|--------------------------------------|----------------------------------------|---------------------------------------------|-----------------------------|
-| `LinuxFlatpak`     | `flatpak`, `flatpak-builder`         | `flatpak flatpak-builder`              | `flatpak flatpak-builder`                   | `flatpak flatpak-builder`   |
-| `LinuxSnap`        | `snapcraft`                          | Snap package (`snapd`), then Snapcraft | Snap package (`snapd`), then Snapcraft      | AUR `snapd`, then Snapcraft |
-| `LinuxDeb`         | `dpkg-deb`                           | `dpkg-dev`                             | `dpkg`                                      | `dpkg`                      |
-| `LinuxRpm`         | `rpmbuild`                           | `rpm`                                  | `rpm-build`                                 | `rpm`                       |
+| Packaging type     | Required tool                                            | Debian/Ubuntu package                                           | Fedora package                              | Arch package                |
+|--------------------|----------------------------------------------------------|-----------------------------------------------------------------|---------------------------------------------|-----------------------------|
+| `LinuxFlatpak`     | `flatpak`, `flatpak-builder`                             | `flatpak flatpak-builder`                                       | `flatpak flatpak-builder`                   | `flatpak flatpak-builder`   |
+| `LinuxSnap`        | `snapcraft`                                              | Snap package (`snapd`), then Snapcraft                          | Snap package (`snapd`), then Snapcraft      | AUR `snapd`, then Snapcraft |
+| `LinuxDeb`         | `dpkg-deb`                                               | `dpkg-dev`                                                      | `dpkg`                                      | `dpkg`                      |
+| `LinuxRpm`         | `rpmbuild`                                               | `rpm`                                                           | `rpm-build`                                 | `rpm`                       |
 | `LinuxArchPackage` | `makepkg`, `pacman`, `tar`, `bsdtar`, `fakeroot`, `zstd` | `makepkg pacman-package-manager fakeroot zstd libarchive-tools` | Arch Linux host/container with `base-devel` | `base-devel`                |
 
 Install the tools for a Debian or Ubuntu build host with:
@@ -132,7 +132,7 @@ Run a target:
 | `Compile`               | `Restore`             | `dotnet build` on `MainProject`. Default target.                                                                       |
 | `Run`                   | `Compile`             | `dotnet run` on `MainProject` with `--no-build --no-restore`.                                                          |
 | `Publish`               | `Restore`             | Publishes every runtime identifier in `RIds` and creates the packaging formats selected by `PackagingTypes`.           |
-| `GenerateInstallScript` | —                     | Generates Bash and Windows PowerShell install/uninstall scripts for compatible GitHub release assets.                 |
+| `GenerateInstallScript` | —                     | Generates Bash and Windows PowerShell install/uninstall scripts for compatible GitHub release assets.                  |
 
 `DependOnTargets` lets a derived build inject extra targets into `Compile`, `Run`, and `Publish`.
 
@@ -199,7 +199,7 @@ metadata, shortcuts, and install folders remain product-named while the payload 
 | Portable zip      | `Portable`                       | Any                                                   | `<asset>.zip` (skipped for macOS RIDs when `MacOSAppBundle` is also enabled) |
 | .NET single-file  | `DotNetSingleFile`               | Any                                                   | Single executable copied beside the publish folder                           |
 | Windows installer | `WindowsInstaller`               | Windows host **and** a WiX `.wixproj` in the solution | `.msi` / `.exe` produced by the installer project                            |
-| macOS app bundle  | `MacOSAppBundle`                 | Unix host                                             | `<asset>.app`                                                         |
+| macOS app bundle  | `MacOSAppBundle`                 | Unix host                                             | `<asset>.app`                                                                |
 | macOS disk image  | `MacOSDmg`                       | macOS host with `hdiutil`                             | `<asset>.dmg`                                                                |
 | macOS installer   | `MacOSPkg`                       | macOS host with `pkgbuild`                            | `<asset>.pkg`                                                                |
 | Linux AppImage    | `LinuxAppImage`                  | Linux host                                            | `<asset>.AppImage`                                                           |
@@ -230,9 +230,9 @@ Run `GenerateInstallScript` to create `scripts/install-<software-name>.sh`,
 `scripts/uninstall-<software-name>.ps1`. The target is independent of `Publish`, so it can describe packages produced by
 separate Windows, Linux, and macOS runners without trying to build them locally. A script is omitted when none of its
 supported formats are selected. Every installer run prints a command header, its help command shows detailed usage,
-`list` shows all published GitHub release versions, and `list-changelog` shows GitHub release notes for up to 20 versions
-by default. Pass a different positive limit when needed. Install the latest version or select an older release to
-downgrade:
+`list` shows all published GitHub release versions, and `list-changelog` shows GitHub release notes for up to 20
+versions by default. Pass a different positive limit when needed. Install the latest version or select an older release
+to downgrade:
 
 ```bash
 ./scripts/install-myapp.sh
@@ -275,19 +275,19 @@ The Bash `list-changelog` command uses `jq` when available and otherwise falls b
 release-note JSON.
 
 Only formats present in `PackagingTypes` are emitted. Their priority follows the insertion order of
-`ApplicationPackagingInfo.KnownPackagingTypes`. Linux first tries the package native to the detected distribution
-(DEB, RPM, or Arch), followed by AppImage, Flatpak, Snap, .NET single-file, and finally Portable. macOS tries the
-app-bundle archive, followed by PKG and DMG. Incompatible formats are skipped and the next selected format is tried. The
-release asset must contain Fallout's runtime identifier (`linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64`, or
+`ApplicationPackagingInfo.KnownPackagingTypes`. Linux first tries the package native to the detected distribution (DEB,
+RPM, or Arch), followed by AppImage, Flatpak, Snap, .NET single-file, and finally Portable. macOS tries the app-bundle
+archive, followed by PKG and DMG. Incompatible formats are skipped and the next selected format is tried. The release
+asset must contain Fallout's runtime identifier (`linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64`, or
 `osx-multiarch`) and use the standard extension for its packaging type. This is automatic with the default `AssetName`
 callback.
 
 Windows PowerShell first tries a Windows installer (`.msi`, then `.exe`), followed by the .NET single-file executable
 and finally the Portable zip. Single-file and Portable packages install under `%LOCALAPPDATA%\Programs\<package>` and
-add the executable directory to the current user's `PATH`. MSI packages run passively and request elevation when
-needed; whether an MSI permits installing an older version is controlled by that installer project. Missing release
-versions and GitHub request failures are reported as concise script errors instead of raw PowerShell exceptions.
-Set `WindowsInstallScriptWinGetPackageId` to an exact WinGet package identifier to make the Windows script try a silent
+add the executable directory to the current user's `PATH`. MSI packages run passively and request elevation when needed;
+whether an MSI permits installing an older version is controlled by that installer project. Missing release versions and
+GitHub request failures are reported as concise script errors instead of raw PowerShell exceptions. Set
+`WindowsInstallScriptWinGetPackageId` to an exact WinGet package identifier to make the Windows script try a silent
 WinGet install first. If WinGet is unavailable or returns an error, the script falls back to its normal GitHub release
 asset selection and installation. Explicit versions are passed to WinGet without a leading `v` and use its force option.
 The generated Windows uninstaller tries that exact WinGet package ID, then exact application-name entries in the Windows
@@ -310,20 +310,20 @@ bundle alone, while PKG output installs the app directly in `/Applications`. The
 follows such a symlink while scanning the source tree, walks the whole host `/Applications` directory, and gets killed
 with exit code 137 on GitHub-hosted macOS runners. Native macOS packages are created before the application ZIP to keep
 peak packaging memory lower. With `PublishMultiArch`, both native formats contain the combined `osx-x64` and
-`osx-arm64` app.
-Avalonia applications should also set `Application.Name` in `App.axaml` to the same value as `SoftwareName`; otherwise,
-Avalonia may replace the macOS menu title at runtime with its `Avalonia Application` fallback despite the generated
+`osx-arm64` app. Avalonia applications should also set `Application.Name` in `App.axaml` to the same value as
+`SoftwareName`; otherwise, Avalonia may replace the macOS menu title at runtime with its `Avalonia Application` fallback
+despite the generated
 `CFBundleName` and `CFBundleDisplayName` values.
 
 Debian, RPM, and Arch Linux payloads install the application under `/usr/lib/<package>` and a launcher under
 `/usr/bin/<package>`. When selecting `LinuxDeb`, set
 `LinuxAppBundleOptions.DebPackageMaintainer` to `Full Name <email@example.com>`. Snap defaults to the `core24` base,
 strict confinement, common desktop interfaces, and the `libicu74` stage package required by self-contained .NET apps;
-customize `SnapBase`, `SnapConfinement`, `SnapPlugs`, or `SnapStagePackages` through `LinuxAppBundleOptions`. Stage-package
-names are base-specific, so update `SnapStagePackages` when changing `SnapBase`. Native package tools and the selected
-Flatpak/Snap runtime bases must already be available on
-the build host. Debian payloads are staged in the operating system's temporary directory so `dpkg-deb` receives valid
-Unix permissions even when the repository is on a Windows-mounted WSL path such as `/mnt/c` or `/mnt/d`.
+customize `SnapBase`, `SnapConfinement`, `SnapPlugs`, or `SnapStagePackages` through `LinuxAppBundleOptions`.
+Stage-package names are base-specific, so update `SnapStagePackages` when changing `SnapBase`. Native package tools and
+the selected Flatpak/Snap runtime bases must already be available on the build host. Debian payloads are staged in the
+operating system's temporary directory so `dpkg-deb` receives valid Unix permissions even when the repository is on a
+Windows-mounted WSL path such as `/mnt/c` or `/mnt/d`.
 
 Set `LinuxAppBundleOptions.FlatpakAllowHostCommandExecution` to `true` when a Flatpak application must use
 `flatpak-spawn --host`. This adds the broad `--talk-name=org.freedesktop.Flatpak` sandbox permission and is disabled by

@@ -73,9 +73,14 @@ public partial class StageKitBuild
     /// </summary>
     /// <param name="command">The shell command.</param>
     /// <param name="workingDirectory">The command working directory.</param>
+    /// <remarks>
+    /// Both output streams are logged as information because command-line tools commonly write routine progress to
+    /// standard error. The exit code determines whether the command failed.
+    /// </remarks>
     protected virtual void ExecuteShell(string command, AbsolutePath workingDirectory)
     {
-        using var process = ProcessTasks.StartShell(command, workingDirectory);
+        using var process = ProcessTasks.StartShell(command, workingDirectory,
+            logger: (_, output) => Log.Information("{Output}", output));
         process.AssertWaitForExit().AssertZeroExitCode();
     }
 
