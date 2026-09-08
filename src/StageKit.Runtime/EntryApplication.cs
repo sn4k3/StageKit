@@ -525,6 +525,20 @@ public static class EntryApplication
     public static int ProcessId => Environment.ProcessId;
 
     /// <summary>
+    /// Gets a unique identifier for the current process instance.
+    /// </summary>
+    /// <remarks>
+    /// This identifier can be used to correlate diagnostics, logs, and crash reports produced during the process
+    /// lifetime.
+    /// </remarks>
+    public static Guid ProcessSessionId { get; } =
+#if NET10_0_OR_GREATER
+        Guid.CreateVersion7();
+#else
+        Guid.NewGuid();
+#endif
+
+    /// <summary>
     /// Gets the approximate <see cref="Stopwatch"/> timestamp when the current process started.
     /// </summary>
     public static long ProcessStartingTimestamp { get; } = GetProcessStartingTimestamp();
@@ -1025,6 +1039,7 @@ public static class EntryApplication
 
         // Process information
         info[nameof(ProcessId)] = ProcessId.ToString();
+        info[nameof(ProcessSessionId)] = ProcessSessionId.ToString();
         info[nameof(ProcessStartingTimestamp)] = ProcessStartingTimestamp.ToString();
         info[nameof(ProcessUptime)] = ProcessUptime.ToString("c");
         info[nameof(ProcessFullName)] = ProcessFullName;

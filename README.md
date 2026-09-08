@@ -584,6 +584,7 @@ Process uptime is available through `StageKit.Runtime`:
 
 ```csharp
 Console.WriteLine(EntryApplication.ProcessUptime);
+Console.WriteLine(EntryApplication.ProcessSessionId);
 ```
 
 ## Runtime Helpers

@@ -35,16 +35,6 @@ public static partial class ApplicationKit
     } = Environment.GetCommandLineArgs();
 
     /// <summary>
-    /// Gets a unique session identifier for the current application instance, can be used to correlate logs and crash reports across the application's runtime.
-    /// </summary>
-    public static Guid SessionId { get; } =
-#if NET10_0_OR_GREATER
-        Guid.CreateVersion7();
-#else
-        Guid.NewGuid();
-#endif
-
-    /// <summary>
     /// Gets or sets the application name used to build default data paths.
     /// </summary>
     public static string ApplicationName

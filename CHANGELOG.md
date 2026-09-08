@@ -1,7 +1,8 @@
 # v0.3.3 (08/09/2026)
 
-- Move process timing from `ApplicationKit.StartingTimestamp` and `RuntimeElapsed` to
-  `EntryApplication.ProcessStartingTimestamp` and `ProcessUptime`; the former APIs have been removed
+- Move process lifetime metadata from `ApplicationKit.StartingTimestamp`, `RuntimeElapsed`, and `SessionId` to
+  `EntryApplication.ProcessStartingTimestamp`, `ProcessUptime`, and `ProcessSessionId`; the former APIs have been
+  removed
 - Add structured process snapshots and configurable runtime reports to `RuntimeDiagnostics`, including process, GC,
   thread-pool, runtime-feature, culture, and time-zone details plus reusable custom report formatting
 - Add portable processor and multi-adapter graphics information to `HostSystem`, with native or structured detection,

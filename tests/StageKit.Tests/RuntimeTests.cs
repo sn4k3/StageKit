@@ -16,6 +16,7 @@ public sealed class RuntimeTests
 
         var actualRuntime = EntryApplication.ProcessUptime;
 
+        Assert.NotEqual(Guid.Empty, EntryApplication.ProcessSessionId);
         Assert.True(EntryApplication.ProcessStartingTimestamp <= Stopwatch.GetTimestamp());
         Assert.InRange(actualRuntime, expectedRuntime - TimeSpan.FromSeconds(1),
             expectedRuntime + TimeSpan.FromSeconds(1));
@@ -30,6 +31,9 @@ public sealed class RuntimeTests
         Assert.Equal(RuntimeInformation.RuntimeIdentifier, info["Runtime.RuntimeIdentifier"]);
         Assert.Equal(Environment.ProcessId.ToString(CultureInfo.InvariantCulture), info["Process.Id"]);
         Assert.Equal(EntryApplication.PackagingType.ToString(), info["EntryApplication.PackagingType"]);
+        Assert.Equal(
+            EntryApplication.ProcessSessionId.ToString(),
+            info["EntryApplication.ProcessSessionId"]);
         Assert.Contains("System.Uptime", info);
         Assert.Contains("Process.WorkingSetBytes", info);
         Assert.Contains("Runtime.IsDynamicCodeSupported", info);

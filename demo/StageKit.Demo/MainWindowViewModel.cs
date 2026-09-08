@@ -155,7 +155,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
                 "Graphics cards",
                 graphicsCardNames.Count > 0 ? string.Join(", ", graphicsCardNames) : "Unavailable"),
             new RuntimeValue("Packaging", EntryApplication.PackagingType.ToString()),
-            new RuntimeValue("Session", ApplicationKit.SessionId.ToString())
+            new RuntimeValue("Session", EntryApplication.ProcessSessionId.ToString())
         ];
         RuntimeReport = RuntimeDiagnostics.GetReport();
         OnPropertyChanged(nameof(RuntimeValues));

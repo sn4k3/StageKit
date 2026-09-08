@@ -44,9 +44,11 @@ Console.WriteLine(EntryApplication.AssemblyVersionString);
 Console.WriteLine(EntryApplication.GenericRuntimeIdentifier);
 Console.WriteLine(EntryApplication.ExecutablePath);
 Console.WriteLine(EntryApplication.PackagingType);
+Console.WriteLine(EntryApplication.ProcessSessionId);
 Console.WriteLine(EntryApplication.ProcessUptime);
 ```
 
+`ProcessSessionId` uniquely identifies the current process instance for correlating diagnostics and logs.
 `ProcessStartingTimestamp` exposes the approximate monotonic `Stopwatch` timestamp for the process start, while
 `ProcessUptime` reports the elapsed duration from that anchor.
 
@@ -75,8 +77,8 @@ Dictionary<string, string?> info = RuntimeDiagnostics.GetInfoDict();
 ProcessRuntimeSnapshot process = RuntimeDiagnostics.GetProcessSnapshot();
 ```
 
-The default report includes runtime feature and GC configuration, system architecture and uptime, culture and time
-zone, application metadata, and a point-in-time process snapshot. Configure report contents with
+The default report includes runtime feature and GC configuration, system architecture and uptime, culture and time zone,
+application metadata, and a point-in-time process snapshot. Configure report contents with
 `RuntimeDiagnosticsOptions`:
 
 ```csharp
@@ -89,8 +91,8 @@ var options = new RuntimeDiagnosticsOptions
 Console.WriteLine(RuntimeDiagnostics.GetReport(options));
 ```
 
-`ProcessRuntimeSnapshot` provides structured process uptime, CPU time, working-set and private-memory sizes, process
-and thread-pool counts, available thread-pool capacity, managed heap size, allocation totals, and collection counts.
+`ProcessRuntimeSnapshot` provides structured process uptime, CPU time, working-set and private-memory sizes, process and
+thread-pool counts, available thread-pool capacity, managed heap size, allocation totals, and collection counts.
 
 Call `FormatReport(...)` to format application-defined diagnostic values with the same stable, line-safe representation:
 
@@ -164,13 +166,13 @@ and let the process launcher handle quoting.
 - `MacOSDmg`
 - `MacOSPkg`
 
-`ApplicationPackagingInfo.KnownPackagingTypes` provides metadata for these formats. Enumerating that dictionary uses
-the preferred package-selection order: platform-native packages come first, generic bundles follow, and Portable is
-the final fallback. Consumers such as Fallout's generated installer preserve this order.
+`ApplicationPackagingInfo.KnownPackagingTypes` provides metadata for these formats. Enumerating that dictionary uses the
+preferred package-selection order: platform-native packages come first, generic bundles follow, and Portable is the
+final fallback. Consumers such as Fallout's generated installer preserve this order.
 
 Runtime detection checks the standard AppImage, Flatpak, Snap, and macOS bundle markers first, then reads the
-`build-runtime.json` manifest emitted by Fallout when it is available. This manifest enables detection of DEB, RPM,
-Arch Linux, Snap, Windows Installer, DMG, and PKG packaging. Applications without a marker or manifest report
+`build-runtime.json` manifest emitted by Fallout when it is available. This manifest enables detection of DEB, RPM, Arch
+Linux, Snap, Windows Installer, DMG, and PKG packaging. Applications without a marker or manifest report
 `Portable`; an ordinary macOS `.app` without a manifest reports `MacOSAppBundle`.
 
 Convenience properties are also available:
