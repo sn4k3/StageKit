@@ -58,7 +58,7 @@ public record CrashReport
     /// <summary>
     /// Gets the managed thread pool thread count captured at crash time.
     /// </summary>
-    public int ThreadPoolCount { get; init; } = ThreadPool.ThreadCount;
+    public int ThreadPoolCount { get; init; }
 
     /// <summary>
     /// Gets the process thread count captured at crash time.
@@ -83,23 +83,22 @@ public record CrashReport
     /// <summary>
     /// Gets the process working set size captured at crash time.
     /// </summary>
-    public long ProcessWorkingSet64 { get; init; } = Environment.WorkingSet;
+    public long ProcessWorkingSet64 { get; init; }
 
     /// <summary>
     /// Gets the total managed heap bytes captured at crash time.
     /// </summary>
-    public long GcTotalMemory { get; init; } = GC.GetTotalMemory(false);
+    public long GcTotalMemory { get; init; }
 
     /// <summary>
     /// Gets the total bytes allocated by the process over its lifetime, captured at crash time.
     /// </summary>
-    public long GcTotalAllocatedBytes { get; init; } = GC.GetTotalAllocatedBytes();
+    public long GcTotalAllocatedBytes { get; init; }
 
     /// <summary>
     /// Gets the number of garbage collections per generation (index 0, 1, 2) captured at crash time.
     /// </summary>
-    public int[] GcCollectionCounts { get; init; } =
-        [GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2)];
+    public int[] GcCollectionCounts { get; init; } = [0, 0, 0];
 
     /// <summary>
     /// Gets the elapsed runtime of the system at crash time. This value is calculated from the moment the system began until the crash report was created.
@@ -109,7 +108,7 @@ public record CrashReport
     /// <summary>
     /// Gets the elapsed runtime of the application at crash time. This value is calculated from the moment the application process began until the crash report was created.
     /// </summary>
-    public TimeSpan ProgramElapsedRuntime { get; init; } = ApplicationKit.RuntimeElapsed;
+    public TimeSpan ProgramElapsedRuntime { get; init; }
 
     /// <summary>
     /// Gets a dictionary of custom key-value data to include in the crash report. This can be used to add application-specific information relevant to the crash.
@@ -189,18 +188,21 @@ public record CrashReport
     /// </summary>
     public CrashReport()
     {
-        try
-        {
-            using var process = Process.GetCurrentProcess();
-            ThreadCount = process.Threads.Count;
-            CpuPrivilegedTime = process.PrivilegedProcessorTime;
-            CpuUserTime = process.UserProcessorTime;
-            ProcessWorkingSet64 = process.WorkingSet64;
-        }
-        catch
-        {
-            // ignored
-        }
+        var snapshot = RuntimeDiagnostics.GetProcessSnapshot();
+        ProgramElapsedRuntime = snapshot.ProcessUptime;
+        ThreadPoolCount = snapshot.ThreadPoolThreadCount;
+        ThreadCount = snapshot.ThreadCount;
+        CpuPrivilegedTime = snapshot.PrivilegedProcessorTime;
+        CpuUserTime = snapshot.UserProcessorTime;
+        ProcessWorkingSet64 = snapshot.WorkingSetBytes;
+        GcTotalMemory = snapshot.ManagedHeapBytes;
+        GcTotalAllocatedBytes = snapshot.TotalAllocatedBytes;
+        GcCollectionCounts =
+        [
+            snapshot.Generation0CollectionCount,
+            snapshot.Generation1CollectionCount,
+            snapshot.Generation2CollectionCount
+        ];
     }
 
     /// <summary>

@@ -5,18 +5,6 @@ namespace StageKit.Tests;
 public sealed class ApplicationKitTests
 {
     [Fact]
-    public void RuntimeElapsed_ApproximatelyMatchesCurrentProcessRuntime()
-    {
-        using var process = System.Diagnostics.Process.GetCurrentProcess();
-        var expectedRuntime = DateTime.UtcNow - process.StartTime.ToUniversalTime();
-
-        var actualRuntime = ApplicationKit.RuntimeElapsed;
-
-        Assert.InRange(actualRuntime, expectedRuntime - TimeSpan.FromSeconds(1),
-            expectedRuntime + TimeSpan.FromSeconds(1));
-    }
-
-    [Fact]
     public void ApplicationArgs_WhenCrashReportFlagExists_ParsesCrashReportIndex()
     {
         var originalFlag = ApplicationKit.CrashReportFlag;

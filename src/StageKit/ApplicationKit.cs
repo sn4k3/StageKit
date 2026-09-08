@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
@@ -17,18 +16,6 @@ public static partial class ApplicationKit
     /// Gets or sets the logger used by StageKit helpers.
     /// </summary>
     public static ILogger? Logger { get; set; }
-
-    /// <summary>
-    /// Gets the approximate <see cref="Stopwatch"/> timestamp when the current process started.
-    /// </summary>
-    public static long StartingTimestamp { get; } = GetProcessStartingTimestamp();
-
-    /// <summary>
-    /// Gets the elapsed time since the application started.
-    /// </summary>
-    /// <remarks>This property provides a high-resolution measurement of the application's runtime duration.
-    /// The value is calculated from the moment the application process began.</remarks>
-    public static TimeSpan RuntimeElapsed => Stopwatch.GetElapsedTime(StartingTimestamp);
 
     /// <summary>
     /// Gets or sets the command-line arguments for the current application instance.
@@ -95,33 +82,6 @@ public static partial class ApplicationKit
             new JsonStringEnumConverter()
         }
     };
-
-    #endregion
-
-    #region Methods
-
-    /// <summary>
-    /// Gets the approximate <see cref="Stopwatch"/> timestamp when the current process started.
-    /// </summary>
-    /// <returns>The approximate <see cref="Stopwatch"/> timestamp when the current process started.</returns>
-    private static long GetProcessStartingTimestamp()
-    {
-        var currentTimestamp = Stopwatch.GetTimestamp();
-
-        try
-        {
-            using var process = Process.GetCurrentProcess();
-            var elapsedSinceProcessStart = DateTime.UtcNow - process.StartTime.ToUniversalTime();
-            if (elapsedSinceProcessStart <= TimeSpan.Zero) return currentTimestamp;
-
-            var elapsedTimestampTicks = (long)(elapsedSinceProcessStart.TotalSeconds * Stopwatch.Frequency);
-            return currentTimestamp - elapsedTimestampTicks;
-        }
-        catch
-        {
-            return currentTimestamp;
-        }
-    }
 
     #endregion
 }

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -8,6 +9,19 @@ namespace StageKit.Tests;
 public sealed class RuntimeTests
 {
     [Fact]
+    public void EntryApplication_ProcessUptime_ApproximatelyMatchesCurrentProcessRuntime()
+    {
+        using var process = Process.GetCurrentProcess();
+        var expectedRuntime = DateTime.UtcNow - process.StartTime.ToUniversalTime();
+
+        var actualRuntime = EntryApplication.ProcessUptime;
+
+        Assert.True(EntryApplication.ProcessStartingTimestamp <= Stopwatch.GetTimestamp());
+        Assert.InRange(actualRuntime, expectedRuntime - TimeSpan.FromSeconds(1),
+            expectedRuntime + TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
     public void RuntimeDiagnostics_GetInfoDict_IncludesRuntimeAndEntryApplicationInfo()
     {
         var info = RuntimeDiagnostics.GetInfoDict();
@@ -16,6 +30,65 @@ public sealed class RuntimeTests
         Assert.Equal(RuntimeInformation.RuntimeIdentifier, info["Runtime.RuntimeIdentifier"]);
         Assert.Equal(Environment.ProcessId.ToString(CultureInfo.InvariantCulture), info["Process.Id"]);
         Assert.Equal(EntryApplication.PackagingType.ToString(), info["EntryApplication.PackagingType"]);
+        Assert.Contains("System.Uptime", info);
+        Assert.Contains("Process.WorkingSetBytes", info);
+        Assert.Contains("Runtime.IsDynamicCodeSupported", info);
+        Assert.Contains("Environment.CurrentCulture", info);
+        Assert.DoesNotContain("System.UpTime", info);
+    }
+
+    [Fact]
+    public void RuntimeDiagnostics_GetProcessSnapshot_CapturesCurrentMeasurements()
+    {
+        var before = DateTimeOffset.UtcNow;
+
+        var snapshot = RuntimeDiagnostics.GetProcessSnapshot();
+
+        Assert.InRange(snapshot.CapturedAtUtc, before, DateTimeOffset.UtcNow);
+        Assert.InRange(snapshot.ProcessUptime,
+            EntryApplication.ProcessUptime - TimeSpan.FromSeconds(1),
+            EntryApplication.ProcessUptime + TimeSpan.FromSeconds(1));
+        Assert.True(snapshot.WorkingSetBytes >= 0);
+        Assert.True(snapshot.PrivateMemoryBytes >= 0);
+        Assert.True(snapshot.ThreadCount >= 0);
+        Assert.True(snapshot.ManagedHeapBytes >= 0);
+        Assert.True(snapshot.TotalAllocatedBytes >= 0);
+        Assert.Equal(
+            snapshot.PrivilegedProcessorTime + snapshot.UserProcessorTime,
+            snapshot.TotalProcessorTime);
+
+        if (snapshot.IsProcessInformationAvailable)
+        {
+            Assert.True(snapshot.WorkingSetBytes > 0);
+            Assert.True(snapshot.ThreadCount > 0);
+        }
+    }
+
+    [Fact]
+    public void RuntimeDiagnostics_GetInfoDict_CanExcludeProcessSnapshot()
+    {
+        var info = RuntimeDiagnostics.GetInfoDict(new RuntimeDiagnosticsOptions
+        {
+            IncludeProcessSnapshot = false
+        });
+
+        Assert.Contains("Process.Id", info);
+        Assert.DoesNotContain("Process.CapturedAtUtc", info);
+        Assert.DoesNotContain("GC.ManagedHeapBytes", info);
+    }
+
+    [Fact]
+    public void RuntimeDiagnostics_FormatReport_PreservesOrderAndEscapesLineEndings()
+    {
+        KeyValuePair<string, string?>[] info =
+        [
+            new("First", "line 1\r\nline 2"),
+            new("Second", "value")
+        ];
+
+        var report = RuntimeDiagnostics.FormatReport(info);
+
+        Assert.Equal($"First: line 1\\nline 2{Environment.NewLine}Second: value", report);
     }
 
     [Fact]
@@ -27,6 +100,19 @@ public sealed class RuntimeTests
         Assert.Contains("Runtime.FrameworkDescription:", report);
         Assert.DoesNotContain("Loaded Assemblies:", report);
         Assert.Contains("Loaded Assemblies:", reportWithAssemblies);
+    }
+
+    [Fact]
+    public void RuntimeDiagnostics_GetReport_UsesOptions()
+    {
+        var report = RuntimeDiagnostics.GetReport(new RuntimeDiagnosticsOptions
+        {
+            IncludeProcessSnapshot = false,
+            IncludeLoadedAssemblies = true
+        });
+
+        Assert.DoesNotContain("Process.CapturedAtUtc:", report);
+        Assert.Contains("Loaded Assemblies:", report);
     }
 
     [Fact]

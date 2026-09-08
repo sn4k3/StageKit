@@ -29,7 +29,8 @@ applications those packages ship in.
 - Pending debounce tracking with timeout-aware wait support
 - Single-instance process guard based on a named mutex
 - Atomic file writes, profile backup/restore, support bundle export, and retention helpers
-- Dependency-light primitives package for atomic file writes, host URL/file-manager launching, and disposable/resource helpers
+- Dependency-light primitives package for atomic file writes, host URL/file-manager launching, and disposable/resource
+  helpers
 - Cross-platform host memory snapshots through `HostSystem.GetMemoryStatus()` and `TryGetMemoryStatus(out var memory)`
 - First-run and onboarding state persistence
 - Serializable crash reports with exception chains, stack traces, runtime information, and process stats
@@ -88,13 +89,13 @@ dotnet add package StageKit.Updatum
 
 ## Packages
 
-| Package               | NuGet                                                                                                                                | Docs                                        | Description                                                                                                                                                                             |
-|-----------------------|--------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `StageKit`            | [![Nuget](https://img.shields.io/nuget/v/StageKit?style=flat-square)](https://www.nuget.org/packages/StageKit)                       | This file                                   | Application infrastructure: settings, crash reports, retention, backups, support bundles, single-instance guards, and app metadata.                                                     |
-| `StageKit.Primitives` | [![Nuget](https://img.shields.io/nuget/v/StageKit.Primitives?style=flat-square)](https://www.nuget.org/packages/StageKit.Primitives) | [README](src/StageKit.Primitives/README.md) | Dependency-light primitives: atomic file writes, path and shell helpers, temporary resources, disposable base types, GC handles, and unmanaged memory wrappers. |
-| `StageKit.Runtime`    | [![Nuget](https://img.shields.io/nuget/v/StageKit.Runtime?style=flat-square)](https://www.nuget.org/packages/StageKit.Runtime)       | [README](src/StageKit.Runtime/README.md)    | Entry-application and runtime helpers: assembly metadata, process paths, build manifests, bundle detection, relaunch utilities, and combined diagnostics through `RuntimeDiagnostics`.  |
-| `StageKit.Updatum`    | [![Nuget](https://img.shields.io/nuget/v/StageKit.Updatum?style=flat-square)](https://www.nuget.org/packages/StageKit.Updatum)       | [README](src/StageKit.Updatum/README.md)    | GitHub release discovery, optional SHA-256 and platform-signature verification, download progress, and staged Windows/Linux/macOS update installation.                                  |
-| `StageKit.Fallout`    | [![Nuget](https://img.shields.io/nuget/v/StageKit.Fallout?style=flat-square)](https://www.nuget.org/packages/StageKit.Fallout)       | [README](src/StageKit.Fallout/README.md)    | Build-time only: reusable Fallout build pipeline with restore/compile/run/publish targets and portable, single-file, WiX installer, macOS `.app`, and Linux AppImage bundling.          |
+| Package               | NuGet                                                                                                                                | Docs                                        | Description                                                                                                                                                                            |
+|-----------------------|--------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `StageKit`            | [![Nuget](https://img.shields.io/nuget/v/StageKit?style=flat-square)](https://www.nuget.org/packages/StageKit)                       | This file                                   | Application infrastructure: settings, crash reports, retention, backups, support bundles, single-instance guards, and app metadata.                                                    |
+| `StageKit.Primitives` | [![Nuget](https://img.shields.io/nuget/v/StageKit.Primitives?style=flat-square)](https://www.nuget.org/packages/StageKit.Primitives) | [README](src/StageKit.Primitives/README.md) | Dependency-light primitives: atomic file writes, path and shell helpers, temporary resources, disposable base types, GC handles, and unmanaged memory wrappers.                        |
+| `StageKit.Runtime`    | [![Nuget](https://img.shields.io/nuget/v/StageKit.Runtime?style=flat-square)](https://www.nuget.org/packages/StageKit.Runtime)       | [README](src/StageKit.Runtime/README.md)    | Entry-application and runtime helpers: assembly metadata, process paths, build manifests, bundle detection, relaunch utilities, and combined diagnostics through `RuntimeDiagnostics`. |
+| `StageKit.Updatum`    | [![Nuget](https://img.shields.io/nuget/v/StageKit.Updatum?style=flat-square)](https://www.nuget.org/packages/StageKit.Updatum)       | [README](src/StageKit.Updatum/README.md)    | GitHub release discovery, optional SHA-256 and platform-signature verification, download progress, and staged Windows/Linux/macOS update installation.                                 |
+| `StageKit.Fallout`    | [![Nuget](https://img.shields.io/nuget/v/StageKit.Fallout?style=flat-square)](https://www.nuget.org/packages/StageKit.Fallout)       | [README](src/StageKit.Fallout/README.md)    | Build-time only: reusable Fallout build pipeline with restore/compile/run/publish targets and portable, single-file, WiX installer, macOS `.app`, and Linux AppImage bundling.         |
 
 ## Application Updates
 
@@ -419,7 +420,8 @@ RunApplication();
 ```
 
 The guard uses a named mutex, but disposal only closes its handle and may run on any thread. A still-owned mutex becomes
-abandoned, and the next `Acquire(...)` treats that state as primary. The guard does not forward activation arguments yet.
+abandoned, and the next `Acquire(...)` treats that state as primary. The guard does not forward activation arguments
+yet.
 
 If your app also launches a crash-report viewer with `ApplicationKit.CrashReportFlag`, check the crash-report mode
 before blocking secondary instances, or use a different instance name for the viewer process.
@@ -578,10 +580,10 @@ Console.WriteLine(ApplicationKit.AgeShortStr);
 Console.WriteLine(ApplicationKit.IsBirthday);
 ```
 
-Runtime duration since library initialization is available through:
+Process uptime is available through `StageKit.Runtime`:
 
 ```csharp
-Console.WriteLine(ApplicationKit.RuntimeElapsed);
+Console.WriteLine(EntryApplication.ProcessUptime);
 ```
 
 ## Runtime Helpers
@@ -619,9 +621,11 @@ var report = RuntimeDiagnostics.GetReport(includeLoadedAssemblies: true);
 The [StageKit.Demo Avalonia app](demo/StageKit.Demo/StageKit.Demo.csproj) is an interactive workshop with tabs for:
 
 - runtime and packaging diagnostics, including a privileged process-output sample;
-- atomic autosave settings, a live System/Light/Dark theme selector, recent-document collection persistence, and direct access to the settings directory;
+- atomic autosave settings, a live System/Light/Dark theme selector, recent-document collection persistence, and direct
+  access to the settings directory;
 - profile backups, support bundles, retention, onboarding state, and a fatal crash/relaunch/report-loading round trip;
-- Updatum release discovery against `sn4k3/UVtools`, checksum-verified downloads, and opt-in staged installation for the current runtime.
+- Updatum release discovery against `sn4k3/UVtools`, checksum-verified downloads, and opt-in staged installation for the
+  current runtime.
 
 Update installation is opt-in and clearly separated from download, so the demo can exercise the full replacement flow
 without installing anything accidentally.
@@ -677,9 +681,9 @@ ReadyToRun output, then creates the selected bundles in `artifacts/publish/`. Po
 installer, macOS `.app`, and Linux AppImage are enabled by default. Bundles whose host requirement is unmet are skipped
 with a warning. See the
 [`StageKit.Fallout` README](src/StageKit.Fallout/README.md) for targets, parameters, and customization points.
-`GenerateInstallScript` creates standalone Bash and Windows PowerShell installers and uninstallers under `scripts/`.
-The Bash installer can force Portable ZIP extraction into an application-named directory with `--portable [PATH]`;
-the uninstallers probe supported native and standalone installation forms and remove detected installations.
+`GenerateInstallScript` creates standalone Bash and Windows PowerShell installers and uninstallers under `scripts/`. The
+Bash installer can force Portable ZIP extraction into an application-named directory with `--portable [PATH]`; the
+uninstallers probe supported native and standalone installation forms and remove detected installations.
 
 ## Security
 

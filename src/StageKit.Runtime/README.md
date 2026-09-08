@@ -44,7 +44,11 @@ Console.WriteLine(EntryApplication.AssemblyVersionString);
 Console.WriteLine(EntryApplication.GenericRuntimeIdentifier);
 Console.WriteLine(EntryApplication.ExecutablePath);
 Console.WriteLine(EntryApplication.PackagingType);
+Console.WriteLine(EntryApplication.ProcessUptime);
 ```
+
+`ProcessStartingTimestamp` exposes the approximate monotonic `Stopwatch` timestamp for the process start, while
+`ProcessUptime` reports the elapsed duration from that anchor.
 
 `ExecutablePath` is bundle-aware. It can report an AppImage path, a macOS `.app` path, a .NET single-file host path, a
 hosted `dotnet` assembly path, the process path, or finally `Environment.GetCommandLineArgs()[0]` when the usual runtime
@@ -68,6 +72,33 @@ Console.WriteLine(RuntimeDiagnostics.GetReport());
 Console.WriteLine(RuntimeDiagnostics.GetReport(includeLoadedAssemblies: true));
 
 Dictionary<string, string?> info = RuntimeDiagnostics.GetInfoDict();
+ProcessRuntimeSnapshot process = RuntimeDiagnostics.GetProcessSnapshot();
+```
+
+The default report includes runtime feature and GC configuration, system architecture and uptime, culture and time
+zone, application metadata, and a point-in-time process snapshot. Configure report contents with
+`RuntimeDiagnosticsOptions`:
+
+```csharp
+var options = new RuntimeDiagnosticsOptions
+{
+    IncludeProcessSnapshot = false,
+    IncludeLoadedAssemblies = true
+};
+
+Console.WriteLine(RuntimeDiagnostics.GetReport(options));
+```
+
+`ProcessRuntimeSnapshot` provides structured process uptime, CPU time, working-set and private-memory sizes, process
+and thread-pool counts, available thread-pool capacity, managed heap size, allocation totals, and collection counts.
+
+Call `FormatReport(...)` to format application-defined diagnostic values with the same stable, line-safe representation:
+
+```csharp
+Dictionary<string, string?> customInfo = RuntimeDiagnostics.GetInfoDict();
+customInfo["Application.Profile"] = "Production";
+
+Console.WriteLine(RuntimeDiagnostics.FormatReport(customInfo));
 ```
 
 ## Build Runtime Manifest

@@ -370,7 +370,8 @@ public static class EntryApplication
             {
                 if (Utilities.IsOwnedByPackage("dpkg", "-S", applicationFile)) return ApplicationPackagingType.LinuxDeb;
                 if (Utilities.IsOwnedByPackage("rpm", "-qf", applicationFile)) return ApplicationPackagingType.LinuxRpm;
-                if (Utilities.IsOwnedByPackage("pacman", "-Qo", applicationFile)) return ApplicationPackagingType.LinuxArchPackage;
+                if (Utilities.IsOwnedByPackage("pacman", "-Qo", applicationFile))
+                    return ApplicationPackagingType.LinuxArchPackage;
             }
         }
         else if (OperatingSystem.IsMacOS())
@@ -522,6 +523,19 @@ public static class EntryApplication
     /// Gets the process identifier (PID) of the currently running process.
     /// </summary>
     public static int ProcessId => Environment.ProcessId;
+
+    /// <summary>
+    /// Gets the approximate <see cref="Stopwatch"/> timestamp when the current process started.
+    /// </summary>
+    public static long ProcessStartingTimestamp { get; } = GetProcessStartingTimestamp();
+
+    /// <summary>
+    /// Gets the elapsed time since the current process started.
+    /// </summary>
+    /// <remarks>
+    /// This property uses a monotonic, high-resolution timestamp anchored to the process start time.
+    /// </remarks>
+    public static TimeSpan ProcessUptime => Stopwatch.GetElapsedTime(ProcessStartingTimestamp);
 
     /// <summary>
     /// Gets the full name of the current process, including .exe for Windows.
@@ -782,6 +796,25 @@ public static class EntryApplication
 
     #region Methods
 
+    private static long GetProcessStartingTimestamp()
+    {
+        var currentTimestamp = Stopwatch.GetTimestamp();
+
+        try
+        {
+            using var process = Process.GetCurrentProcess();
+            var elapsedSinceProcessStart = DateTime.UtcNow - process.StartTime.ToUniversalTime();
+            if (elapsedSinceProcessStart <= TimeSpan.Zero) return currentTimestamp;
+
+            var elapsedTimestampTicks = (long)(elapsedSinceProcessStart.TotalSeconds * Stopwatch.Frequency);
+            return currentTimestamp - elapsedTimestampTicks;
+        }
+        catch
+        {
+            return currentTimestamp;
+        }
+    }
+
     [UnconditionalSuppressMessage(
         "SingleFile",
         "IL3000:Avoid accessing Assembly file path when publishing as a single file",
@@ -992,6 +1025,8 @@ public static class EntryApplication
 
         // Process information
         info[nameof(ProcessId)] = ProcessId.ToString();
+        info[nameof(ProcessStartingTimestamp)] = ProcessStartingTimestamp.ToString();
+        info[nameof(ProcessUptime)] = ProcessUptime.ToString("c");
         info[nameof(ProcessFullName)] = ProcessFullName;
         info[nameof(ProcessName)] = ProcessName;
 
