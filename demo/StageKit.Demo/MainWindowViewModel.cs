@@ -147,6 +147,9 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             new RuntimeValue("Framework", Environment.Version.ToString()),
             new RuntimeValue("Runtime", EntryApplication.GenericRuntimeIdentifier),
             new RuntimeValue("Operating system", HostSystem.OperatingSystemNameWithArch),
+            new RuntimeValue("System manufacturer", HostSystem.SystemManufacturer ?? "Unavailable"),
+            new RuntimeValue("System model", HostSystem.SystemModel ?? "Unavailable"),
+            new RuntimeValue("System uptime", HostSystem.SystemUptime.ToString(@"d\.hh\:mm\:ss")),
             new RuntimeValue("Processor", HostSystem.ProcessorName ?? "Unavailable"),
             new RuntimeValue(
                 "Graphics cards",

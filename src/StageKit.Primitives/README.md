@@ -48,6 +48,9 @@ using StageKit.Primitives.System;
 
 Console.WriteLine(HostSystem.OperatingSystemName);         // Windows, macOS, Linux, ...
 Console.WriteLine(HostSystem.OperatingSystemNameWithArch); // Windows X64, macOS Arm64, ...
+Console.WriteLine(HostSystem.SystemManufacturer);          // Device manufacturer, when available
+Console.WriteLine(HostSystem.SystemModel);                 // Device model, when available
+Console.WriteLine(HostSystem.SystemUptime);                // Time since the operating system started
 Console.WriteLine(HostSystem.ProcessorName);               // Processor model, when available
 
 foreach (string graphicsCard in HostSystem.GraphicsCardNames)
@@ -70,10 +73,11 @@ if (HostSystem.IsNetworkAvailable())
 connectivity-test service, validates the expected response to detect common captive portals, and times out after three
 seconds. It accepts a cancellation token.
 
-Processor and graphics-adapter results are cached after successful detection. Windows uses registry hardware data and
-excludes indirect USB and software display drivers, Linux parses `/proc/cpuinfo` and PCI information with a sysfs
-fallback, and macOS uses `sysctl` and structured `system_profiler` output. External hardware queries are limited to
-five seconds.
+Manufacturer, model, processor, and graphics-adapter results are cached after successful detection. Generic firmware
+placeholder values are treated as unavailable. Windows uses registry hardware data, falls back to baseboard identity for
+custom-built systems, and excludes indirect USB and software display drivers. Linux uses DMI or device-tree data and
+parses `/proc/cpuinfo` and PCI information with a sysfs fallback, while macOS uses `sysctl` and structured
+`system_profiler` output. External hardware queries are limited to five seconds.
 
 ### Memory
 
@@ -87,12 +91,12 @@ if (HostSystem.TryGetMemoryStatus(out var memory))
 }
 ```
 
-`GetMemoryStatus()` returns a fresh snapshot, or an empty snapshot when unavailable. Windows and macOS use native
-APIs; Linux reads `/proc/meminfo` without regular expressions. No subprocesses or additional dependencies are needed.
+`GetMemoryStatus()` returns a fresh snapshot, or an empty snapshot when unavailable. Windows and macOS use native APIs;
+Linux reads `/proc/meminfo` without regular expressions. No subprocesses or additional dependencies are needed.
 Physical-memory properties use bytes and describe OS-visible memory, not container limits. Linux prefers
-`MemAvailable` and falls back to `MemFree`; macOS estimates availability using free plus inactive pages.
-The returned `HostMemoryStatus` is an immutable, platform-neutral value containing total, available, and used physical
-memory plus the percentage in use.
+`MemAvailable` and falls back to `MemFree`; macOS estimates availability using free plus inactive pages. The returned
+`HostMemoryStatus` is an immutable, platform-neutral value containing total, available, and used physical memory plus
+the percentage in use.
 
 ## SafeFile
 
@@ -213,8 +217,8 @@ file.Keep();
 
 ## System Helpers
 
-`HostSystem.HostStringComparison` provides the comparison StageKit uses for file-system paths: ordinal,
-case-insensitive comparison on Windows and ordinal comparison elsewhere.
+`HostSystem.HostStringComparison` provides the comparison StageKit uses for file-system paths: ordinal, case-insensitive
+comparison on Windows and ordinal comparison elsewhere.
 
 ```csharp
 using StageKit.Primitives.System;
@@ -230,8 +234,8 @@ if (HostSystem.TryFindExecutable("git", out string? gitPath))
     Console.WriteLine(gitPath);
 ```
 
-Open URLs, directories, and files with the host's default applications. `ShowFileInFileManager(...)` selects the file
-in Windows Explorer or macOS Finder; on Linux it opens the containing directory because there is no portable selection
+Open URLs, directories, and files with the host's default applications. `ShowFileInFileManager(...)` selects the file in
+Windows Explorer or macOS Finder; on Linux it opens the containing directory because there is no portable selection
 command:
 
 ```csharp
@@ -252,11 +256,11 @@ HostSystem.Beep(440, 500, waitForCompletion: true);       // blocks until the to
 await HostSystem.BeepAsync(440, 500, cancellationToken);  // completes when the tone ends
 ```
 
-Both clamp the frequency to 37 - 20000 Hz and raise durations below 40 ms, because `Console.Beep` rejects values
-outside that range. Windows uses `Console.Beep`, Linux prefers ALSA's `speaker-test`, and macOS falls back to the
-fixed-tone system alert sound, so `frequency` is ignored there. A beep is best-effort and never throws: hosts without a
-console, audio device, or tone utility return `false`. `BeepAsync(...)` observes cancellation only before the tone
-starts, since neither backend can be interrupted.
+Both clamp the frequency to 37 - 20000 Hz and raise durations below 40 ms, because `Console.Beep` rejects values outside
+that range. Windows uses `Console.Beep`, Linux prefers ALSA's `speaker-test`, and macOS falls back to the fixed-tone
+system alert sound, so `frequency` is ignored there. A beep is best-effort and never throws: hosts without a console,
+audio device, or tone utility return `false`. `BeepAsync(...)` observes cancellation only before the tone starts, since
+neither backend can be interrupted.
 
 Use `UnixSystem.SetUnix755Executable(...)` to grant owner write/execute and group/other execute permissions to a Unix
 launcher. The method is a no-op on Windows.
@@ -308,7 +312,8 @@ int exitCode = await ProcessHelper.StartHostProcessAsync(
 needed. Only the argument-list overload is provided so command boundaries remain intact across the host bridge.
 
 For full control over the working directory, environment, window behavior, and other process settings, configure the
-created `ProcessStartInfo` before starting it. Use `CreateShellProcessStartInfo(...)` when the command needs shell syntax:
+created `ProcessStartInfo` before starting it. Use `CreateShellProcessStartInfo(...)` when the command needs shell
+syntax:
 
 ```csharp
 var startInfo = ProcessHelper.CreateShellProcessStartInfo("system-tool --configure");
@@ -321,8 +326,8 @@ ProcessOutput output = await ProcessHelper.GetProcessOutputAsync(startInfo, canc
 Pass an `IEnumerable<string>` to `CreateShellProcessStartInfo(...)` to supply the command plus additional shell
 arguments. The factory prepends `/d /c` on Windows or `-c` elsewhere.
 
-Use `CreateShellScriptProcessStartInfo(...)` to run a script *file*. It passes the path as a discrete argument instead of
-embedding it in a shell command string, so a path containing spaces survives; `bash -c` would word-split it apart:
+Use `CreateShellScriptProcessStartInfo(...)` to run a script *file*. It passes the path as a discrete argument instead
+of embedding it in a shell command string, so a path containing spaces survives; `bash -c` would word-split it apart:
 
 ```csharp
 var startInfo = ProcessHelper.CreateShellScriptProcessStartInfo(scriptFilePath, requireElevation: true);
@@ -331,7 +336,8 @@ startInfo.WorkingDirectory = workspacePath;
 int exitCode = await ProcessHelper.StartProcessAsync(startInfo, waitForCompletion: true, cancellationToken: token);
 ```
 
-On Unix the script runs under `bash`, which reads the file directly and ignores its shebang. Windows still routes through
+On Unix the script runs under `bash`, which reads the file directly and ignores its shebang. Windows still routes
+through
 `cmd /d /c`, because a batch file cannot be launched without a command interpreter.
 
 ### Detecting a denied elevation
@@ -345,11 +351,11 @@ int exitCode = await ProcessHelper.StartProcessAsync(startInfo, waitForCompletio
 if (ProcessHelper.IsExitCodeElevationDenied(exitCode)) { /* the user declined the prompt */ }
 ```
 
-| Platform | Denial exit code | Constant |
-| --- | --- | --- |
-| Windows | `1223` | `WindowsElevationCancelledExitCode` |
-| Linux | `126`, `127` | `LinuxElevationDismissedExitCode`, `LinuxElevationNotAuthorizedExitCode` |
-| macOS | `1` | `MacOSElevationCancelledExitCode` |
+| Platform | Denial exit code | Constant                                                                 |
+|----------|------------------|--------------------------------------------------------------------------|
+| Windows  | `1223`           | `WindowsElevationCancelledExitCode`                                      |
+| Linux    | `126`, `127`     | `LinuxElevationDismissedExitCode`, `LinuxElevationNotAuthorizedExitCode` |
+| macOS    | `1`              | `MacOSElevationCancelledExitCode`                                        |
 
 Windows reports a dismissed `runas` prompt as `ERROR_CANCELLED` from process creation rather than as an exit code; the
 start and output helpers translate it to `WindowsElevationCancelledExitCode` so it can be matched like any other code.
@@ -384,10 +390,10 @@ if (output.IsExitCodeElevationDenied()) { /* also covers the macOS prompt, via s
 The `Process` overload reads `ExitCode`, so it throws `InvalidOperationException` when the process has not exited, and
 it inherits the macOS limitation. The `ProcessOutput` overload has the standard error available and does not.
 
-Run shell syntax through `cmd /d /c` on Windows or `bash -c` elsewhere, and use the output helpers when the exit code and
-both redirected streams are needed. Output helpers also accept `requireElevation`; Linux and macOS capture through their
-elevation wrappers, while non-privileged Windows `runas` capture returns exit code `-1` because that API cannot redirect
-the elevated child streams:
+Run shell syntax through `cmd /d /c` on Windows or `bash -c` elsewhere, and use the output helpers when the exit code
+and both redirected streams are needed. Output helpers also accept `requireElevation`; Linux and macOS capture through
+their elevation wrappers, while non-privileged Windows `runas` capture returns exit code `-1` because that API cannot
+redirect the elevated child streams:
 
 ```csharp
 int shellExitCode = ProcessHelper.StartShell("system-tool --configure", waitForCompletion: true);

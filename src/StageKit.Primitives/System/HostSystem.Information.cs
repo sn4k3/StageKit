@@ -15,6 +15,8 @@ public static partial class HostSystem
         @"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}";
 
     private static readonly TimeSpan HardwareQueryTimeout = TimeSpan.FromSeconds(5);
+    private static readonly Lazy<string?> SystemManufacturerLazy = new(GetSystemManufacturer);
+    private static readonly Lazy<string?> SystemModelLazy = new(GetSystemModel);
     private static readonly Lazy<string?> ProcessorNameLazy = new(GetProcessorName);
     private static readonly Lazy<IReadOnlyList<string>> GraphicsCardNamesLazy = new(GetGraphicsCardNames);
 
@@ -32,10 +34,25 @@ public static partial class HostSystem
     /// <summary>
     /// Gets the current operating-system name followed by its architecture.
     /// </summary>
-    [field: AllowNull]
-    [field: MaybeNull]
-    public static string OperatingSystemNameWithArch =>
-        field ??= $"{OperatingSystemName} {RuntimeInformation.OSArchitecture}";
+    public static string OperatingSystemNameWithArch => $"{OperatingSystemName} {RuntimeInformation.OSArchitecture}";
+
+    /// <summary>
+    /// Gets the manufacturer of the current host, or <see langword="null"/> when it cannot be determined.
+    /// </summary>
+    /// <remarks>A successful result is cached. A failed query is retried on the next access.</remarks>
+    public static string? SystemManufacturer => SystemManufacturerLazy.Value ?? GetSystemManufacturer();
+
+    /// <summary>
+    /// Gets the model of the current host, or <see langword="null"/> when it cannot be determined.
+    /// </summary>
+    /// <remarks>A successful result is cached. A failed query is retried on the next access.</remarks>
+    public static string? SystemModel => SystemModelLazy.Value ?? GetSystemModel();
+
+    /// <summary>
+    /// Gets the elapsed time since the operating system started.
+    /// </summary>
+    /// <returns>The operating-system uptime reported by the runtime.</returns>
+    public static TimeSpan SystemUptime => TimeSpan.FromMilliseconds(Environment.TickCount64);
 
     /// <summary>
     /// Gets the display name of the current host's processor, or <see langword="null"/> when it cannot be determined.
@@ -89,6 +106,96 @@ public static partial class HostSystem
         if (OperatingSystem.IsBrowser()) return "Browser";
         if (OperatingSystem.IsWasi()) return "WASI";
         return "Unknown";
+    }
+
+    private static string? GetSystemManufacturer()
+    {
+        try
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                return GetWindowsBiosValue("SystemManufacturer")
+                       ?? GetWindowsBiosValue("BaseBoardManufacturer");
+            }
+
+            if (OperatingSystem.IsLinux())
+                return GetSystemInformationFileValue("/sys/devices/virtual/dmi/id/sys_vendor");
+
+            if (OperatingSystem.IsMacOS() || OperatingSystem.IsMacCatalyst())
+                return "Apple Inc.";
+
+            if (OperatingSystem.IsFreeBSD())
+                return NormalizeSystemInformationValue(
+                    GetBoundedProcessOutput("kenv", ["-q", "smbios.system.maker"]));
+        }
+        catch (Exception e) when (IsExpectedHardwareQueryException(e))
+        {
+            Debug.WriteLine(e);
+        }
+
+        return null;
+    }
+
+    private static string? GetSystemModel()
+    {
+        try
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                return GetWindowsBiosValue("SystemProductName")
+                       ?? GetWindowsBiosValue("BaseBoardProduct");
+            }
+
+            if (OperatingSystem.IsLinux())
+            {
+                return GetSystemInformationFileValue("/sys/devices/virtual/dmi/id/product_name")
+                       ?? GetSystemInformationFileValue("/sys/firmware/devicetree/base/model");
+            }
+
+            if (OperatingSystem.IsMacOS() || OperatingSystem.IsMacCatalyst())
+                return NormalizeSystemInformationValue(TryGetMacSysctlString("hw.model"));
+
+            if (OperatingSystem.IsFreeBSD())
+                return NormalizeSystemInformationValue(
+                    GetBoundedProcessOutput("kenv", ["-q", "smbios.system.product"]));
+        }
+        catch (Exception e) when (IsExpectedHardwareQueryException(e))
+        {
+            Debug.WriteLine(e);
+        }
+
+        return null;
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static string? GetWindowsBiosValue(string valueName)
+    {
+        using var bios = Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\BIOS");
+        return NormalizeSystemInformationValue(bios?.GetValue(valueName) as string);
+    }
+
+    private static string? GetSystemInformationFileValue(string path)
+    {
+        return File.Exists(path)
+            ? NormalizeSystemInformationValue(File.ReadAllText(path))
+            : null;
+    }
+
+    internal static string? NormalizeSystemInformationValue(string? value)
+    {
+        var normalized = value?.Trim().TrimEnd('\0').Trim();
+        if (string.IsNullOrEmpty(normalized)
+            || normalized.Equals("Default string", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("Not Applicable", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("System manufacturer", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("System Product Name", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("To Be Filled By O.E.M.", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("Unknown", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return normalized;
     }
 
     internal static string? ParseLinuxProcessorName(ReadOnlySpan<char> text)

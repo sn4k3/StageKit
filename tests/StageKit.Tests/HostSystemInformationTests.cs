@@ -5,6 +5,32 @@ namespace StageKit.Tests;
 public sealed class HostSystemInformationTests
 {
     [Fact]
+    public void SystemUptime_ReturnsCurrentRuntimeUptime()
+    {
+        var before = TimeSpan.FromMilliseconds(Environment.TickCount64);
+
+        var uptime = HostSystem.SystemUptime;
+
+        var after = TimeSpan.FromMilliseconds(Environment.TickCount64);
+        Assert.InRange(uptime, before, after);
+    }
+
+    [Theory]
+    [InlineData("  Framework Laptop 13  ", "Framework Laptop 13")]
+    [InlineData("Raspberry Pi 5 Model B Rev 1.0\0", "Raspberry Pi 5 Model B Rev 1.0")]
+    [InlineData("Default string", null)]
+    [InlineData("System Product Name", null)]
+    [InlineData("To Be Filled By O.E.M.", null)]
+    [InlineData("Unknown", null)]
+    [InlineData(null, null)]
+    public void SystemInformationNormalizer_RemovesPaddingAndFirmwarePlaceholders(
+        string? value,
+        string? expected)
+    {
+        Assert.Equal(expected, HostSystem.NormalizeSystemInformationValue(value));
+    }
+
+    [Fact]
     public void LinuxProcessorParser_PrefersSpecificModelName()
     {
         const string cpuInfo = """

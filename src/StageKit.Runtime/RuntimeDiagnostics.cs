@@ -27,7 +27,8 @@ public static class RuntimeDiagnostics
             ["Process.Name"] = EntryApplication.ProcessName,
             ["Process.Path"] = Environment.ProcessPath,
             ["Process.BaseDirectory"] = AppContext.BaseDirectory,
-            ["Process.CurrentDirectory"] = Environment.CurrentDirectory
+            ["Process.CurrentDirectory"] = Environment.CurrentDirectory,
+            ["System.UpTime"] = TimeSpan.FromMilliseconds(Environment.TickCount64).ToString(@"d\.hh\:mm\:ss"),
         };
 
         foreach (var kvp in EntryApplication.GetApplicationInfoDict())

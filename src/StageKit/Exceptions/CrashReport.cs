@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json.Serialization;
+using StageKit.Primitives.System;
 using StageKit.Runtime;
 
 namespace StageKit;
@@ -103,7 +104,7 @@ public record CrashReport
     /// <summary>
     /// Gets the elapsed runtime of the system at crash time. This value is calculated from the moment the system began until the crash report was created.
     /// </summary>
-    public TimeSpan SystemElapsedRuntime { get; init; } = TimeSpan.FromMilliseconds(Environment.TickCount64);
+    public TimeSpan SystemElapsedRuntime { get; init; } = HostSystem.SystemUptime;
 
     /// <summary>
     /// Gets the elapsed runtime of the application at crash time. This value is calculated from the moment the application process began until the crash report was created.

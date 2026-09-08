@@ -3,6 +3,7 @@
 - Add portable processor and multi-adapter graphics information to `HostSystem`, with native or structured detection,
   Windows filtering for indirect USB and software display drivers, bounded external queries, retry-after-failure
   behavior, and compatibility for the original `GraphicCardName` spelling
+- Add cached system manufacturer and model detection plus a portable `HostSystem.SystemUptime` measurement
 - Add `HostSystem.IsNetworkAvailable()` for a fast, cross-platform local network-availability check and
   `IsInternetAvailableAsync()` for an active, timeout-bound internet connectivity probe with captive-portal detection
 - Add cached `HostSystem.OperatingSystemName` and `OperatingSystemNameWithArch` display values, including Mac Catalyst,
