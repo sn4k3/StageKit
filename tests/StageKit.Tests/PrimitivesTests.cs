@@ -552,7 +552,7 @@ public sealed class PrimitivesTests
     }
 
     [Fact]
-    public void ProcessHelper_CreateShellScriptProcessStartInfo_PassesScriptPathAsDiscreteArgument()
+    public void ProcessHelper_CreateShellScriptProcessStartInfo_PreservesScriptPathWithSpaces()
     {
         const string scriptFilePath = "/tmp/a directory with spaces/upgrade script.sh";
 
@@ -560,12 +560,40 @@ public sealed class PrimitivesTests
 
         Assert.Equal(OperatingSystem.IsWindows() ? "cmd.exe" : "bash", startInfo.FileName);
 
-        // Unix drops "-c" so the shell never word-splits the path back apart.
-        Assert.Equal(
-            OperatingSystem.IsWindows() ? ["/d", "/c", scriptFilePath] : [scriptFilePath],
-            startInfo.ArgumentList);
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Equal("/d /s /c \"\"/tmp/a directory with spaces/upgrade script.sh\"\"", startInfo.Arguments);
+            Assert.Empty(startInfo.ArgumentList);
+        }
+        else
+        {
+            Assert.Equal([scriptFilePath], startInfo.ArgumentList);
+        }
+
         Assert.False(startInfo.UseShellExecute);
         Assert.Empty(startInfo.Verb);
+    }
+
+    [Fact]
+    public void ProcessHelper_CreateShellScriptProcessStartInfo_PreservesScriptArgumentBoundaries()
+    {
+        const string scriptFilePath = "/tmp/a directory with spaces/upgrade script.sh";
+
+        var startInfo = ProcessHelper.CreateShellScriptProcessStartInfo(
+            scriptFilePath,
+            ["first", "two words"]);
+
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Equal(
+                "/d /s /c \"\"/tmp/a directory with spaces/upgrade script.sh\" \"first\" \"two words\"\"",
+                startInfo.Arguments);
+            Assert.Empty(startInfo.ArgumentList);
+        }
+        else
+        {
+            Assert.Equal([scriptFilePath, "first", "two words"], startInfo.ArgumentList);
+        }
     }
 
     [Theory]
@@ -593,17 +621,24 @@ public sealed class PrimitivesTests
             await File.WriteAllTextAsync(
                 scriptFilePath,
                 OperatingSystem.IsWindows()
-                    ? "@echo off\r\necho stagekit script\r\n"
-                    : "#!/usr/bin/env bash\necho \"stagekit script\"\n",
+                    ? "@echo off\r\necho %~1^|%~2\r\n"
+                    : "#!/usr/bin/env bash\nprintf '%s|%s' \"$1\" \"$2\"\n",
                 TestContext.Current.CancellationToken);
 
-            var startInfo = ProcessHelper.CreateShellScriptProcessStartInfo(scriptFilePath);
+            string[] arguments = ["first", "two words"];
+            var startInfo = ProcessHelper.CreateShellScriptProcessStartInfo(scriptFilePath, arguments);
             var output = await ProcessHelper.GetProcessOutputAsync(
                 startInfo,
                 TestContext.Current.CancellationToken);
+            var exitCode = await ProcessHelper.StartShellScriptAsync(
+                scriptFilePath,
+                arguments,
+                waitForCompletion: true,
+                cancellationToken: TestContext.Current.CancellationToken);
 
             Assert.Equal(0, output.ExitCode);
-            Assert.Equal("stagekit script", output.StandardOutput.Trim());
+            Assert.Equal("first|two words", output.StandardOutput.Trim());
+            Assert.Equal(0, exitCode);
         }
         finally
         {
@@ -910,6 +945,174 @@ public sealed class PrimitivesTests
     }
 
     [Fact]
+    public async Task ShellScriptFile_ExecuteAsync_CapturesOutputAndDeletesTemporaryFileOnDispose()
+    {
+        var rootPath = CreateTempDirectory();
+        var directoryPath = Path.Combine(rootPath, "shell scripts");
+        string filePath;
+
+        try
+        {
+            using (var script = ShellScriptFile.CreateTemporary(directoryPath: directoryPath))
+            {
+                filePath = script.FilePath;
+                script.Clear();
+                script.WriteComment("ShellScriptFile test");
+                script.WriteEnvironmentVariable("STAGEKIT_VALUE", "stagekit-shell");
+                script.WriteIfMacOS("# macOS");
+                script.WriteLineIfMacOS(string.Empty);
+                script.WriteIfLinux("# Linux");
+                script.WriteLineIfLinux(string.Empty);
+                script.WriteLineIfWindows(
+                    $"echo {ShellScriptFile.FormatVariable("STAGEKIT_VALUE")}:%~1");
+                script.WriteLineIfUnix(
+                    $"printf '%s:%s' {ShellScriptFile.FormatVariable("STAGEKIT_VALUE")} \"$1\"");
+
+                Assert.True(script.DeleteOnDispose);
+                Assert.True(script.IsFlushPending);
+                Assert.False(script.Exists);
+
+                var output = await script.ExecuteAsync(
+                    ["argument with spaces"],
+                    TestContext.Current.CancellationToken);
+
+                Assert.True(output.Succeeded, output.StandardError);
+                Assert.Equal("stagekit-shell:argument with spaces", output.StandardOutput.Trim());
+                Assert.True(script.Exists);
+                Assert.False(script.IsFlushPending);
+                Assert.EndsWith(ShellScriptFile.ScriptFileExtension, filePath);
+                Assert.Equal(
+                    script.GetScript(),
+                    await File.ReadAllTextAsync(filePath, TestContext.Current.CancellationToken));
+            }
+
+            Assert.False(File.Exists(filePath));
+            Assert.Throws<ArgumentException>(() => ShellScriptFile.FormatVariable("invalid-name"));
+        }
+        finally
+        {
+            if (Directory.Exists(rootPath)) Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ShellScriptFile_Dispose_WritesPendingContentUnlessDeleted()
+    {
+        var rootPath = CreateTempDirectory();
+        var keptPath = Path.Combine(rootPath, "kept", $"kept{ShellScriptFile.ScriptFileExtension}");
+        var deletedPath = Path.Combine(rootPath, $"deleted{ShellScriptFile.ScriptFileExtension}");
+
+        try
+        {
+            using (var script = new ShellScriptFile(keptPath))
+            {
+                Assert.False(script.DeleteOnDispose);
+
+                // Exercise the inherited TextWriter surface.
+                TextWriter writer = script;
+                writer.Write("echo ");
+                writer.Write(42);
+                writer.WriteLine();
+            }
+
+            Assert.True(File.Exists(keptPath));
+            Assert.Contains("echo 42", File.ReadAllText(keptPath), StringComparison.Ordinal);
+
+            using (var script = new ShellScriptFile(deletedPath) { DeleteOnDispose = true })
+            {
+                script.WriteLine("echo deleted");
+                script.Flush();
+
+                Assert.True(script.Exists);
+                Assert.False(script.IsFlushPending);
+            }
+
+            Assert.False(File.Exists(deletedPath));
+        }
+        finally
+        {
+            if (Directory.Exists(rootPath)) Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ShellScriptFile_WriteLines_AppendsEveryLine()
+    {
+        using var script = ShellScriptFile.CreateTemporary(directoryPath: CreateTempDirectory());
+        var preamble = script.GetScript();
+        var newLine = Environment.NewLine;
+
+        script.WriteLines("one", "two");
+        script.WriteLines(new List<string?> { "three" });
+        script.WriteLinesIf(true, "four", "five");
+        script.WriteLinesIf(false, "skipped", "skipped");
+        script.WriteLinesIf(true, new List<string?> { "six" });
+        script.WriteLines([]);
+        script.WriteLine();
+
+        Assert.Equal(
+            $"{preamble}one{newLine}two{newLine}three{newLine}four{newLine}five{newLine}six{newLine}{newLine}",
+            script.GetScript());
+    }
+
+    [Fact]
+    public async Task ShellScriptFile_WriteLinesAsyncAndComments_AppendEveryLine()
+    {
+        using var script = ShellScriptFile.CreateTemporary(directoryPath: CreateTempDirectory());
+        var newLine = Environment.NewLine;
+        var commentPrefix = OperatingSystem.IsWindows() ? "rem " : "# ";
+        script.Clear();
+        var preamble = script.GetScript();
+
+        await script.WriteLinesAsync("one", "two");
+        await script.WriteLinesAsync(new List<string?> { "three" });
+        await script.WriteLineAsync();
+        script.WriteComments("first", "second");
+        script.WriteComments(new List<string?> { $"third{newLine}fourth" });
+
+        Assert.Equal(
+            $"{preamble}one{newLine}two{newLine}three{newLine}{newLine}" +
+            $"{commentPrefix}first{newLine}{commentPrefix}second{newLine}" +
+            $"{commentPrefix}third{newLine}{commentPrefix}fourth{newLine}",
+            script.GetScript());
+    }
+
+    [Fact]
+    public void ShellScriptFile_WriteLinesIfPlatform_AppendsEveryLineOnMatchingHost()
+    {
+        using var script = ShellScriptFile.CreateTemporary(directoryPath: CreateTempDirectory());
+        var newLine = Environment.NewLine;
+        script.Clear();
+        var preamble = script.GetScript();
+
+        script.WriteLinesIfWindows("windows-one", "windows-two");
+        script.WriteLinesIfMacOS("macos-one", "macos-two");
+        script.WriteLinesIfLinux(new List<string?> { "linux-one", "linux-two" });
+        script.WriteLinesIfUnix("unix-one", "unix-two");
+
+        var expected = preamble;
+        if (OperatingSystem.IsWindows()) expected += $"windows-one{newLine}windows-two{newLine}";
+        if (OperatingSystem.IsMacOS()) expected += $"macos-one{newLine}macos-two{newLine}";
+        if (OperatingSystem.IsLinux()) expected += $"linux-one{newLine}linux-two{newLine}";
+        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || OperatingSystem.IsFreeBSD())
+            expected += $"unix-one{newLine}unix-two{newLine}";
+
+        Assert.Equal(expected, script.GetScript());
+    }
+
+    [Fact]
+    public void ShellScriptFile_Dispose_RejectsFurtherWrites()
+    {
+        var directoryPath = CreateTempDirectory();
+        var script = ShellScriptFile.CreateTemporary(directoryPath: directoryPath);
+        script.Dispose();
+
+        Assert.True(script.IsDisposed);
+        Assert.Throws<ObjectDisposedException>(() => script.WriteLine("echo disposed"));
+        Assert.Throws<ObjectDisposedException>(() => script.Execute());
+    }
+
+    [Fact]
     public void PathUtilities_IsSubPathOf_RequiresDirectoryBoundary()
     {
         var rootPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", "root");
@@ -981,7 +1184,8 @@ public sealed class PrimitivesTests
     [InlineData("Item4", "Item4")]
     [InlineData("A", "A")]
     [InlineData("aB", "a B")]
-    public void InsertCharBetweenCamelCase_InsertsAtCaseAndDigitTransitions(string value, string expected, bool splitNumbers = true)
+    public void InsertCharBetweenCamelCase_InsertsAtCaseAndDigitTransitions(string value, string expected,
+        bool splitNumbers = true)
     {
         Assert.Equal(expected, value.InsertCharBetweenCamelCase(splitNumbers: splitNumbers));
     }
@@ -1000,7 +1204,7 @@ public sealed class PrimitivesTests
                 Directory.CreateSymbolicLink(linkPath, outsidePath);
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or
-                                               PlatformNotSupportedException)
+                                                  PlatformNotSupportedException)
             {
                 Assert.Skip($"Symbolic links are unavailable in this environment: {exception.Message}");
             }

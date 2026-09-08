@@ -111,7 +111,7 @@ Crash reporting flows through `ExceptionInfo`, `CrashReport`, `CrashReportsFile`
 
 Storage helpers in `StageKit` include `ApplicationBackup`, `SupportBundleExporter`, `ApplicationRetention`, and `OnboardingStateFile`.
 
-`StageKit.Primitives` contains `DisposableObject`, `LeaveOpenDisposableObject`, `GCSafeHandle`, `SafeFile`, `SafeFileStream`, `PathUtilities`, `TemporaryDirectory`, and `TemporaryFile`. Keep this package dependency-light and suitable for reuse by other libraries. IO-related files may live under the `IO/` folder, but their public namespace should remain `StageKit.Primitives` unless the IO surface becomes large enough to justify a separate namespace.
+`StageKit.Primitives` contains `DisposableObject`, `LeaveOpenDisposableObject`, `GCSafeHandle`, `SafeFile`, `SafeFileStream`, `PathUtilities`, `TemporaryDirectory`, `TemporaryFile`, and `ShellScriptFile`. Keep this package dependency-light and suitable for reuse by other libraries. IO-related files may live under the `IO/` folder, but their public namespace should remain `StageKit.Primitives` unless the IO surface becomes large enough to justify a separate namespace.
 
 `StageKit.Runtime` contains `EntryApplication`, `ApplicationPackagingType`, and `RuntimeDiagnostics`. Keep this package focused on runtime, process, entry assembly, packaging detection, relaunch, and diagnostics helpers.
 

@@ -253,6 +253,162 @@ public static class ProcessHelper
     }
 
     /// <summary>
+    /// Starts a script file through the host command shell with raw arguments.
+    /// </summary>
+    /// <param name="scriptFilePath">The path of the script file to run.</param>
+    /// <param name="arguments">The raw arguments to pass to the script.</param>
+    /// <param name="requireElevation">
+    /// <see langword="true"/> to request administrator elevation unless the current process is already privileged.
+    /// </param>
+    /// <param name="waitForCompletion"><see langword="true"/> to wait for the script to complete.</param>
+    /// <param name="waitTimeout">The number of milliseconds to wait for completion.</param>
+    /// <returns>
+    /// The exit code when waiting for completion, zero when the script starts without waiting, or <c>-1</c> when
+    /// startup fails or the wait times out.
+    /// </returns>
+    public static int StartShellScript(
+        string scriptFilePath,
+        string? arguments = null,
+        bool requireElevation = false,
+        bool waitForCompletion = false,
+        int waitTimeout = Timeout.Infinite)
+    {
+        try
+        {
+            return StartProcess(
+                CreateShellScriptProcessStartInfo(scriptFilePath, arguments, requireElevation),
+                waitForCompletion,
+                waitTimeout);
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            return -1;
+        }
+    }
+
+    /// <summary>
+    /// Asynchronously starts a script file through the host command shell with raw arguments.
+    /// </summary>
+    /// <param name="scriptFilePath">The path of the script file to run.</param>
+    /// <param name="arguments">The raw arguments to pass to the script.</param>
+    /// <param name="requireElevation">
+    /// <see langword="true"/> to request administrator elevation unless the current process is already privileged.
+    /// </param>
+    /// <param name="waitForCompletion"><see langword="true"/> to asynchronously wait for the script to complete.</param>
+    /// <param name="waitTimeout">The number of milliseconds to wait for completion.</param>
+    /// <param name="cancellationToken">The token used to cancel waiting for completion.</param>
+    /// <returns>
+    /// A task containing the exit code when waiting for completion, zero when the script starts without waiting, or
+    /// <c>-1</c> when startup fails or the wait times out.
+    /// </returns>
+    public static async Task<int> StartShellScriptAsync(
+        string scriptFilePath,
+        string? arguments = null,
+        bool requireElevation = false,
+        bool waitForCompletion = false,
+        int waitTimeout = Timeout.Infinite,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await StartProcessAsync(
+                    CreateShellScriptProcessStartInfo(scriptFilePath, arguments, requireElevation),
+                    waitForCompletion,
+                    waitTimeout,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            return -1;
+        }
+    }
+
+    /// <summary>
+    /// Starts a script file through the host command shell with an argument list.
+    /// </summary>
+    /// <param name="scriptFilePath">The path of the script file to run.</param>
+    /// <param name="arguments">The arguments to pass to the script.</param>
+    /// <param name="requireElevation">
+    /// <see langword="true"/> to request administrator elevation unless the current process is already privileged.
+    /// </param>
+    /// <param name="waitForCompletion"><see langword="true"/> to wait for the script to complete.</param>
+    /// <param name="waitTimeout">The number of milliseconds to wait for completion.</param>
+    /// <returns>
+    /// The exit code when waiting for completion, zero when the script starts without waiting, or <c>-1</c> when
+    /// startup fails or the wait times out.
+    /// </returns>
+    public static int StartShellScript(
+        string scriptFilePath,
+        IEnumerable<string> arguments,
+        bool requireElevation = false,
+        bool waitForCompletion = false,
+        int waitTimeout = Timeout.Infinite)
+    {
+        try
+        {
+            return StartProcess(
+                CreateShellScriptProcessStartInfo(scriptFilePath, arguments, requireElevation),
+                waitForCompletion,
+                waitTimeout);
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            return -1;
+        }
+    }
+
+    /// <summary>
+    /// Asynchronously starts a script file through the host command shell with an argument list.
+    /// </summary>
+    /// <param name="scriptFilePath">The path of the script file to run.</param>
+    /// <param name="arguments">The arguments to pass to the script.</param>
+    /// <param name="requireElevation">
+    /// <see langword="true"/> to request administrator elevation unless the current process is already privileged.
+    /// </param>
+    /// <param name="waitForCompletion"><see langword="true"/> to asynchronously wait for the script to complete.</param>
+    /// <param name="waitTimeout">The number of milliseconds to wait for completion.</param>
+    /// <param name="cancellationToken">The token used to cancel waiting for completion.</param>
+    /// <returns>
+    /// A task containing the exit code when waiting for completion, zero when the script starts without waiting, or
+    /// <c>-1</c> when startup fails or the wait times out.
+    /// </returns>
+    public static async Task<int> StartShellScriptAsync(
+        string scriptFilePath,
+        IEnumerable<string> arguments,
+        bool requireElevation = false,
+        bool waitForCompletion = false,
+        int waitTimeout = Timeout.Infinite,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await StartProcessAsync(
+                    CreateShellScriptProcessStartInfo(scriptFilePath, arguments, requireElevation),
+                    waitForCompletion,
+                    waitTimeout,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            return -1;
+        }
+    }
+
+    /// <summary>
     /// Starts a process on the host system, escaping a Flatpak sandbox when necessary.
     /// </summary>
     /// <param name="name">The executable name or path.</param>
@@ -1027,13 +1183,12 @@ public static class ProcessHelper
     /// </exception>
     /// <remarks>
     /// <p>
-    /// Prefer this over <see cref="CreateShellProcessStartInfo(string, bool)"/> when launching a script file. The
-    /// path is passed as a discrete argument rather than inside a shell command string, so a path containing spaces
-    /// survives. <c>bash -c</c> word-splits its command string and would break such a path.
+    /// Prefer this over <see cref="CreateShellProcessStartInfo(string, bool)"/> when launching a script file. It
+    /// applies the platform shell's script-path handling so paths containing spaces remain intact.
     /// </p>
     /// <p>
     /// Runs the script with <c>bash</c> on Unix, which reads the file directly and ignores its shebang, and through
-    /// <c>cmd /d /c</c> on Windows, which cannot launch a batch file without a command interpreter.
+    /// <c>cmd /d /s /c</c> on Windows, which cannot launch a batch file without a command interpreter.
     /// </p>
     /// <p>
     /// When elevation is applied on Linux or macOS the returned instance targets the <c>pkexec</c> or
@@ -1046,7 +1201,7 @@ public static class ProcessHelper
         string scriptFilePath,
         bool requireElevation = false)
     {
-        return CreateShellScriptProcessStartInfo(scriptFilePath, requireElevation, Environment.IsPrivilegedProcess);
+        return CreateShellScriptProcessStartInfo(scriptFilePath, [], requireElevation, Environment.IsPrivilegedProcess);
     }
 
     internal static ProcessStartInfo CreateShellScriptProcessStartInfo(
@@ -1054,16 +1209,96 @@ public static class ProcessHelper
         bool requireElevation,
         bool isPrivilegedProcess)
     {
+        return CreateShellScriptProcessStartInfo(scriptFilePath, [], requireElevation, isPrivilegedProcess);
+    }
+
+    /// <summary>
+    /// Creates start information that runs a script file through the host command shell with raw script arguments.
+    /// </summary>
+    /// <param name="scriptFilePath">The path of the script file to run.</param>
+    /// <param name="arguments">The raw arguments to pass to the script.</param>
+    /// <param name="requireElevation">
+    /// <see langword="true"/> to request administrator elevation unless the current process is already privileged.
+    /// </param>
+    /// <returns>A configurable <see cref="ProcessStartInfo"/> instance.</returns>
+    public static ProcessStartInfo CreateShellScriptProcessStartInfo(
+        string scriptFilePath,
+        string? arguments,
+        bool requireElevation = false)
+    {
+        return CreateShellScriptProcessStartInfo(
+            scriptFilePath,
+            arguments,
+            requireElevation,
+            Environment.IsPrivilegedProcess);
+    }
+
+    internal static ProcessStartInfo CreateShellScriptProcessStartInfo(
+        string scriptFilePath,
+        string? arguments,
+        bool requireElevation,
+        bool isPrivilegedProcess)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(scriptFilePath);
 
-        var (name, argumentPrefix) = GetShell();
+        var (name, _) = GetShell();
+        var quotedScriptPath = scriptFilePath.QuoteProcessArgument();
+        var scriptAndArguments = string.IsNullOrEmpty(arguments)
+            ? quotedScriptPath
+            : string.Concat(quotedScriptPath, " ", arguments);
+        var shellArguments = OperatingSystem.IsWindows()
+            ? string.Concat("/d /s /c \"", scriptAndArguments, "\"")
+            : scriptAndArguments;
 
-        // Unix shells word-split the "-c" command string, so hand the path over as its own argument instead.
-        string[] arguments = OperatingSystem.IsWindows()
-            ? [.. argumentPrefix, scriptFilePath]
-            : [scriptFilePath];
+        return CreateProcessStartInfo(name, shellArguments, requireElevation, isPrivilegedProcess);
+    }
 
-        return CreateProcessStartInfo(name, arguments, requireElevation, isPrivilegedProcess);
+    /// <summary>
+    /// Creates start information that runs a script file through the host command shell with a script argument list.
+    /// </summary>
+    /// <param name="scriptFilePath">The path of the script file to run.</param>
+    /// <param name="arguments">The arguments to pass to the script.</param>
+    /// <param name="requireElevation">
+    /// <see langword="true"/> to request administrator elevation unless the current process is already privileged.
+    /// </param>
+    /// <returns>A configurable <see cref="ProcessStartInfo"/> instance.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="arguments"/> is <see langword="null"/>.</exception>
+    public static ProcessStartInfo CreateShellScriptProcessStartInfo(
+        string scriptFilePath,
+        IEnumerable<string> arguments,
+        bool requireElevation = false)
+    {
+        return CreateShellScriptProcessStartInfo(
+            scriptFilePath,
+            arguments,
+            requireElevation,
+            Environment.IsPrivilegedProcess);
+    }
+
+    internal static ProcessStartInfo CreateShellScriptProcessStartInfo(
+        string scriptFilePath,
+        IEnumerable<string> arguments,
+        bool requireElevation,
+        bool isPrivilegedProcess)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(scriptFilePath);
+        ArgumentNullException.ThrowIfNull(arguments);
+
+        var (name, _) = GetShell();
+        if (!OperatingSystem.IsWindows())
+            return CreateProcessStartInfo(name, [scriptFilePath, .. arguments], requireElevation, isPrivilegedProcess);
+
+        var quotedArguments = string.Join(' ', arguments.Select(static argument => argument.QuoteProcessArgument()));
+        var scriptAndArguments = string.IsNullOrEmpty(quotedArguments)
+            ? scriptFilePath.QuoteProcessArgument()
+            : string.Concat(scriptFilePath.QuoteProcessArgument(), " ", quotedArguments);
+
+        // cmd.exe needs an extra pair of enclosing quotes when the command starts with a quoted executable path.
+        return CreateProcessStartInfo(
+            name,
+            string.Concat("/d /s /c \"", scriptAndArguments, "\""),
+            requireElevation,
+            isPrivilegedProcess);
     }
 
     /// <summary>

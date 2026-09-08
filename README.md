@@ -456,6 +456,9 @@ await stream.CommitAsync(cancellationToken);
 Use the IO helpers for path checks and temporary workspace cleanup:
 
 ```csharp
+using StageKit.Primitives;
+using StageKit.Primitives.System;
+
 if (!PathUtilities.IsSubPathOf(candidatePath, rootPath))
 {
     throw new InvalidOperationException("Path escapes the root directory.");
@@ -463,6 +466,11 @@ if (!PathUtilities.IsSubPathOf(candidatePath, rootPath))
 
 using var directory = new TemporaryDirectory(prefix: "stagekit");
 using var file = new TemporaryFile(extension: "json");
+
+using var script = ShellScriptFile.CreateTemporary();
+script.WriteLineIfWindows("echo %~1");
+script.WriteLineIfUnix("printf %s \"$1\"");
+ProcessOutput output = await script.ExecuteAsync(["Ready"], cancellationToken);
 ```
 
 Launch external tools with optional administrator elevation through Windows `runas`, Linux `pkexec`, or macOS
@@ -488,6 +496,12 @@ Console.Write(output.StandardOutput);
 
 ProcessOutput asyncOutput = await ProcessHelper.GetShellOutputAsync(
     "system-tool --status",
+    cancellationToken: cancellationToken);
+
+int scriptExitCode = await ProcessHelper.StartShellScriptAsync(
+    scriptPath,
+    ["--profile", profileName],
+    waitForCompletion: true,
     cancellationToken: cancellationToken);
 ```
 
