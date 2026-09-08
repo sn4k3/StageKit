@@ -119,20 +119,65 @@
                         <ItemsControl ItemsSource="{Binding RuntimeValues}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <WrapPanel ItemWidth="255" ItemHeight="92" />
+                                    <WrapPanel ItemWidth="255" ItemHeight="112" />
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Border Classes="card" Margin="0,0,12,12">
                                         <StackPanel Spacing="6">
-                                            <TextBlock Classes="muted" Text="{Binding Label}" />
-                                            <TextBlock FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding Value}" />
+                                            <SelectableTextBlock Classes="muted" Text="{Binding Label}" />
+                                            <SelectableTextBlock FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding Value}" />
                                         </StackPanel>
                                     </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+
+                        <Border x:Name="MemoryStatusSection" Classes="card">
+                            <StackPanel Spacing="12">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Classes="section-title" Text="Host memory" />
+                                        <TextBlock Classes="muted" Text="{Binding MemoryRefreshStatus}" />
+                                    </StackPanel>
+                                    <Button x:Name="RefreshMemoryButton"
+                                            Grid.Column="1"
+                                            Command="{Binding RefreshMemoryStatusCommand}"
+                                            Content="Refresh now" />
+                                </Grid>
+
+                                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="16">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Classes="muted" Text="Total physical" />
+                                        <TextBlock FontSize="22" FontWeight="SemiBold"
+                                                   Text="{Binding TotalPhysicalMemoryText}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Spacing="4">
+                                        <TextBlock Classes="muted" Text="Available" />
+                                        <TextBlock FontSize="22" FontWeight="SemiBold"
+                                                   Text="{Binding AvailablePhysicalMemoryText}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Spacing="4">
+                                        <TextBlock Classes="muted" Text="Used" />
+                                        <TextBlock FontSize="22" FontWeight="SemiBold"
+                                                   Text="{Binding UsedPhysicalMemoryText}" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                    <ProgressBar x:Name="MemoryUsageProgressBar"
+                                                 Height="12"
+                                                 Minimum="0"
+                                                 Maximum="100"
+                                                 Value="{Binding MemoryLoadPercentage}" />
+                                    <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                                               FontWeight="SemiBold" Text="{Binding MemoryLoadText}" />
+                                </Grid>
+                                <TextBlock Classes="muted" TextWrapping="Wrap"
+                                           Text="HostSystem reads operating-system-visible physical memory through native Windows and macOS APIs or Linux /proc/meminfo." />
+                            </StackPanel>
+                        </Border>
 
                         <Border Classes="card">
                             <StackPanel Spacing="10">
@@ -188,6 +233,55 @@
                                             Command="{Binding OpenStageKitWebsiteCommand}"
                                             Content="Open StageKit website" />
                                 </WrapPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel Spacing="10">
+                                <TextBlock Classes="section-title" Text="Host beep" />
+                                <TextBlock Classes="muted" TextWrapping="Wrap"
+                                           Text="Play a tone with HostSystem.BeepAsync. Windows uses Console.Beep, Linux prefers ALSA speaker-test, and macOS falls back to the fixed-tone system alert sound, so frequency is ignored there." />
+                                <Grid ColumnDefinitions="Auto,160,Auto,160,*" ColumnSpacing="10">
+                                    <TextBlock VerticalAlignment="Center" Classes="muted" Text="Frequency (Hz)" />
+                                    <NumericUpDown x:Name="BeepFrequencyUpDown"
+                                                   Grid.Column="1"
+                                                   Minimum="37" Maximum="20000"
+                                                   Increment="10"
+                                                   FormatString="F0"
+                                                   IsEnabled="{Binding !IsBeeping}"
+                                                   Value="{Binding BeepFrequency, Mode=TwoWay}" />
+                                    <TextBlock Grid.Column="2" VerticalAlignment="Center" Classes="muted"
+                                               Text="Duration (ms)" />
+                                    <NumericUpDown x:Name="BeepDurationUpDown"
+                                                   Grid.Column="3"
+                                                   Minimum="40" Maximum="5000"
+                                                   Increment="50"
+                                                   FormatString="F0"
+                                                   IsEnabled="{Binding !IsBeeping}"
+                                                   Value="{Binding BeepDuration, Mode=TwoWay}" />
+                                </Grid>
+                                <WrapPanel>
+                                    <Button x:Name="PlayBeepButton"
+                                            Classes="primary"
+                                            Margin="0,0,8,8"
+                                            Command="{Binding PlayBeepCommand}"
+                                            IsEnabled="{Binding !IsBeeping}"
+                                            Content="Play tone" />
+                                    <Button x:Name="PlayBeepLoopButton"
+                                            Margin="0,0,8,8"
+                                            Command="{Binding PlayBeepLoopCommand}"
+                                            IsEnabled="{Binding !IsBeeping}"
+                                            Content="Loop tone" />
+                                    <Button x:Name="StopBeepButton"
+                                            Classes="danger"
+                                            Margin="0,0,8,8"
+                                            Command="{Binding StopBeepCommand}"
+                                            IsEnabled="{Binding IsBeeping}"
+                                            Content="Stop" />
+                                </WrapPanel>
+                                <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding BeepStatus}" />
+                                <TextBlock Classes="muted" TextWrapping="Wrap"
+                                           Text="Stop cancels the token, which ends a loop between tones. A tone that is already sounding always plays out, because neither Console.Beep nor the host tone utility can be interrupted." />
                             </StackPanel>
                         </Border>
 

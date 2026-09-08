@@ -1,4 +1,22 @@
-# v0.3.3 (/09/2026)
+# v0.3.3 (08/09/2026)
+
+- Add portable processor and multi-adapter graphics information to `HostSystem`, with native or structured detection,
+  Windows filtering for indirect USB and software display drivers, bounded external queries, retry-after-failure
+  behavior, and compatibility for the original `GraphicCardName` spelling
+- Add `HostSystem.IsNetworkAvailable()` for a fast, cross-platform local network-availability check and
+  `IsInternetAvailableAsync()` for an active, timeout-bound internet connectivity probe with captive-portal detection
+- Add cached `HostSystem.OperatingSystemName` and `OperatingSystemNameWithArch` display values, including Mac Catalyst,
+  WASI, and correctly styled tvOS and watchOS names
+- Add immutable, platform-neutral host memory snapshots with native Windows/macOS queries, span-based Linux parsing,
+  readable physical-memory properties, and explicit failure detection
+- Show live host memory totals, availability, usage, and load in the Avalonia demo with automatic two-second refreshes
+- Add `StringExtensions.InsertCharBetweenCamelCase` to `StageKit.Primitives` for splitting camelCase/PascalCase (and,
+  optionally, digit) transitions with a configurable separator character
+- Add `HostSystem.Beep` and `HostSystem.BeepAsync` to `StageKit.Primitives`. Both report success as a `bool` instead of
+  throwing, clamp the frequency to the 37 Hz floor `Console.Beep` requires, format the Linux `sleep` interval with the
+  invariant culture, probe for `speaker-test` before using it, and fall back to the macOS system alert sound
+- Add a host beep section to the Avalonia demo with frequency and duration editors, single and looping playback through
+  `HostSystem.BeepAsync`, and a stop button that cancels the loop
 - Add `LinuxRpm` and `DotNetSingleFile` to `StageKit` releases
 - Set `CreateNoWindow = true` on `ProcessHelper` by default to avoid a console window on Linux
 - Add `ProcessHelper.StartProcessWithShellExecute` and `StartProcessWithShellExecuteAsync` overloads for targets that

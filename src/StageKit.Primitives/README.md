@@ -20,7 +20,8 @@ All public helpers are exposed from the `StageKit.Primitives` namespace. IO-rela
 - Stream-based atomic file writes through `SafeFileStream`
 - Path, leaf-name validation, temporary file, and temporary directory helpers
 - Bash ANSI-C and Windows batch value quoting helpers through `StringExtensions`
-- Host-aware path comparison, URL/file-manager launching, and Unix executable-permission helpers
+- Host-aware operating-system names, network availability, path comparison, URL/file-manager launching, and Unix
+  executable-permission helpers
 - Disposable base type with thread-safe idempotent disposal through `DisposableObject`
 - Finalizable disposable base type through `UnmanagedDisposableObject`
 - Leave-open lifecycle base type through `LeaveOpenDisposableObject`
@@ -37,6 +38,61 @@ dotnet add package StageKit.Primitives
 
 - .NET 8 or newer
 - C# latest language version
+
+## Host information
+
+The operating-system display name and architecture are detected once per process:
+
+```csharp
+using StageKit.Primitives.System;
+
+Console.WriteLine(HostSystem.OperatingSystemName);         // Windows, macOS, Linux, ...
+Console.WriteLine(HostSystem.OperatingSystemNameWithArch); // Windows X64, macOS Arm64, ...
+Console.WriteLine(HostSystem.ProcessorName);               // Processor model, when available
+
+foreach (string graphicsCard in HostSystem.GraphicsCardNames)
+{
+    Console.WriteLine(graphicsCard);
+}
+```
+
+Check whether the host currently has an operational non-loopback, non-tunnel network interface, or actively verify
+internet access:
+
+```csharp
+if (HostSystem.IsNetworkAvailable())
+{
+    bool hasInternet = await HostSystem.IsInternetAvailableAsync();
+}
+```
+
+`IsNetworkAvailable()` is a fast local check. `IsInternetAvailableAsync()` sends a small request to Microsoft's
+connectivity-test service, validates the expected response to detect common captive portals, and times out after three
+seconds. It accepts a cancellation token.
+
+Processor and graphics-adapter results are cached after successful detection. Windows uses registry hardware data and
+excludes indirect USB and software display drivers, Linux parses `/proc/cpuinfo` and PCI information with a sysfs
+fallback, and macOS uses `sysctl` and structured `system_profiler` output. External hardware queries are limited to
+five seconds.
+
+### Memory
+
+```csharp
+using StageKit.Primitives.System;
+
+if (HostSystem.TryGetMemoryStatus(out var memory))
+{
+    Console.WriteLine($"Available: {memory.AvailablePhysicalBytes / (1024d * 1024 * 1024):F2} GiB");
+    Console.WriteLine($"Used: {memory.MemoryLoadPercentage:F1}%");
+}
+```
+
+`GetMemoryStatus()` returns a fresh snapshot, or an empty snapshot when unavailable. Windows and macOS use native
+APIs; Linux reads `/proc/meminfo` without regular expressions. No subprocesses or additional dependencies are needed.
+Physical-memory properties use bytes and describe OS-visible memory, not container limits. Linux prefers
+`MemAvailable` and falls back to `MemFree`; macOS estimates availability using free plus inactive pages.
+The returned `HostMemoryStatus` is an immutable, platform-neutral value containing total, available, and used physical
+memory plus the percentage in use.
 
 ## SafeFile
 
@@ -187,6 +243,20 @@ HostSystem.ShowFileInFileManager(reportPath);
 
 Async counterparts such as `OpenUrlAsync(...)` and `ShowFileInFileManagerAsync(...)` accept a cancellation token. All
 open methods return `false` for invalid or missing targets, unsupported hosts, and launcher failures.
+
+`Beep(...)` plays a tone through the host speaker, and `BeepAsync(...)` completes when the tone ends:
+
+```csharp
+HostSystem.Beep();                                        // 800 Hz for 150 ms, in the background
+HostSystem.Beep(440, 500, waitForCompletion: true);       // blocks until the tone ends
+await HostSystem.BeepAsync(440, 500, cancellationToken);  // completes when the tone ends
+```
+
+Both clamp the frequency to 37 - 20000 Hz and raise durations below 40 ms, because `Console.Beep` rejects values
+outside that range. Windows uses `Console.Beep`, Linux prefers ALSA's `speaker-test`, and macOS falls back to the
+fixed-tone system alert sound, so `frequency` is ignored there. A beep is best-effort and never throws: hosts without a
+console, audio device, or tone utility return `false`. `BeepAsync(...)` observes cancellation only before the tone
+starts, since neither backend can be interrupted.
 
 Use `UnixSystem.SetUnix755Executable(...)` to grant owner write/execute and group/other execute permissions to a Unix
 launcher. The method is a no-op on Windows.

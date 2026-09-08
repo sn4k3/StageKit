@@ -51,6 +51,60 @@ public class DemoWindowTests
             Assert.NotNull(window.FindControl<Button>("OpenSettingsFileButton"));
             Assert.NotNull(window.FindControl<Button>("ShowSettingsFileInFileManagerButton"));
             Assert.NotNull(window.FindControl<Button>("OpenStageKitWebsiteButton"));
+            Assert.NotNull(window.FindControl<Border>("MemoryStatusSection"));
+            Assert.NotNull(window.FindControl<ProgressBar>("MemoryUsageProgressBar"));
+            Assert.NotNull(window.FindControl<Button>("RefreshMemoryButton"));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [Fact]
+    public void MainWindow_Startup_ExposesBeepControls()
+    {
+        EnsureAvalonia();
+
+        var window = new MainWindow();
+        try
+        {
+            var frequency = window.FindControl<NumericUpDown>("BeepFrequencyUpDown");
+            var duration = window.FindControl<NumericUpDown>("BeepDurationUpDown");
+
+            Assert.NotNull(frequency);
+            Assert.NotNull(duration);
+            Assert.NotNull(window.FindControl<Button>("PlayBeepButton"));
+            Assert.NotNull(window.FindControl<Button>("PlayBeepLoopButton"));
+            Assert.NotNull(window.FindControl<Button>("StopBeepButton"));
+
+            // The editor bounds must match the range HostSystem.Beep accepts.
+            Assert.Equal(37m, frequency.Minimum);
+            Assert.Equal(20_000m, frequency.Maximum);
+            Assert.Equal(40m, duration.Minimum);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [Fact]
+    public void MainWindow_StopBeep_WhenIdle_ReportsNothingIsPlaying()
+    {
+        EnsureAvalonia();
+
+        var window = new MainWindow();
+        var viewModel = Assert.IsType<MainWindowViewModel>(window.DataContext);
+        try
+        {
+            Assert.False(viewModel.IsBeeping);
+
+            // Stopping while idle must not start or await a tone, so this stays silent.
+            viewModel.StopBeepCommand.Execute(null);
+
+            Assert.Equal("No tone is playing.", viewModel.BeepStatus);
+            Assert.False(viewModel.IsBeeping);
         }
         finally
         {

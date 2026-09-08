@@ -1,12 +1,11 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.Diagnostics;
+﻿using System.Globalization;
 
 namespace StageKit.Primitives.System;
 
 /// <summary>
 /// Provides cross-platform system helper methods.
 /// </summary>
-public static class HostSystem
+public static partial class HostSystem
 {
     /// <summary>
     /// Gets the string comparison used for file-system paths on the current platform.
@@ -14,120 +13,6 @@ public static class HostSystem
     public static StringComparison HostStringComparison { get; } = OperatingSystem.IsWindows()
         ? StringComparison.OrdinalIgnoreCase
         : StringComparison.Ordinal;
-
-    /// <summary>
-    /// Opens an absolute URL with the host's default application.
-    /// </summary>
-    /// <param name="url">The absolute URL to open.</param>
-    /// <returns>
-    /// <see langword="true"/> if the open request was started; otherwise, <see langword="false"/>.
-    /// </returns>
-    public static bool OpenUrl(string url)
-    {
-        return Start(CreateUrlStartInfo(url));
-    }
-
-    /// <summary>
-    /// Asynchronously opens an absolute URL with the host's default application.
-    /// </summary>
-    /// <param name="url">The absolute URL to open.</param>
-    /// <param name="cancellationToken">The token used to cancel the open request before it starts.</param>
-    /// <returns>
-    /// A task containing <see langword="true"/> if the open request was started; otherwise,
-    /// <see langword="false"/>.
-    /// </returns>
-    public static Task<bool> OpenUrlAsync(string url, CancellationToken cancellationToken = default)
-    {
-        return StartAsync(CreateUrlStartInfo(url), cancellationToken);
-    }
-
-    /// <summary>
-    /// Opens an existing directory in the host's default file manager.
-    /// </summary>
-    /// <param name="directoryPath">The directory to open.</param>
-    /// <returns>
-    /// <see langword="true"/> if the open request was started; otherwise, <see langword="false"/>.
-    /// </returns>
-    public static bool OpenDirectory(string directoryPath)
-    {
-        return Start(CreateExistingPathStartInfo(directoryPath, isDirectory: true));
-    }
-
-    /// <summary>
-    /// Asynchronously opens an existing directory in the host's default file manager.
-    /// </summary>
-    /// <param name="directoryPath">The directory to open.</param>
-    /// <param name="cancellationToken">The token used to cancel the open request before it starts.</param>
-    /// <returns>
-    /// A task containing <see langword="true"/> if the open request was started; otherwise,
-    /// <see langword="false"/>.
-    /// </returns>
-    public static Task<bool> OpenDirectoryAsync(string directoryPath, CancellationToken cancellationToken = default)
-    {
-        return StartAsync(CreateExistingPathStartInfo(directoryPath, isDirectory: true), cancellationToken);
-    }
-
-    /// <summary>
-    /// Opens an existing file with the host's default application.
-    /// </summary>
-    /// <param name="filePath">The file to open.</param>
-    /// <returns>
-    /// <see langword="true"/> if the open request was started; otherwise, <see langword="false"/>.
-    /// </returns>
-    public static bool OpenFile(string filePath)
-    {
-        return Start(CreateExistingPathStartInfo(filePath, isDirectory: false));
-    }
-
-    /// <summary>
-    /// Asynchronously opens an existing file with the host's default application.
-    /// </summary>
-    /// <param name="filePath">The file to open.</param>
-    /// <param name="cancellationToken">The token used to cancel the open request before it starts.</param>
-    /// <returns>
-    /// A task containing <see langword="true"/> if the open request was started; otherwise,
-    /// <see langword="false"/>.
-    /// </returns>
-    public static Task<bool> OpenFileAsync(string filePath, CancellationToken cancellationToken = default)
-    {
-        return StartAsync(CreateExistingPathStartInfo(filePath, isDirectory: false), cancellationToken);
-    }
-
-    /// <summary>
-    /// Shows an existing file in the host's file manager.
-    /// </summary>
-    /// <param name="filePath">The file to show.</param>
-    /// <returns>
-    /// <see langword="true"/> if the request was started; otherwise, <see langword="false"/>.
-    /// </returns>
-    /// <remarks>
-    /// Windows Explorer and macOS Finder select the file. Linux opens the containing directory because desktop file
-    /// managers do not provide one portable file-selection command.
-    /// </remarks>
-    public static bool ShowFileInFileManager(string filePath)
-    {
-        return Start(CreateShowExistingFileStartInfo(filePath));
-    }
-
-    /// <summary>
-    /// Asynchronously shows an existing file in the host's file manager.
-    /// </summary>
-    /// <param name="filePath">The file to show.</param>
-    /// <param name="cancellationToken">The token used to cancel the request before it starts.</param>
-    /// <returns>
-    /// A task containing <see langword="true"/> if the request was started; otherwise,
-    /// <see langword="false"/>.
-    /// </returns>
-    /// <remarks>
-    /// Windows Explorer and macOS Finder select the file. Linux opens the containing directory because desktop file
-    /// managers do not provide one portable file-selection command.
-    /// </remarks>
-    public static Task<bool> ShowFileInFileManagerAsync(
-        string filePath,
-        CancellationToken cancellationToken = default)
-    {
-        return StartAsync(CreateShowExistingFileStartInfo(filePath), cancellationToken);
-    }
 
     /// <summary>
     /// Normalize the executable extension for the current OS.
@@ -141,217 +26,126 @@ public static class HostSystem
             : path;
     }
 
-    internal static ProcessStartInfo? CreateOpenTargetStartInfo(string target)
+    /// <summary>
+    /// Produces a beep tone through the host speaker.
+    /// </summary>
+    /// <param name="frequency">The tone frequency in hertz. Clamped to <c>37</c> - <c>20000</c>.</param>
+    /// <param name="duration">The duration of the beep in milliseconds. Values below <c>40</c> are raised to <c>40</c>.</param>
+    /// <param name="waitForCompletion">
+    /// <see langword="true"/> to wait for the tone to end; otherwise, the tone plays in the background.
+    /// </param>
+    /// <returns>
+    /// <see langword="true"/> if the tone completed, or started when not waiting for completion; otherwise,
+    /// <see langword="false"/>.
+    /// </returns>
+    /// <remarks>
+    /// A beep is best-effort and never throws: a host without a console, audio device, or tone utility simply
+    /// returns <see langword="false"/>. Only Windows and Linux honor <paramref name="frequency"/>; macOS falls back
+    /// to the system alert sound, which has a fixed tone.
+    /// </remarks>
+    public static bool Beep(int frequency = 800, int duration = 150, bool waitForCompletion = false)
     {
-        if (OperatingSystem.IsWindows())
+        (frequency, duration) = NormalizeBeepArguments(frequency, duration);
+
+        if (!OperatingSystem.IsWindows())
         {
-            return new ProcessStartInfo(target)
-            {
-                UseShellExecute = true
-            };
+            return ProcessHelper.StartShell(CreateBeepShellCommand(frequency, duration),
+                waitForCompletion: waitForCompletion) == 0;
         }
 
-        if (OperatingSystem.IsMacOS())
-            return CreateLauncherStartInfo("/usr/bin/open", target);
+        if (waitForCompletion) return TryWindowsBeep(frequency, duration);
 
-        return OperatingSystem.IsLinux()
-            ? CreateLauncherStartInfo("xdg-open", target)
-            : null;
-    }
-
-    internal static ProcessStartInfo? CreateShowFileInFileManagerStartInfo(string filePath)
-    {
-        if (OperatingSystem.IsWindows())
-            return CreateLauncherStartInfo("explorer.exe", string.Concat("/select,", filePath));
-
-        if (OperatingSystem.IsMacOS())
-            return CreateLauncherStartInfo("/usr/bin/open", "-R", filePath);
-
-        var directoryPath = Path.GetDirectoryName(filePath);
-        return OperatingSystem.IsLinux() && directoryPath is not null
-            ? CreateLauncherStartInfo("xdg-open", directoryPath)
-            : null;
+        // TryWindowsBeep never throws, so this task cannot fault and become an unobserved task exception.
+        _ = Task.Run(() => TryWindowsBeep(frequency, duration));
+        return true;
     }
 
     /// <summary>
-    /// Tries to resolve an executable using the current host's executable search rules.
+    /// Asynchronously produces a beep tone through the host speaker, completing when the tone ends.
     /// </summary>
-    /// <param name="executable">The executable name or path to resolve.</param>
-    /// <param name="result">
-    /// The absolute path to the executable if found; otherwise, <c>null</c>.
-    /// </param>
-    /// <returns><see langword="true"/> if the executable was found; otherwise, <see langword="false"/>.</returns>
+    /// <param name="frequency">The tone frequency in hertz. Clamped to <c>37</c> - <c>20000</c>.</param>
+    /// <param name="duration">The duration of the beep in milliseconds. Values below <c>40</c> are raised to <c>40</c>.</param>
+    /// <param name="cancellationToken">The token used to cancel the beep before it starts.</param>
+    /// <returns>
+    /// A task containing <see langword="true"/> if the tone completed; otherwise, <see langword="false"/>.
+    /// </returns>
     /// <remarks>
-    /// Windows searches the current and system directories before <c>PATH</c> and honors <c>PATHEXT</c>. Unix
-    /// searches only directories represented in <c>PATH</c>, including empty entries as the current directory, and
-    /// requires at least one executable mode bit. An explicit path is checked directly without searching.
+    /// A beep is best-effort and never throws: a host without a console, audio device, or tone utility simply
+    /// returns <see langword="false"/>. Only Windows and Linux honor <paramref name="frequency"/>; macOS falls back
+    /// to the system alert sound, which has a fixed tone. Cancellation is only observed before the tone starts,
+    /// because neither the host tone utility nor <see cref="Console.Beep(int, int)"/> can be interrupted.
     /// </remarks>
-    public static bool TryFindExecutable(string executable, [NotNullWhen(true)] out string? result)
+    public static Task<bool> BeepAsync(
+        int frequency = 800,
+        int duration = 150,
+        CancellationToken cancellationToken = default)
     {
-        result = null;
+        (frequency, duration) = NormalizeBeepArguments(frequency, duration);
 
-        if (string.IsNullOrWhiteSpace(executable))
-            return false;
+        return OperatingSystem.IsWindows()
+            ? Task.Run(() => TryWindowsBeep(frequency, duration), cancellationToken)
+            : BeepShellAsync(CreateBeepShellCommand(frequency, duration), cancellationToken);
+    }
 
+    private static async Task<bool> BeepShellAsync(string command, CancellationToken cancellationToken = default)
+    {
+        var exitCode = await ProcessHelper
+            .StartShellAsync(command, waitForCompletion: true, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        return exitCode == 0;
+    }
+
+    private static bool TryWindowsBeep(int frequency, int duration)
+    {
         try
         {
-            var isWindows = OperatingSystem.IsWindows();
-            var executableExtensions = isWindows ? GetWindowsExecutableExtensions() : [];
-
-            if (Path.IsPathRooted(executable) || PathUtilities.ContainsDirectorySeparator(executable))
-            {
-                return TryExecutablePath(
-                    Path.GetFullPath(executable),
-                    executableExtensions,
-                    out result);
-            }
-
-            if (isWindows)
-            {
-                if (TryDirectory(Environment.CurrentDirectory, executable, executableExtensions, out result))
-                    return true;
-
-                var systemDirectory = Environment.GetFolderPath(Environment.SpecialFolder.System);
-
-                if (!string.IsNullOrEmpty(systemDirectory) &&
-                    TryDirectory(systemDirectory, executable, executableExtensions, out result))
-                {
-                    return true;
-                }
-
-                if (Environment.Is64BitOperatingSystem)
-                {
-                    var systemX86Directory = Environment.GetFolderPath(Environment.SpecialFolder.SystemX86);
-
-                    if (!string.IsNullOrEmpty(systemX86Directory) &&
-                        TryDirectory(systemX86Directory, executable, executableExtensions, out result))
-                    {
-                        return true;
-                    }
-                }
-
-                var windowsDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
-
-                if (!string.IsNullOrEmpty(windowsDirectory) &&
-                    TryDirectory(windowsDirectory, executable, executableExtensions, out result))
-                {
-                    return true;
-                }
-            }
-
-            var environmentPath = Environment.GetEnvironmentVariable("PATH");
-
-            if (environmentPath is null)
-                return false;
-
-            var remaining = environmentPath.AsSpan();
-
-            while (true)
-            {
-                var separatorIndex = remaining.IndexOf(Path.PathSeparator);
-
-                var directory = separatorIndex >= 0
-                    ? remaining[..separatorIndex]
-                    : remaining;
-
-                if (isWindows)
-                    directory = directory.Trim();
-
-                // Quoted PATH entries occasionally occur on Windows.
-                if (isWindows &&
-                    directory.Length >= 2 &&
-                    directory[0] == '"' &&
-                    directory[^1] == '"')
-                {
-                    directory = directory[1..^1];
-                }
-
-                if (directory.IsEmpty)
-                    directory = Environment.CurrentDirectory;
-
-                if (TryDirectory(directory, executable, executableExtensions, out result))
-                    return true;
-
-                if (separatorIndex < 0)
-                    break;
-
-                remaining = remaining[(separatorIndex + 1)..];
-            }
-
-            return false;
+#pragma warning disable CA1416 // Validate platform compatibility - callers guard with OperatingSystem.IsWindows().
+            Console.Beep(frequency, duration);
+#pragma warning restore CA1416 // Validate platform compatibility
+            return true;
         }
-        catch (Exception exception) when (exception is ArgumentException or
-                                          IOException or
-                                          UnauthorizedAccessException or
-                                          NotSupportedException)
+        catch
         {
-            result = null;
+            // A missing console, audio device, or restrictive host policy must not surface from a beep.
             return false;
         }
     }
 
-    private static bool TryDirectory(
-        ReadOnlySpan<char> directory,
-        ReadOnlySpan<char> executable,
-        string[] executableExtensions,
-        [NotNullWhen(true)] out string? result)
+    /// <summary>
+    /// Clamps beep arguments into the range every supported host accepts.
+    /// </summary>
+    /// <param name="frequency">The requested tone frequency in hertz.</param>
+    /// <param name="duration">The requested duration in milliseconds.</param>
+    /// <returns>The clamped frequency and duration.</returns>
+    /// <remarks>
+    /// <see cref="Console.Beep(int, int)"/> rejects frequencies below <c>37</c> hertz and durations of zero or less,
+    /// so the lower bounds are enforced rather than passed through. The upper bound is the top of human hearing.
+    /// </remarks>
+    internal static (int Frequency, int Duration) NormalizeBeepArguments(int frequency, int duration)
     {
-        return TryExecutablePath(
-            Path.GetFullPath(Path.Join(directory, executable)),
-            executableExtensions,
-            out result);
+        return (Math.Clamp(frequency, 37, 20_000), Math.Max(40, duration));
     }
 
-    private static bool TryExecutablePath(
-        string path,
-        string[] executableExtensions,
-        [NotNullWhen(true)] out string? result)
+    /// <summary>
+    /// Creates the shell command that plays a tone on non-Windows hosts.
+    /// </summary>
+    /// <param name="frequency">The tone frequency in hertz.</param>
+    /// <param name="duration">The duration of the tone in milliseconds.</param>
+    /// <returns>The shell command.</returns>
+    /// <remarks>
+    /// Prefers ALSA's <c>speaker-test</c> (Linux), then <c>osascript</c> (macOS), and finally the terminal bell.
+    /// </remarks>
+    internal static string CreateBeepShellCommand(int frequency, int duration)
     {
-        result = null;
+        var seconds = Math.Round(duration / 1000.0, 3, MidpointRounding.AwayFromZero)
+            .ToString(CultureInfo.InvariantCulture);
 
-        if (OperatingSystem.IsWindows())
-        {
-            var extension = Path.GetExtension(path);
-
-            if (extension.Length > 0)
-            {
-                if (!executableExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase) ||
-                    !File.Exists(path))
-                {
-                    return false;
-                }
-
-                result = path;
-                return true;
-            }
-
-            foreach (var executableExtension in executableExtensions)
-            {
-                var executablePath = string.Concat(path, executableExtension);
-
-                if (File.Exists(executablePath))
-                {
-                    result = executablePath;
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        if (!File.Exists(path))
-            return false;
-
-        var mode = File.GetUnixFileMode(path);
-        const UnixFileMode executableModes = UnixFileMode.UserExecute |
-                                             UnixFileMode.GroupExecute |
-                                             UnixFileMode.OtherExecute;
-
-        if ((mode & executableModes) == 0)
-            return false;
-
-        result = path;
-        return true;
+        return $"if command -v speaker-test > /dev/null 2>&1; then " +
+               $"speaker-test -t sine -f {frequency.ToString(CultureInfo.InvariantCulture)} -l 1 > /dev/null 2>&1 & " +
+               $"sleep {seconds} && kill $! > /dev/null 2>&1; " +
+               "elif command -v osascript > /dev/null 2>&1; then osascript -e beep > /dev/null 2>&1; " +
+               "else printf '\\a'; fi";
     }
 
     private static string[] GetWindowsExecutableExtensions()
@@ -369,82 +163,5 @@ public static class HostSystem
             .ToArray();
 
         return executableExtensions.Length > 0 ? executableExtensions : defaultExecutableExtensions;
-    }
-
-    private static ProcessStartInfo CreateLauncherStartInfo(string launcher, params ReadOnlySpan<string> arguments)
-    {
-        var startInfo = new ProcessStartInfo(launcher)
-        {
-            UseShellExecute = false
-        };
-
-        foreach (var argument in arguments)
-            startInfo.ArgumentList.Add(argument);
-
-        return startInfo;
-    }
-
-    private static ProcessStartInfo? CreateUrlStartInfo(string url)
-    {
-        return Uri.TryCreate(url, UriKind.Absolute, out var uri) && !uri.IsFile
-            ? CreateOpenTargetStartInfo(uri.AbsoluteUri)
-            : null;
-    }
-
-    private static ProcessStartInfo? CreateExistingPathStartInfo(string path, bool isDirectory)
-    {
-        if (string.IsNullOrWhiteSpace(path) ||
-            (isDirectory ? !Directory.Exists(path) : !File.Exists(path)))
-        {
-            return null;
-        }
-
-        try
-        {
-            return CreateOpenTargetStartInfo(Path.GetFullPath(path));
-        }
-        catch (Exception exception) when (exception is ArgumentException or
-                                          IOException or
-                                          UnauthorizedAccessException or
-                                          NotSupportedException)
-        {
-            Debug.WriteLine(exception);
-            return null;
-        }
-    }
-
-    private static ProcessStartInfo? CreateShowExistingFileStartInfo(string filePath)
-    {
-        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
-            return null;
-
-        try
-        {
-            return CreateShowFileInFileManagerStartInfo(Path.GetFullPath(filePath));
-        }
-        catch (Exception exception) when (exception is ArgumentException or
-                                          IOException or
-                                          UnauthorizedAccessException or
-                                          NotSupportedException)
-        {
-            Debug.WriteLine(exception);
-            return null;
-        }
-    }
-
-    private static bool Start(ProcessStartInfo? startInfo)
-    {
-        return startInfo is not null && ProcessHelper.StartProcess(startInfo) == 0;
-    }
-
-    private static async Task<bool> StartAsync(
-        ProcessStartInfo? startInfo,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        return startInfo is not null &&
-               await ProcessHelper.StartProcessAsync(startInfo, cancellationToken: cancellationToken)
-                   .ConfigureAwait(false) == 0;
     }
 }

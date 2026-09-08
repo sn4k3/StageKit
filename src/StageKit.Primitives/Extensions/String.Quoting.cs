@@ -3,7 +3,7 @@
 /// <summary>
 /// Provides extension methods for quoting and escaping strings for various contexts, including Bash, YAML, shell commands, and process arguments.
 /// </summary>
-public static class StringExtensions
+public static partial class StringExtensions
 {
     extension(string? value)
     {

@@ -2,6 +2,16 @@
 
 This file gives Codex repo-specific guidance for working on StageKit.
 
+## Tooling (MCP)
+
+These MCP tools are configured at the user level and available in this repo:
+
+- **rider** — JetBrains MCP Server plugin (SSE, `http://localhost:<port>/sse` — port is whatever Rider's built-in web server picked, shown in Settings → Tools → MCP Server; update with `claude mcp remove rider -s user && claude mcp add rider -s user -t sse http://localhost:<port>/sse` if it changes). Exposes the currently open Rider instance: run/debug configurations, refactorings, project structure, live diagnostics. Only works while StageKit is open in Rider; prefer it over shell `dotnet` commands when a task benefits from Rider's live semantic model (rename/refactor, jump-to-usage, running a specific test from the IDE).
+- **serena** — semantic code navigation (symbols, references, structural edits) via LSP, independent of Rider being open. Prefer for cross-file symbol search/refactor when Rider isn't running or for scripted, repeatable navigation.
+- **csharp-lsp plugin** — wires `csharp-ls` in as the native C#/.cs language server (go-to-definition, references, diagnostics) without needing Rider or Serena.
+- **microsoft-docs plugin** — official Microsoft Learn MCP; use for authoritative .NET BCL/Azure API lookups instead of guessing signatures.
+- **context7** — up-to-date library docs (e.g. `CommunityToolkit.Mvvm`, `Avalonia`, `Octokit`, `ObservableCollections`) — resolve the library id, then fetch docs before assuming an API shape.
+
 ## Project Shape
 
 StageKit is a small standalone .NET infrastructure library for application settings, crash reporting, runtime metadata, backups, support bundles, retention, onboarding state, and single-instance guards.

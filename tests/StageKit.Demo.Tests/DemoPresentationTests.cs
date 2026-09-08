@@ -103,4 +103,15 @@ public class DemoPresentationTests
 
         Assert.Equal(expected, result);
     }
+
+    [Theory]
+    [InlineData(0UL, "0 B")]
+    [InlineData(1023UL, "1023 B")]
+    [InlineData(1024UL, "1.00 KiB")]
+    [InlineData(1610612736UL, "1.50 GiB")]
+    [InlineData(18446744073709551615UL, "16.00 EiB")]
+    public void FormatByteSize_Values_ReturnsReadableBinarySize(ulong bytes, string expected)
+    {
+        Assert.Equal(expected, DemoFormatting.FormatByteSize(bytes));
+    }
 }

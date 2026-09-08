@@ -30,6 +30,7 @@ applications those packages ship in.
 - Single-instance process guard based on a named mutex
 - Atomic file writes, profile backup/restore, support bundle export, and retention helpers
 - Dependency-light primitives package for atomic file writes, host URL/file-manager launching, and disposable/resource helpers
+- Cross-platform host memory snapshots through `HostSystem.GetMemoryStatus()` and `TryGetMemoryStatus(out var memory)`
 - First-run and onboarding state persistence
 - Serializable crash reports with exception chains, stack traces, runtime information, and process stats
 - AppDomain and task scheduler unhandled exception helpers

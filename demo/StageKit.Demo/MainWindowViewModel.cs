@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using Avalonia;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StageKit.Primitives.Extensions;
@@ -14,59 +15,69 @@ public sealed record RuntimeValue(string Label, string Value);
 public partial class MainWindowViewModel : ObservableObject, IDisposable
 {
     private const string StageKitRepositoryUrl = "https://github.com/sn4k3/StageKit";
+    private const int BeepLoopGapMilliseconds = 250;
+    private static readonly TimeSpan MemoryRefreshInterval = TimeSpan.FromSeconds(2);
     private readonly UpdatumManager _updater = DemoUpdateManager.Create();
+    private readonly DispatcherTimer _memoryRefreshTimer = new();
     private CancellationTokenSource? _updateCancellation;
+    private CancellationTokenSource? _beepCancellation;
     private UpdatumDownloadedAsset? _downloadedAsset;
     private readonly DemoCrashPresentation? _startupCrashReport;
 
-    [ObservableProperty]
-    public partial string StatusMessage { get; set; } = "Ready to explore StageKit.";
+    [ObservableProperty] public partial string StatusMessage { get; set; } = "Ready to explore StageKit.";
 
-    [ObservableProperty]
-    public partial string RuntimeReport { get; set; } = string.Empty;
+    [ObservableProperty] public partial string RuntimeReport { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial string TotalPhysicalMemoryText { get; set; } = "Unavailable";
+
+    [ObservableProperty] public partial string AvailablePhysicalMemoryText { get; set; } = "Unavailable";
+
+    [ObservableProperty] public partial string UsedPhysicalMemoryText { get; set; } = "Unavailable";
+
+    [ObservableProperty] public partial double MemoryLoadPercentage { get; set; }
+
+    [ObservableProperty] public partial string MemoryLoadText { get; set; } = "Unavailable";
+
+    [ObservableProperty] public partial string MemoryRefreshStatus { get; set; } = "Waiting for the first refresh.";
 
     [ObservableProperty]
     public partial string PrivilegedProcessOutput { get; set; } =
         "Run the sample to request elevation and capture the completed process output.";
 
-    [ObservableProperty]
-    public partial string NewRecentDocument { get; set; } = string.Empty;
+    [ObservableProperty] public partial string NewRecentDocument { get; set; } = string.Empty;
+
+    [ObservableProperty] public partial string LastArtifactPath { get; set; } = "No artifact created in this session.";
+
+    [ObservableProperty] public partial string UpdaterStatus { get; set; } = "Not checked yet.";
+
+    [ObservableProperty] public partial string ReleaseSummary { get; set; } = "No release selected.";
+
+    [ObservableProperty] public partial string CompatibleAssetName { get; set; } = "No compatible asset selected.";
+
+    [ObservableProperty] public partial string ChangelogText { get; set; } = "Check for updates to load release notes.";
+
+    [ObservableProperty] public partial string DownloadProgress { get; set; } = "0.00 MB / 0.00 MB (0%)";
+
+    [ObservableProperty] public partial double DownloadPercentage { get; set; }
+
+    [ObservableProperty] public partial bool CanDownloadUpdate { get; set; }
+
+    [ObservableProperty] public partial bool HasDownloadedAsset { get; set; }
+
+    [ObservableProperty] public partial bool AutoInstallUpdates { get; set; }
+
+    [ObservableProperty] public partial bool CanInstallUpdate { get; set; }
+
+    [ObservableProperty] public partial int SelectedFeatureIndex { get; set; }
+
+    [ObservableProperty] public partial int BeepFrequency { get; set; } = 800;
+
+    [ObservableProperty] public partial int BeepDuration { get; set; } = 150;
+
+    [ObservableProperty] public partial bool IsBeeping { get; set; }
 
     [ObservableProperty]
-    public partial string LastArtifactPath { get; set; } = "No artifact created in this session.";
-
-    [ObservableProperty]
-    public partial string UpdaterStatus { get; set; } = "Not checked yet.";
-
-    [ObservableProperty]
-    public partial string ReleaseSummary { get; set; } = "No release selected.";
-
-    [ObservableProperty]
-    public partial string CompatibleAssetName { get; set; } = "No compatible asset selected.";
-
-    [ObservableProperty]
-    public partial string ChangelogText { get; set; } = "Check for updates to load release notes.";
-
-    [ObservableProperty]
-    public partial string DownloadProgress { get; set; } = "0.00 MB / 0.00 MB (0%)";
-
-    [ObservableProperty]
-    public partial double DownloadPercentage { get; set; }
-
-    [ObservableProperty]
-    public partial bool CanDownloadUpdate { get; set; }
-
-    [ObservableProperty]
-    public partial bool HasDownloadedAsset { get; set; }
-
-    [ObservableProperty]
-    public partial bool AutoInstallUpdates { get; set; }
-
-    [ObservableProperty]
-    public partial bool CanInstallUpdate { get; set; }
-
-    [ObservableProperty]
-    public partial int SelectedFeatureIndex { get; set; }
+    public partial string BeepStatus { get; set; } = "Idle. Choose a frequency and duration, then play a tone.";
 
     public MainWindowViewModel()
     {
@@ -77,12 +88,17 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         SelectedFeatureIndex = _startupCrashReport is null ? 0 : 2;
         Settings.PropertyChanged += SettingsOnPropertyChanged;
         _updater.PropertyChanged += UpdaterOnPropertyChanged;
+        _memoryRefreshTimer.Interval = MemoryRefreshInterval;
+        _memoryRefreshTimer.Tick += MemoryRefreshTimerOnTick;
         ApplyTheme(Settings.Theme);
         RefreshRuntime();
+        RefreshMemoryStatus();
         RefreshStageKitState();
+        _memoryRefreshTimer.Start();
     }
 
-    public string WindowTitle => $"StageKit Demo v{EntryApplication.AssemblyVersionString} ({EntryApplication.GenericRuntimeIdentifier})";
+    public string WindowTitle =>
+        $"StageKit Demo v{EntryApplication.AssemblyVersionString} ({EntryApplication.GenericRuntimeIdentifier})";
 
     public AppSettings Settings => AppSettings.Instance;
 
@@ -109,7 +125,8 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         : $"Recovered crash report #{_startupCrashReport.ReportId}";
 
     public string StartupCrashReportText => _startupCrashReport?.ReportText
-        ?? "Use the fatal crash action below to exercise StageKit's persist, relaunch, and report-loading flow.";
+                                            ??
+                                            "Use the fatal crash action below to exercise StageKit's persist, relaunch, and report-loading flow.";
 
     public string SettingsFileStatus =>
         $"{Settings.FileName} · Saves: {Settings.SaveCount} · Unsaved: {Settings.HasUnsavedChanges}";
@@ -124,10 +141,16 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void RefreshRuntime()
     {
+        var graphicsCardNames = HostSystem.GraphicsCardNames;
         RuntimeValues =
         [
             new RuntimeValue("Framework", Environment.Version.ToString()),
             new RuntimeValue("Runtime", EntryApplication.GenericRuntimeIdentifier),
+            new RuntimeValue("Operating system", HostSystem.OperatingSystemNameWithArch),
+            new RuntimeValue("Processor", HostSystem.ProcessorName ?? "Unavailable"),
+            new RuntimeValue(
+                "Graphics cards",
+                graphicsCardNames.Count > 0 ? string.Join(", ", graphicsCardNames) : "Unavailable"),
             new RuntimeValue("Packaging", EntryApplication.PackagingType.ToString()),
             new RuntimeValue("Session", ApplicationKit.SessionId.ToString())
         ];
@@ -135,6 +158,33 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(RuntimeValues));
         OnPropertyChanged(nameof(ProfilePath));
         StatusMessage = "Runtime diagnostics refreshed.";
+    }
+
+    [RelayCommand]
+    private void RefreshMemoryStatus()
+    {
+        if (!HostSystem.TryGetMemoryStatus(out var memory))
+        {
+            TotalPhysicalMemoryText = "Unavailable";
+            AvailablePhysicalMemoryText = "Unavailable";
+            UsedPhysicalMemoryText = "Unavailable";
+            MemoryLoadPercentage = 0;
+            MemoryLoadText = "Unavailable";
+            MemoryRefreshStatus = "Memory information is unavailable on this host.";
+            return;
+        }
+
+        TotalPhysicalMemoryText = DemoFormatting.FormatByteSize(memory.TotalPhysicalBytes);
+        AvailablePhysicalMemoryText = DemoFormatting.FormatByteSize(memory.AvailablePhysicalBytes);
+        UsedPhysicalMemoryText = DemoFormatting.FormatByteSize(memory.UsedPhysicalBytes);
+        MemoryLoadPercentage = memory.MemoryLoadPercentage;
+        MemoryLoadText = $"{memory.MemoryLoadPercentage:F1}% used";
+        MemoryRefreshStatus = $"Updated {DateTimeOffset.Now:T} · refreshes every 2 seconds";
+    }
+
+    private void MemoryRefreshTimerOnTick(object? sender, EventArgs e)
+    {
+        RefreshMemoryStatus();
     }
 
     [RelayCommand]
@@ -164,8 +214,8 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
                 StatusMessage = "Administrator approval was denied.";
             }
             else if (OperatingSystem.IsWindows() &&
-                !Environment.IsPrivilegedProcess &&
-                output.ExitCode == -1)
+                     !Environment.IsPrivilegedProcess &&
+                     output.ExitCode == -1)
             {
                 PrivilegedProcessOutput +=
                     "\n\nWindows note: runas cannot redirect an elevated child's output. " +
@@ -184,6 +234,89 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             PrivilegedProcessOutput = $"The privileged process could not be run.\n\n{exception}";
             StatusMessage = $"Privileged process failed: {exception.Message}";
             UnhandledExceptions.HandleSafeException(exception, "[StageKit.Demo.PrivilegedProcess]");
+        }
+    }
+
+    [RelayCommand]
+    private Task PlayBeepAsync()
+    {
+        return RunBeepAsync(repeat: false);
+    }
+
+    [RelayCommand]
+    private Task PlayBeepLoopAsync()
+    {
+        return RunBeepAsync(repeat: true);
+    }
+
+    [RelayCommand]
+    private void StopBeep()
+    {
+        if (_beepCancellation is null)
+        {
+            BeepStatus = "No tone is playing.";
+            return;
+        }
+
+        _beepCancellation.Cancel();
+
+        // Neither Console.Beep nor the host tone utility can be interrupted, so the tone already sounding finishes.
+        BeepStatus = "Stopping… the tone already sounding plays out first.";
+    }
+
+    private async Task RunBeepAsync(bool repeat)
+    {
+        if (IsBeeping)
+        {
+            BeepStatus = "A tone is already playing. Stop it first.";
+            return;
+        }
+
+        using var cancellation = new CancellationTokenSource();
+        _beepCancellation = cancellation;
+        IsBeeping = true;
+
+        var (frequency, duration) = (BeepFrequency, BeepDuration);
+        var played = 0;
+
+        try
+        {
+            do
+            {
+                BeepStatus = repeat
+                    ? $"Looping {frequency} Hz for {duration} ms · {played} tone(s) played. Press Stop to end the loop."
+                    : $"Playing {frequency} Hz for {duration} ms…";
+
+                if (!await HostSystem.BeepAsync(frequency, duration, cancellation.Token))
+                {
+                    BeepStatus = played == 0
+                        ? "The host could not play a tone. It may have no console, audio device, or tone utility."
+                        : $"The host stopped playing tones after {played}.";
+                    return;
+                }
+
+                played++;
+
+                if (repeat) await Task.Delay(BeepLoopGapMilliseconds, cancellation.Token);
+            } while (repeat && !cancellation.IsCancellationRequested);
+
+            BeepStatus = repeat
+                ? $"Loop finished after {played} tone(s)."
+                : $"Played {frequency} Hz for {duration} ms.";
+        }
+        catch (OperationCanceledException)
+        {
+            BeepStatus = $"Stopped after {played} tone(s).";
+        }
+        catch (Exception exception)
+        {
+            BeepStatus = $"The tone could not be played: {exception.Message}";
+            UnhandledExceptions.HandleSafeException(exception, "[StageKit.Demo.Beep]");
+        }
+        finally
+        {
+            IsBeeping = false;
+            _beepCancellation = null;
         }
     }
 
@@ -611,13 +744,17 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             ? "(empty)"
             : output.StandardError.TrimEnd();
 
-        return $"Exit code: {output.ExitCode}\n\nStandard output:\n{standardOutput}\n\nStandard error:\n{standardError}";
+        return
+            $"Exit code: {output.ExitCode}\n\nStandard output:\n{standardOutput}\n\nStandard error:\n{standardError}";
     }
 
     public void Dispose()
     {
+        _memoryRefreshTimer.Stop();
+        _memoryRefreshTimer.Tick -= MemoryRefreshTimerOnTick;
         Settings.PropertyChanged -= SettingsOnPropertyChanged;
         _updater.PropertyChanged -= UpdaterOnPropertyChanged;
+        _beepCancellation?.Cancel();
         _updateCancellation?.Cancel();
         _updateCancellation?.Dispose();
         _downloadedAsset?.SafeDeleteFile();

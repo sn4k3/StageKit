@@ -7,7 +7,7 @@ public static class DemoFeatureCatalog
     public static IReadOnlyList<DemoFeature> All { get; } =
     [
         new("Runtime", "Inspect process, packaging, and runtime metadata.",
-            ["ApplicationKit", "EntryApplication", "RuntimeDiagnostics", "HostSystem", "ProcessHelper"]),
+            ["ApplicationKit", "EntryApplication", "RuntimeDiagnostics", "HostSystem", "HostMemoryStatus", "ProcessHelper"]),
         new("Settings", "Exercise atomic autosave settings and collection persistence.",
             ["RootSettingsFile<T>", "RootCollectionFile<T, TItem>"]),
         new("Storage", "Create backups and support bundles, manage onboarding, and apply retention.",

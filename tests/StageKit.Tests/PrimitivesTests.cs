@@ -2,6 +2,7 @@ using StageKit.Primitives;
 using StageKit.Primitives.Extensions;
 using StageKit.Primitives.System;
 using System.Diagnostics;
+using System.Globalization;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -10,6 +11,19 @@ namespace StageKit.Tests;
 
 public sealed class PrimitivesTests
 {
+    [Fact]
+    public void HostSystem_OperatingSystemName_DescribesCurrentHost()
+    {
+        Assert.True(new[]
+        {
+            "Windows", "Mac Catalyst", "macOS", "Android", "iOS", "tvOS", "watchOS", "Linux", "FreeBSD",
+            "Browser", "WASI", "Unknown"
+        }.Contains(HostSystem.OperatingSystemName, StringComparer.Ordinal));
+        Assert.Equal(
+            $"{HostSystem.OperatingSystemName} {RuntimeInformation.OSArchitecture}",
+            HostSystem.OperatingSystemNameWithArch);
+    }
+
     [Fact]
     public void HostSystem_TryFindExecutable_FindsHostShell()
     {
@@ -85,6 +99,57 @@ public sealed class PrimitivesTests
     {
         Assert.False(HostSystem.OpenUrl(url));
         Assert.False(await HostSystem.OpenUrlAsync(url, TestContext.Current.CancellationToken));
+    }
+
+    [Theory]
+    [InlineData(800, 150, 800, 150)]
+    [InlineData(20, 150, 37, 150)] // Console.Beep throws below 37 Hz.
+    [InlineData(int.MinValue, int.MinValue, 37, 40)]
+    [InlineData(int.MaxValue, int.MaxValue, 20_000, int.MaxValue)]
+    [InlineData(800, 0, 800, 40)] // Console.Beep throws on a non-positive duration.
+    public void HostSystem_NormalizeBeepArguments_ClampsToHostAcceptedRange(
+        int frequency,
+        int duration,
+        int expectedFrequency,
+        int expectedDuration)
+    {
+        var (normalizedFrequency, normalizedDuration) = HostSystem.NormalizeBeepArguments(frequency, duration);
+
+        Assert.Equal(expectedFrequency, normalizedFrequency);
+        Assert.Equal(expectedDuration, normalizedDuration);
+    }
+
+    [Fact]
+    public void HostSystem_CreateBeepShellCommand_FormatsDurationInvariantly()
+    {
+        var originalCulture = CultureInfo.CurrentCulture;
+
+        try
+        {
+            // A comma-decimal culture would emit "sleep 0,15", which bash rejects as an invalid time interval.
+            CultureInfo.CurrentCulture = new CultureInfo("pt-PT");
+
+            var command = HostSystem.CreateBeepShellCommand(800, 150);
+
+            Assert.Contains("sleep 0.15", command, StringComparison.Ordinal);
+            Assert.DoesNotContain(",", command, StringComparison.Ordinal);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+        }
+    }
+
+    [Fact]
+    public void HostSystem_CreateBeepShellCommand_ProbesToneUtilitiesBeforeUse()
+    {
+        var command = HostSystem.CreateBeepShellCommand(800, 150);
+
+        // The probe must be unquoted, otherwise the test is a non-empty literal and always succeeds.
+        Assert.Contains("if command -v speaker-test > /dev/null 2>&1; then", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("'$(command -v speaker-test)'", command, StringComparison.Ordinal);
+        Assert.Contains("osascript", command, StringComparison.Ordinal);
+        Assert.Contains("printf '\\a'", command, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -904,6 +969,21 @@ public sealed class PrimitivesTests
     public void EscapeWindowsBatchValue_EscapesSetValueMetacharacters(string value, string expected)
     {
         Assert.Equal(expected, value.EscapeWindowsBatchValue());
+    }
+
+    [Theory]
+    [InlineData("", "")]
+    [InlineData("word", "word")]
+    [InlineData("CamelCase", "Camel Case")]
+    [InlineData("HTMLParser", "HTMLParser")]
+    [InlineData("Item42", "Item 42")]
+    [InlineData("Item42", "Item42", false)]
+    [InlineData("Item4", "Item4")]
+    [InlineData("A", "A")]
+    [InlineData("aB", "a B")]
+    public void InsertCharBetweenCamelCase_InsertsAtCaseAndDigitTransitions(string value, string expected, bool splitNumbers = true)
+    {
+        Assert.Equal(expected, value.InsertCharBetweenCamelCase(splitNumbers: splitNumbers));
     }
 
     [Fact]
