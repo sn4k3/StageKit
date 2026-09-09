@@ -743,6 +743,9 @@ uninstallers probe supported native and standalone installation forms and remove
 
 ## Security
 
+The Windows installer offers Start menu and Desktop shortcuts, both enabled by default, and an optional application
+launch after installation, disabled by default.
+
 Please report vulnerabilities privately. See [SECURITY.md](SECURITY.md).
 
 ## Contributing

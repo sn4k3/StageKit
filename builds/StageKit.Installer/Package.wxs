@@ -7,44 +7,97 @@
              Language="1033"
              Scope="perMachine"
              Compressed="yes">
-        <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
-        <MediaTemplate EmbedCab="yes" />
+        <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed."/>
+        <MediaTemplate EmbedCab="yes"/>
+        <Property Id="CREATESTARTMENUSHORTCUT" Value="1" Secure="yes"/>
+        <Property Id="CREATEDESKTOPSHORTCUT" Value="1" Secure="yes"/>
 
-        <Icon Id="ProductIcon.ico" SourceFile="$(var.ApplicationIcon)" />
-        <Property Id="ARPPRODUCTICON" Value="ProductIcon.ico" />
-        <Property Id="ARPURLINFOABOUT" Value="$(var.RepositoryUrl)" />
-        <Property Id="ARPHELPLINK" Value="$(var.RepositoryUrl)/issues" />
-        <SetProperty Id="ARPINSTALLLOCATION" Value="[INSTALLFOLDER]" After="CostFinalize" />
+        <CustomAction Id="LaunchApplication" FileRef="MainExecutable" ExeCommand=""
+                      Execute="immediate" Impersonate="yes" Return="asyncNoWait"/>
+
+        <Icon Id="ProductIcon.ico" SourceFile="$(var.ApplicationIcon)"/>
+        <Property Id="ARPPRODUCTICON" Value="ProductIcon.ico"/>
+        <Property Id="ARPURLINFOABOUT" Value="$(var.RepositoryUrl)"/>
+        <Property Id="ARPHELPLINK" Value="$(var.RepositoryUrl)/issues"/>
+        <SetProperty Id="ARPINSTALLLOCATION" Value="[INSTALLFOLDER]" After="CostFinalize"/>
 
         <StandardDirectory Id="ProgramFiles6432Folder">
             <Directory Id="INSTALLFOLDER" Name="$(var.ApplicationName)">
                 <Component Id="MainExecutableComponent" Guid="*">
                     <File Id="MainExecutable"
                           Source="!(bindpath.Publish)\$(var.ApplicationExecutableName).exe"
-                          KeyPath="yes">
-                        <Shortcut Id="StartMenuShortcut"
-                                  Directory="ApplicationProgramsFolder"
-                                  Name="$(var.ApplicationName)"
-                                  Description="$(var.ApplicationName)"
-                                  WorkingDirectory="INSTALLFOLDER"
-                                  Advertise="yes" />
-                    </File>
+                          KeyPath="yes"/>
+                </Component>
+
+                <Component Id="StartMenuShortcutComponent" Guid="*" Condition="CREATESTARTMENUSHORTCUT = 1">
+                    <Shortcut Id="StartMenuShortcut" Directory="ApplicationProgramsFolder"
+                              Name="$(var.ApplicationName)" Target="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe"
+                              WorkingDirectory="INSTALLFOLDER"/>
+                    <RegistryValue Root="HKCU" Key="Software\$(var.Company)\$(var.ApplicationName)\Installer"
+                                   Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes"/>
                     <RemoveFolder Id="RemoveApplicationProgramsFolder"
                                   Directory="ApplicationProgramsFolder"
-                                  On="uninstall" />
+                                  On="uninstall"/>
+                </Component>
+
+                <Component Id="DesktopShortcutComponent" Guid="*" Condition="CREATEDESKTOPSHORTCUT = 1">
+                    <Shortcut Id="DesktopShortcut" Directory="DesktopFolder"
+                              Name="$(var.ApplicationName)" Target="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe"
+                              WorkingDirectory="INSTALLFOLDER"/>
+                    <RegistryValue Root="HKCU" Key="Software\$(var.Company)\$(var.ApplicationName)\Installer"
+                                   Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes"/>
                 </Component>
 
                 <Files Include="!(bindpath.Publish)\**">
-                    <Exclude Files="!(bindpath.Publish)\$(var.ApplicationExecutableName).exe" />
+                    <Exclude Files="!(bindpath.Publish)\$(var.ApplicationExecutableName).exe"/>
                 </Files>
             </Directory>
         </StandardDirectory>
 
         <StandardDirectory Id="ProgramMenuFolder">
-            <Directory Id="ApplicationProgramsFolder" Name="$(var.ApplicationName)" />
+            <Directory Id="ApplicationProgramsFolder" Name="$(var.ApplicationName)"/>
         </StandardDirectory>
 
-        <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
-        <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseFile)" />
+        <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER"/>
+        <UI>
+            <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog"
+                     Value="InstallOptionsDlg" Order="2" Condition="LicenseAccepted = &quot;1&quot;"/>
+            <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog"
+                     Value="InstallOptionsDlg" Order="2" Condition="NOT Installed"/>
+            <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApplication"
+                     Order="1" Condition="STARTAFTERINSTALL = 1 AND NOT Installed AND NOT WIX_UPGRADE_DETECTED"/>
+            <Dialog Id="InstallOptionsDlg" Width="370" Height="270" Title="[ProductName] Setup">
+                <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44"
+                         TabSkip="yes" Text="!(loc.InstallDirDlgBannerBitmap)"/>
+                <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0"/>
+                <Control Id="Title" Type="Text" X="15" Y="15" Width="280" Height="20"
+                         Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Installation options"/>
+                <Control Id="StartMenu" Type="CheckBox" X="20" Y="75" Width="330" Height="18"
+                         Property="CREATESTARTMENUSHORTCUT" CheckBoxValue="1" Text="Create Start menu shortcut"/>
+                <Control Id="Desktop" Type="CheckBox" X="20" Y="105" Width="330" Height="18"
+                         Property="CREATEDESKTOPSHORTCUT" CheckBoxValue="1" Text="Create Desktop shortcut"/>
+                <Control Id="Launch" Type="CheckBox" X="20" Y="135" Width="330" Height="18"
+                         Property="STARTAFTERINSTALL" CheckBoxValue="1" Text="Start program after install"/>
+                <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0"/>
+                <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
+                    <Publish Event="NewDialog" Value="LicenseAgreementDlg"/>
+                </Control>
+                <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes"
+                         Text="!(loc.WixUINext)">
+                    <Publish Event="NewDialog" Value="InstallDirDlg"/>
+                </Control>
+                <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes"
+                         Text="!(loc.WixUICancel)">
+                    <Publish Event="SpawnDialog" Value="CancelDlg"/>
+                </Control>
+            </Dialog>
+        </UI>
+        <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseFile)"/>
+        <?ifdef InstallerDialogImage ?>
+        <WixVariable Id="WixUIDialogBmp" Value="$(var.InstallerDialogImage)"/>
+        <?endif ?>
+        <?ifdef InstallerBannerImage ?>
+        <WixVariable Id="WixUIBannerBmp" Value="$(var.InstallerBannerImage)"/>
+        <?endif ?>
     </Package>
 </Wix>

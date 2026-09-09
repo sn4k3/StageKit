@@ -6,7 +6,9 @@
         <AcceptEula>wix7</AcceptEula>
         <InstallerPlatform>$(Platform)</InstallerPlatform>
         <OutputName>$(ApplicationName)_$(RuntimeIdentifier)_v$(BuildVersion)</OutputName>
-        <LicenseFile>$(MSBuildProjectDirectory)\License.rtf</LicenseFile>
+        <LicenseFile>$(MSBuildProjectDirectory)\Resources\License.rtf</LicenseFile>
+        <InstallerDialogImage>$(MSBuildProjectDirectory)\Resources\InstallerDialogImage.png</InstallerDialogImage>
+        <InstallerBannerImage>$(MSBuildProjectDirectory)\Resources\InstallerBannerImage.png</InstallerBannerImage>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Platform)' == 'x64'">
@@ -26,11 +28,23 @@
         <PackageReference Include="WixToolset.UI.wixext" Version="7.0.0"/>
     </ItemGroup>
 
+    <!-- Optional artwork; omit either property to retain that WixUI default image. -->
+    <PropertyGroup Condition="'$(InstallerDialogImage)' != ''">
+        <DefineConstants>$(DefineConstants);InstallerDialogImage=$(InstallerDialogImage)</DefineConstants>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(InstallerBannerImage)' != ''">
+        <DefineConstants>$(DefineConstants);InstallerBannerImage=$(InstallerBannerImage)</DefineConstants>
+    </PropertyGroup>
+
     <ItemGroup>
-      <Content Include="License.rtf" />
+      <Content Include="Resources\License.rtf" />
     </ItemGroup>
 
     <Target Name="ValidateInstallerInputs" BeforeTargets="CoreCompile">
+        <Error Condition="'$(InstallerDialogImage)' != '' And !Exists('$(InstallerDialogImage)')"
+               Text="Installer dialog image '$(InstallerDialogImage)' does not exist."/>
+        <Error Condition="'$(InstallerBannerImage)' != '' And !Exists('$(InstallerBannerImage)')"
+               Text="Installer banner image '$(InstallerBannerImage)' does not exist."/>
         <Error Condition="'$(PublishDirectory)' == ''"
                Text="PublishDirectory must be provided by the Fallout publish pipeline."/>
         <Error Condition="'$(ApplicationName)' == ''"
