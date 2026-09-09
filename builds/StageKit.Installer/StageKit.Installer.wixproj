@@ -26,6 +26,10 @@
         <PackageReference Include="WixToolset.UI.wixext" Version="7.0.0"/>
     </ItemGroup>
 
+    <ItemGroup>
+      <Content Include="License.rtf" />
+    </ItemGroup>
+
     <Target Name="ValidateInstallerInputs" BeforeTargets="CoreCompile">
         <Error Condition="'$(PublishDirectory)' == ''"
                Text="PublishDirectory must be provided by the Fallout publish pipeline."/>
