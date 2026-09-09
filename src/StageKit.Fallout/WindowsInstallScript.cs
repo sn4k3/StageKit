@@ -54,13 +54,16 @@ internal static class WindowsInstallScript
         var applicationSlug = LinuxPackage.GetPackageName(applicationName);
         wingetPackageId = string.IsNullOrWhiteSpace(wingetPackageId) ? string.Empty : wingetPackageId.Trim();
         if (wingetPackageId.Contains('\r') || wingetPackageId.Contains('\n'))
-            throw new ArgumentException("The WinGet package identifier cannot contain line breaks.", nameof(wingetPackageId));
+            throw new ArgumentException("The WinGet package identifier cannot contain line breaks.",
+                nameof(wingetPackageId));
 
         return Template
             .Replace("{{REPOSITORY}}", EscapeSingleQuoted(repository), StringComparison.Ordinal)
             .Replace("{{APPLICATION_NAME}}", EscapeSingleQuoted(applicationName), StringComparison.Ordinal)
             .Replace("{{APPLICATION_SLUG}}", EscapeSingleQuoted(applicationSlug), StringComparison.Ordinal)
             .Replace("{{EXECUTABLE_NAME}}", EscapeSingleQuoted(string.Concat(executableName, ".exe")),
+                StringComparison.Ordinal)
+            .Replace("{{SINGLE_FILE_NAME}}", EscapeSingleQuoted(string.Concat(applicationName, ".exe")),
                 StringComparison.Ordinal)
             .Replace("{{WINGET_PACKAGE_ID}}", EscapeSingleQuoted(wingetPackageId), StringComparison.Ordinal)
             .Replace("{{PACKAGE_TYPES}}", packageTypeLines, StringComparison.Ordinal)
@@ -101,6 +104,7 @@ internal static class WindowsInstallScript
                                     $ApplicationName = '{{APPLICATION_NAME}}'
                                     $ApplicationSlug = '{{APPLICATION_SLUG}}'
                                     $ExecutableName = '{{EXECUTABLE_NAME}}'
+                                    $SingleFileName = '{{SINGLE_FILE_NAME}}'
                                     $WinGetPackageId = '{{WINGET_PACKAGE_ID}}'
                                     $PackageTypes = @(
                                     {{PACKAGE_TYPES}}
@@ -480,7 +484,7 @@ internal static class WindowsInstallScript
                                     function Install-SingleFile([string] $Path) {
                                         $destination = Join-Path $env:LOCALAPPDATA "Programs\$ApplicationSlug"
                                         New-Item -ItemType Directory -Path $destination -Force | Out-Null
-                                        Copy-Item -LiteralPath $Path -Destination (Join-Path $destination $ExecutableName) -Force
+                                        Copy-Item -LiteralPath $Path -Destination (Join-Path $destination $SingleFileName) -Force
                                         Add-ToUserPath $destination
                                     }
 

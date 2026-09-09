@@ -1,5 +1,8 @@
 # v0.3.4 (09/09/2026)
 
+- Prefer RPM assets on AlmaLinux in generated installers, and retain the application-name casing for installed
+  AppImage and .NET single-file names
+- Stop Linux `speaker-test` tones at the requested duration and use macOS `afplay` for an audible system sound
 - Allow set AppImage squashfs compression in Fallout to customize or override compression
 - Decouple primary directory publish from `DotNetSingleFile` packaging so that directory and portable archive publish retains all runtime assemblies and native dependencies
 - Add the `PublishReadyToRun` build parameter (`--publish-ready-to-run`), defaulting to `false`, to make ReadyToRun compilation opt-in

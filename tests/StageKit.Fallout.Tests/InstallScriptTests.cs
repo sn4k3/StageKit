@@ -89,6 +89,7 @@ public class InstallScriptTests
         Assert.Contains("--force-downgrade", script, StringComparison.Ordinal);
         Assert.Contains("--oldpackage", script, StringComparison.Ordinal);
         Assert.Contains("ID_LIKE", script, StringComparison.Ordinal);
+        Assert.Contains("*almalinux*|*fedora*|*rhel*|*centos*|*suse*)", script, StringComparison.Ordinal);
         Assert.Contains("--portable [PATH]", script, StringComparison.Ordinal);
         Assert.Contains("help|-h|--help|/help|'/?'", script, StringComparison.Ordinal);
         Assert.Contains("gsub(/\"/, \"\", $2)", script, StringComparison.Ordinal);
@@ -140,7 +141,8 @@ public class InstallScriptTests
         Assert.Contains("pacman -R", script, StringComparison.Ordinal);
         Assert.Contains("${XDG_DATA_HOME:-$HOME/.local/share}/${APPLICATION_SLUG}", script,
             StringComparison.Ordinal);
-        Assert.Contains("$HOME/Applications/${APPLICATION_SLUG}.AppImage", script, StringComparison.Ordinal);
+        Assert.Contains("$HOME/Applications/${APPLICATION_NAME}.AppImage", script, StringComparison.Ordinal);
+        Assert.Contains("$HOME/.local/bin/${APPLICATION_NAME}.bin", script, StringComparison.Ordinal);
         Assert.Contains("/Applications/${APPLICATION_NAME}.app", script, StringComparison.Ordinal);
         Assert.Contains("pkgutil --forget", script, StringComparison.Ordinal);
         Assert.Contains("for package_type in \"${PACKAGE_TYPES[@]}\"", script, StringComparison.Ordinal);
@@ -301,6 +303,8 @@ public class InstallScriptTests
         Assert.Contains("$ApplicationName = 'Sam''ple App'", script, StringComparison.Ordinal);
         Assert.Contains("$ApplicationSlug = 'sam-ple-app'", script, StringComparison.Ordinal);
         Assert.Contains("$ExecutableName = 'sample-app.exe'", script, StringComparison.Ordinal);
+        Assert.Contains("$SingleFileName = 'Sam''ple App.exe'", script, StringComparison.Ordinal);
+        Assert.Contains("Join-Path $destination $SingleFileName", script, StringComparison.Ordinal);
         Assert.EndsWith("\r\n", script, StringComparison.Ordinal);
     }
 

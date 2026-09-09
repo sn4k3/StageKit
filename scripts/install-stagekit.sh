@@ -7,6 +7,7 @@ APPLICATION_SLUG='stagekit'
 EXECUTABLE_NAME='StageKit.Demo'
 PACKAGE_TYPES=(
   'linux-deb'
+  'linux-rpm'
   'linux-arch'
   'linux-appimage'
   'linux-flatpak'
@@ -14,6 +15,7 @@ PACKAGE_TYPES=(
   'macos-app-bundle'
   'macos-pkg'
   'macos-dmg'
+  'dotnet-single-file'
   'portable'
 )
 
@@ -118,7 +120,7 @@ detect_linux_native_package() {
 
   case "$distribution_ids" in
     *debian*|*ubuntu*) printf 'linux-deb\n'; return ;;
-    *fedora*|*rhel*|*centos*|*suse*) printf 'linux-rpm\n'; return ;;
+    *almalinux*|*fedora*|*rhel*|*centos*|*suse*) printf 'linux-rpm\n'; return ;;
     *arch*|*manjaro*) printf 'linux-arch\n'; return ;;
   esac
 
@@ -381,12 +383,12 @@ install_portable() {
 
 install_single_file() {
   mkdir -p "$HOME/.local/bin"
-  install -m 0755 "$ASSET_FILE" "$HOME/.local/bin/$EXECUTABLE_NAME"
+  install -m 0755 "$ASSET_FILE" "$HOME/.local/bin/${APPLICATION_NAME}.bin"
 }
 
 install_appimage() {
   mkdir -p "$HOME/Applications"
-  install -m 0755 "$ASSET_FILE" "$HOME/Applications/${APPLICATION_SLUG}.AppImage"
+  install -m 0755 "$ASSET_FILE" "$HOME/Applications/${APPLICATION_NAME}.AppImage"
 }
 
 install_flatpak() {

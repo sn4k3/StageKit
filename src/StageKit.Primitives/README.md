@@ -309,10 +309,10 @@ await HostSystem.BeepAsync(440, 500, cancellationToken);  // completes when the 
 ```
 
 Both clamp the frequency to 37 - 20000 Hz and raise durations below 40 ms, because `Console.Beep` rejects values outside
-that range. Windows uses `Console.Beep`, Linux prefers ALSA's `speaker-test`, and macOS falls back to the fixed-tone
-system alert sound, so `frequency` is ignored there. A beep is best-effort and never throws: hosts without a console,
-audio device, or tone utility return `false`. `BeepAsync(...)` observes cancellation only before the tone starts, since
-neither backend can be interrupted.
+that range. Windows uses `Console.Beep`, Linux runs ALSA's `speaker-test` for the requested duration, and macOS plays
+the fixed-tone Glass system sound through `afplay`, so `frequency` is ignored there. A beep is best-effort and never
+throws: hosts without a console, audio device, or tone utility return `false`. `BeepAsync(...)` observes cancellation
+only before the tone starts, since neither backend can be interrupted.
 
 Use `UnixSystem.SetUnix755Executable(...)` to grant owner write/execute and group/other execute permissions to a Unix
 launcher. The method is a no-op on Windows.

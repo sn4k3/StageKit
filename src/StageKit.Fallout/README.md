@@ -149,9 +149,9 @@ Declared with Fallout's `[Parameter]` attribute, so each can be supplied on the 
 | `PublishMultiArch`          | `false`                                                     | Create one macOS app bundle containing both x64 and arm64 executables. Requires both macOS RIDs. |
 | `DeletePublishDirectories`  | `false`                                                     | Delete raw publish directories after publishing.                                                 |
 | `UseSingleFileForInstaller` | `false`                                                     | Use the single-file executable as the Windows installer payload.                                 |
-| ReadyToRun                | alse                                                        | Publish ReadyToRun (R2R) compiled applications.                                                  |
-| PublishTrimmed            | alse                                                        | Publish trimmed applications.                                                                    |
-| AppImageCompression       | null                                                        | Squashfs compression passed to appimagetool. Use 'default' for appimagetool default.            |
+| ReadyToRun                  | alse                                                        | Publish ReadyToRun (R2R) compiled applications.                                                  |
+| PublishTrimmed              | alse                                                        | Publish trimmed applications.                                                                    |
+| AppImageCompression         | null                                                        | Squashfs compression passed to appimagetool. Use 'default' for appimagetool default.             |
 
 ## Software metadata
 
@@ -284,6 +284,10 @@ archive, followed by PKG and DMG. Incompatible formats are skipped and the next 
 asset must contain Fallout's runtime identifier (`linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64`, or
 `osx-multiarch`) and use the standard extension for its packaging type. This is automatic with the default `AssetName`
 callback.
+
+Standalone assets retain the case of `SoftwareName` when installed: AppImages use
+`~/Applications/<software-name>.AppImage`, Linux .NET single-file executables use
+`~/.local/bin/<software-name>.bin`, and Windows .NET single-file executables use `<software-name>.exe`.
 
 Windows PowerShell first tries a Windows installer (`.msi`, then `.exe`), followed by the .NET single-file executable
 and finally the Portable zip. Single-file and Portable packages install under `%LOCALAPPDATA%\Programs\<package>` and

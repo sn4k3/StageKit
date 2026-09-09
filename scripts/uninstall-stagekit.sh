@@ -90,11 +90,17 @@ uninstall_portable() {
 }
 
 uninstall_single_file() {
-  remove_path "$HOME/.local/bin/$EXECUTABLE_NAME" '.NET single-file installation'
+  remove_path "$HOME/.local/bin/${APPLICATION_NAME}.bin" '.NET single-file installation'
+  if [ "$EXECUTABLE_NAME" != "${APPLICATION_NAME}.bin" ]; then
+    remove_path "$HOME/.local/bin/$EXECUTABLE_NAME" 'legacy .NET single-file installation'
+  fi
 }
 
 uninstall_appimage() {
-  remove_path "$HOME/Applications/${APPLICATION_SLUG}.AppImage" 'AppImage installation'
+  remove_path "$HOME/Applications/${APPLICATION_NAME}.AppImage" 'AppImage installation'
+  if [ "$APPLICATION_SLUG" != "$APPLICATION_NAME" ]; then
+    remove_path "$HOME/Applications/${APPLICATION_SLUG}.AppImage" 'legacy AppImage installation'
+  fi
 }
 
 uninstall_flatpak() {

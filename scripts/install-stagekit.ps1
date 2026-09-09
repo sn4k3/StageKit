@@ -26,9 +26,11 @@ $Repository = 'sn4k3/StageKit'
 $ApplicationName = 'StageKit'
 $ApplicationSlug = 'stagekit'
 $ExecutableName = 'StageKit.Demo.exe'
+$SingleFileName = 'StageKit.exe'
 $WinGetPackageId = ''
 $PackageTypes = @(
     'windows-installer'
+    'dotnet-single-file'
     'portable'
 )
 $ScriptName = if ([string]::IsNullOrWhiteSpace($MyInvocation.MyCommand.Name)) {
@@ -406,7 +408,7 @@ function Add-ToUserPath([string] $Directory) {
 function Install-SingleFile([string] $Path) {
     $destination = Join-Path $env:LOCALAPPDATA "Programs\$ApplicationSlug"
     New-Item -ItemType Directory -Path $destination -Force | Out-Null
-    Copy-Item -LiteralPath $Path -Destination (Join-Path $destination $ExecutableName) -Force
+    Copy-Item -LiteralPath $Path -Destination (Join-Path $destination $SingleFileName) -Force
     Add-ToUserPath $destination
 }
 

@@ -240,7 +240,7 @@
                             <StackPanel Spacing="10">
                                 <TextBlock Classes="section-title" Text="Host beep" />
                                 <TextBlock Classes="muted" TextWrapping="Wrap"
-                                           Text="Play a tone with HostSystem.BeepAsync. Windows uses Console.Beep, Linux prefers ALSA speaker-test, and macOS falls back to the fixed-tone system alert sound, so frequency is ignored there." />
+                                           Text="Play a tone with HostSystem.BeepAsync. Windows uses Console.Beep, Linux uses ALSA speaker-test, and macOS plays the fixed-tone Glass system sound, so frequency is ignored there." />
                                 <Grid ColumnDefinitions="Auto,160,Auto,160,*" ColumnSpacing="10">
                                     <TextBlock VerticalAlignment="Center" Classes="muted" Text="Frequency (Hz)" />
                                     <NumericUpDown x:Name="BeepFrequencyUpDown"

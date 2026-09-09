@@ -134,17 +134,23 @@ public static partial class HostSystem
     /// <param name="duration">The duration of the tone in milliseconds.</param>
     /// <returns>The shell command.</returns>
     /// <remarks>
-    /// Prefers ALSA's <c>speaker-test</c> (Linux), then <c>osascript</c> (macOS), and finally the terminal bell.
+    /// Prefers a macOS system sound through <c>afplay</c>, then ALSA's <c>speaker-test</c> on Linux, and finally the
+    /// terminal bell.
     /// </remarks>
     internal static string CreateBeepShellCommand(int frequency, int duration)
     {
         var seconds = Math.Round(duration / 1000.0, 3, MidpointRounding.AwayFromZero)
             .ToString(CultureInfo.InvariantCulture);
 
-        return $"if command -v speaker-test > /dev/null 2>&1; then " +
-               $"speaker-test -t sine -f {frequency.ToString(CultureInfo.InvariantCulture)} -l 1 > /dev/null 2>&1 & " +
-               $"sleep {seconds} && kill $! > /dev/null 2>&1; " +
-               "elif command -v osascript > /dev/null 2>&1; then osascript -e beep > /dev/null 2>&1; " +
+        return $"if [ \"$(uname -s)\" = 'Darwin' ] && [ -x /usr/bin/afplay ] && " +
+               "[ -r /System/Library/Sounds/Glass.aiff ]; then " +
+               $"/usr/bin/afplay -t {seconds} /System/Library/Sounds/Glass.aiff > /dev/null 2>&1; " +
+               "elif command -v speaker-test > /dev/null 2>&1; then " +
+               $"speaker-test -t sine -f {frequency.ToString(CultureInfo.InvariantCulture)} -l 0 " +
+               "> /dev/null 2>&1 & speaker_test_pid=$!; " +
+               $"sleep {seconds}; " +
+               "if kill -KILL \"$speaker_test_pid\" > /dev/null 2>&1; then " +
+               "wait \"$speaker_test_pid\" 2>/dev/null || true; else wait \"$speaker_test_pid\"; fi; " +
                "else printf '\\a'; fi";
     }
 

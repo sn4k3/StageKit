@@ -147,7 +147,11 @@ public sealed class PrimitivesTests
         // The probe must be unquoted, otherwise the test is a non-empty literal and always succeeds.
         Assert.Contains("if command -v speaker-test > /dev/null 2>&1; then", command, StringComparison.Ordinal);
         Assert.DoesNotContain("'$(command -v speaker-test)'", command, StringComparison.Ordinal);
-        Assert.Contains("osascript", command, StringComparison.Ordinal);
+        Assert.Contains("/usr/bin/afplay -t 0.15 /System/Library/Sounds/Glass.aiff", command,
+            StringComparison.Ordinal);
+        Assert.Contains("speaker-test -t sine -f 800 -l 0", command, StringComparison.Ordinal);
+        Assert.Contains("kill -KILL \"$speaker_test_pid\"", command, StringComparison.Ordinal);
+        Assert.Contains("wait \"$speaker_test_pid\"", command, StringComparison.Ordinal);
         Assert.Contains("printf '\\a'", command, StringComparison.Ordinal);
     }
 
