@@ -1,4 +1,5 @@
 ﻿using System.Runtime.InteropServices;
+using Fallout.Common;
 using Fallout.Common.IO;
 using Serilog;
 using StageKit.Primitives;
@@ -709,6 +710,18 @@ public partial class StageKitBuild
     }
 
     /// <summary>
+    /// Gets the squashfs compression passed to appimagetool.
+    /// </summary>
+    /// <remarks>
+    /// Defaults to <c>gzip</c> for maximum compatibility. Current appimagetool builds default to <c>zstd</c>, which
+    /// the embedded runtime reads but older AppImage tooling does not: AppImageLauncher and any libappimage or
+    /// squashfuse built without zstd report <c>Squashfs image uses (null) compression</c> and refuse to mount the
+    /// bundle. Set to an empty value to use the appimagetool default.
+    /// </remarks>
+    [Parameter("Squashfs compression passed to appimagetool. Use an empty value for the appimagetool default.")]
+    public string? AppImageCompression { get; protected set; }
+
+    /// <summary>
     /// Composes the shell command that builds one AppImage.
     /// </summary>
     /// <param name="architecture">The target AppImage architecture.</param>
@@ -719,7 +732,12 @@ public partial class StageKitBuild
     protected virtual string CreateAppImageBuildCommand(string architecture, AbsolutePath appImageTool,
         AbsolutePath appDirPath, AbsolutePath outputPath)
     {
+        var compression = string.IsNullOrWhiteSpace(AppImageCompression)
+            ? string.Empty
+            : $"--comp {AppImageCompression.Trim().QuoteShell()} ";
+
         return $"ARCH={architecture} {appImageTool.ToString().QuoteShell()} " +
+               compression +
                $"{appDirPath.ToString().QuoteShell()} " +
                outputPath.ToString().QuoteShell();
     }

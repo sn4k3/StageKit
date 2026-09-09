@@ -1,3 +1,8 @@
+# v0.3.4 (09/09/2026)
+
+- Let APT's `_apt` user read downloaded DEB files without falling back to an unsandboxed root download, and print the
+  command that starts applications installed through native Linux packages
+
 # v0.3.3 (08/09/2026)
 
 - Add `ShellScriptFile`, a `TextWriter` that builds and executes Windows batch or Unix shell scripts with optional
