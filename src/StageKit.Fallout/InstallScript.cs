@@ -499,6 +499,8 @@ internal static class InstallScript
 
                                             install_deb() {
                                               if command_exists apt-get; then
+                                                chmod 0755 "$TEMP_DIRECTORY"
+                                                chmod 0644 "$ASSET_FILE"
                                                 run_elevated apt-get install --yes --allow-downgrades "$ASSET_FILE"
                                               else
                                                 run_elevated dpkg --install --force-downgrade "$ASSET_FILE"
@@ -638,5 +640,10 @@ internal static class InstallScript
                                             download_file "$SELECTED_ASSET_URL" "$ASSET_FILE"
                                             install_selected_package
                                             printf '%s was installed successfully.\n' "$APPLICATION_NAME"
+                                            case "$SELECTED_PACKAGE_TYPE" in
+                                              linux-deb|linux-rpm|linux-arch)
+                                                printf 'Run %s to start %s.\n' "$APPLICATION_SLUG" "$APPLICATION_NAME"
+                                                ;;
+                                            esac
                                             """;
 }

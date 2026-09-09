@@ -41,6 +41,12 @@ curl -fsSL https://raw.githubusercontent.com/sn4k3/StageKit/refs/heads/main/scri
 The installer detects the operating system and architecture, then selects the best compatible package from the GitHub
 release. Its options also support version listing, release changelogs, and portable installation.
 
+After a native Linux package installation, start StageKit with:
+
+```bash
+stagekit
+```
+
 Uninstall every detected StageKit installation:
 
 ```bash

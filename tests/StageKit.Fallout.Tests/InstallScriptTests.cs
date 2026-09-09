@@ -84,6 +84,8 @@ public class InstallScriptTests
         Assert.Contains("print(f\"\\n# {version}\\n\\n{body}\")", script, StringComparison.Ordinal);
         Assert.Contains("/releases?per_page=100", script, StringComparison.Ordinal);
         Assert.Contains("--allow-downgrades", script, StringComparison.Ordinal);
+        Assert.Contains("chmod 0755 \"$TEMP_DIRECTORY\"", script, StringComparison.Ordinal);
+        Assert.Contains("chmod 0644 \"$ASSET_FILE\"", script, StringComparison.Ordinal);
         Assert.Contains("--force-downgrade", script, StringComparison.Ordinal);
         Assert.Contains("--oldpackage", script, StringComparison.Ordinal);
         Assert.Contains("ID_LIKE", script, StringComparison.Ordinal);
@@ -91,6 +93,8 @@ public class InstallScriptTests
         Assert.Contains("help|-h|--help|/help|'/?'", script, StringComparison.Ordinal);
         Assert.Contains("gsub(/\"/, \"\", $2)", script, StringComparison.Ordinal);
         Assert.DoesNotContain("gsub(/\\\"/", script, StringComparison.Ordinal);
+        Assert.Contains("printf 'Run %s to start %s.\\n' \"$APPLICATION_SLUG\" \"$APPLICATION_NAME\"", script,
+            StringComparison.Ordinal);
     }
 
     /// <summary>
