@@ -18,6 +18,41 @@ The repository also includes smaller packages for reusable building blocks:
 [`StageKit.Fallout`](src/StageKit.Fallout/README.md) is the build-time pipeline library that publishes and bundles the
 applications those packages ship in.
 
+## Installation
+
+Install the latest StageKit release for the current Linux or macOS platform:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sn4k3/StageKit/refs/heads/main/scripts/install-stagekit.sh | bash
+```
+
+Install a specific release:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sn4k3/StageKit/refs/heads/main/scripts/install-stagekit.sh | bash -s -- --version 0.3.3
+```
+
+Show all installer options:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sn4k3/StageKit/refs/heads/main/scripts/install-stagekit.sh | bash -s -- --help
+```
+
+The installer detects the operating system and architecture, then selects the best compatible package from the GitHub
+release. Its options also support version listing, release changelogs, and portable installation.
+
+Uninstall every detected StageKit installation:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sn4k3/StageKit/refs/heads/main/scripts/uninstall-stagekit.sh | bash
+```
+
+If StageKit was extracted with `--portable PATH`, pass the same parent path to remove it:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sn4k3/StageKit/refs/heads/main/scripts/uninstall-stagekit.sh | bash -s -- --portable "$HOME/Applications"
+```
+
 ## Features
 
 - Singleton JSON settings files with lazy load, manual save, AutoSave, and debounced save support
@@ -58,7 +93,7 @@ The repository keeps publishable libraries, tests, demos, and build tooling in s
 `StageKit.slnx` remains at the repository root and references projects from these folders. Generated output belongs in
 ignored directories such as `artifacts/` and `TestResults/`.
 
-## Install
+## NuGet packages
 
 ```bash
 dotnet add package StageKit
