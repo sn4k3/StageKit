@@ -1,5 +1,7 @@
 # v0.3.4 (09/09/2026)
 
+- Replace existing same-version Windows installations when installing a rebuilt MSI instead of registering another
+  product.
 - Allow custom Windows installer welcome artwork and header logos, including the installation-options page.
 - Add Windows installer checkboxes for Start menu and Desktop shortcuts (enabled by default) and starting the app after
   installation (disabled by default).

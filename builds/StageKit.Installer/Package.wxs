@@ -7,7 +7,9 @@
              Language="1033"
              Scope="perMachine"
              Compressed="yes">
-        <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed."/>
+        <!-- Rebuilt MSIs have new product codes; replace existing same-version installations. -->
+        <MajorUpgrade AllowSameVersionUpgrades="yes"
+                      DowngradeErrorMessage="A newer version of [ProductName] is already installed."/>
         <MediaTemplate EmbedCab="yes"/>
         <Property Id="CREATESTARTMENUSHORTCUT" Value="1" Secure="yes"/>
         <Property Id="CREATEDESKTOPSHORTCUT" Value="1" Secure="yes"/>
@@ -66,7 +68,7 @@
                      Value="InstallOptionsDlg" Order="2" Condition="NOT Installed"/>
             <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApplication"
                      Order="1" Condition="STARTAFTERINSTALL = 1 AND NOT Installed AND NOT WIX_UPGRADE_DETECTED"/>
-            <Dialog Id="InstallOptionsDlg" Width="370" Height="270" Title="[ProductName] Setup">
+            <Dialog Id="InstallOptionsDlg" Width="370" Height="270" Title="[ProductName] v[ProductVersion] Setup">
                 <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44"
                          TabSkip="yes" Text="!(loc.InstallDirDlgBannerBitmap)"/>
                 <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0"/>

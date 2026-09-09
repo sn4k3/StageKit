@@ -4,6 +4,10 @@
         <TargetFrameworks></TargetFrameworks>
         <OutputType>Package</OutputType>
         <AcceptEula>wix7</AcceptEula>
+        <!-- Same-version replacement is intentional (MajorUpgrade.AllowSameVersionUpgrades). -->
+        <SuppressIces>$(SuppressIces);ICE61</SuppressIces>
+        <!-- Keep the MSI in the output root while resolving English UI strings. -->
+        <Cultures>neutral,en-US</Cultures>
         <InstallerPlatform>$(Platform)</InstallerPlatform>
         <OutputName>$(ApplicationName)_$(RuntimeIdentifier)_v$(BuildVersion)</OutputName>
         <LicenseFile>$(MSBuildProjectDirectory)\Resources\License.rtf</LicenseFile>
@@ -37,7 +41,9 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Content Include="Resources\License.rtf" />
+        <Content Include="Resources\InstallerBannerImage.png"/>
+        <Content Include="Resources\InstallerDialogImage.png"/>
+        <Content Include="Resources\License.rtf"/>
     </ItemGroup>
 
     <Target Name="ValidateInstallerInputs" BeforeTargets="CoreCompile">
