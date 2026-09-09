@@ -40,6 +40,14 @@ public class PublishPipelineTests
         Assert.NotNull(frameworkDependent.GetCustomAttribute<ParameterAttribute>());
         Assert.NotNull(buildType.GetProperty(nameof(StageKitBuild.DeletePublishDirectories)));
         Assert.NotNull(buildType.GetProperty(nameof(StageKitBuild.UseSingleFileForInstaller)));
+        var readyToRun = buildType.GetProperty(nameof(StageKitBuild.PublishReadyToRun));
+        Assert.NotNull(readyToRun);
+        Assert.NotNull(readyToRun.GetCustomAttribute<ParameterAttribute>());
+        var publishTrimmed = buildType.GetProperty(nameof(StageKitBuild.PublishTrimmed));
+        Assert.NotNull(publishTrimmed);
+        Assert.NotNull(publishTrimmed.GetCustomAttribute<ParameterAttribute>());
+        Assert.NotNull(buildType.GetProperty(nameof(StageKitBuild.PublishTrimmed)));
+        Assert.NotNull(buildType.GetProperty(nameof(StageKitBuild.PublishReadyToRun)));
         Assert.Null(buildType.GetProperty("PublishBundles"));
         Assert.Null(buildType.GetProperty("PublishNoBundles"));
         Assert.Null(buildType.GetProperty("PublishDiscardNonBundles"));
@@ -302,10 +310,10 @@ public class PublishPipelineTests
     }
 
     /// <summary>
-    /// Verifies that a single-file publish does not leave an external runtime manifest.
+    /// Verifies that preparing a published output writes an external runtime manifest even when single-file packaging is enabled.
     /// </summary>
     [Fact]
-    public void PreparePublishedOutput_SingleFilePublish_DoesNotWriteExternalRuntimeManifest()
+    public void PreparePublishedOutput_SingleFilePublish_WritesExternalRuntimeManifest()
     {
         var publishDirectory = Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}");
         Directory.CreateDirectory(publishDirectory);
@@ -322,7 +330,7 @@ public class PublishPipelineTests
 
             build.InvokePreparePublishedOutput(context);
 
-            Assert.False(File.Exists(Path.Combine(publishDirectory, "runtime.json")));
+            Assert.True(File.Exists(Path.Combine(publishDirectory, "runtime.json")));
         }
         finally
         {
@@ -334,7 +342,41 @@ public class PublishPipelineTests
     /// Verifies that single-file publish settings preserve the configured project, RID, output, and required flags.
     /// </summary>
     [Fact]
-    public void CreatePublishSettings_SingleFileSelection_UsesProjectRuntimeOutputAndRequiredFlags()
+    public void CreateSingleFilePublishSettings_SingleFileSelection_UsesProjectRuntimeOutputAndRequiredFlags()
+    {
+        var build = new TestBuild
+        {
+            UseDefaultSettings = true,
+            TestMainProject = CreateProject("Example.csproj")
+        };
+        build.SetPackagingTypes(ApplicationPackagingType.DotNetSingleFile);
+        var context = CreateContext(build);
+        var outputPath = (AbsolutePath)Path.Combine(Path.GetTempPath(), $"sf-{Guid.NewGuid():N}");
+
+        var settings = build.InvokeCreateSingleFilePublishSettings(context, outputPath);
+
+        Assert.Equal(build.TestMainProject.Path, settings.Project);
+        Assert.Equal("Release", settings.Configuration);
+        Assert.Equal("linux-x64", settings.Runtime);
+        Assert.Equal(outputPath, settings.Output);
+        Assert.True(settings.SelfContained);
+        Assert.True(settings.NoRestore);
+        Assert.False(Assert.IsType<JsonElement>(settings.Properties["PublishReadyToRun"]).GetBoolean());
+        Assert.False(Assert.IsType<JsonElement>(settings.Properties["PublishTrimmed"]).GetBoolean());
+        Assert.True(Assert.IsType<JsonElement>(settings.Properties["PublishSingleFile"]).GetBoolean());
+        Assert.Equal("embedded", Assert.IsType<JsonElement>(settings.Properties["DebugType"]).GetString());
+        Assert.False(Assert.IsType<JsonElement>(settings.Properties["PublishDocumentationFiles"]).GetBoolean());
+        Assert.True(
+            Assert.IsType<JsonElement>(settings.Properties["IncludeAllContentForSelfExtract"]).GetBoolean());
+        Assert.True(
+            Assert.IsType<JsonElement>(settings.Properties["IncludeNativeLibrariesForSelfExtract"]).GetBoolean());
+    }
+
+    /// <summary>
+    /// Verifies that primary publish settings disable single-file publishing when single-file output is selected.
+    /// </summary>
+    [Fact]
+    public void CreatePublishSettings_SingleFileSelection_DisablesPublishSingleFile()
     {
         var build = new TestBuild
         {
@@ -346,20 +388,7 @@ public class PublishPipelineTests
 
         var settings = build.InvokeCreatePublishSettings(context);
 
-        Assert.Equal(build.TestMainProject.Path, settings.Project);
-        Assert.Equal("Release", settings.Configuration);
-        Assert.Equal("linux-x64", settings.Runtime);
-        Assert.Equal(context.PublishPath, settings.Output);
-        Assert.True(settings.SelfContained);
-        Assert.True(settings.NoRestore);
-        Assert.True(Assert.IsType<JsonElement>(settings.Properties["PublishReadyToRun"]).GetBoolean());
-        Assert.True(Assert.IsType<JsonElement>(settings.Properties["PublishSingleFile"]).GetBoolean());
-        Assert.Equal("embedded", Assert.IsType<JsonElement>(settings.Properties["DebugType"]).GetString());
-        Assert.False(Assert.IsType<JsonElement>(settings.Properties["PublishDocumentationFiles"]).GetBoolean());
-        Assert.True(
-            Assert.IsType<JsonElement>(settings.Properties["IncludeAllContentForSelfExtract"]).GetBoolean());
-        Assert.True(
-            Assert.IsType<JsonElement>(settings.Properties["IncludeNativeLibrariesForSelfExtract"]).GetBoolean());
+        Assert.False(Assert.IsType<JsonElement>(settings.Properties["PublishSingleFile"]).GetBoolean());
     }
 
     /// <summary>
@@ -380,6 +409,89 @@ public class PublishPipelineTests
         var settings = build.InvokeCreatePublishSettings(context);
 
         Assert.False(settings.SelfContained);
+        Assert.False(Assert.IsType<JsonElement>(settings.Properties["PublishReadyToRun"]).GetBoolean());
+        Assert.False(Assert.IsType<JsonElement>(settings.Properties["PublishTrimmed"]).GetBoolean());
+    }
+
+    /// <summary>
+    /// Verifies that enabling PublishTrimmed sets PublishTrimmed in publish settings.
+    /// </summary>
+    [Fact]
+    public void CreatePublishSettings_PublishTrimmedEnabled_EnablesPublishTrimmed()
+    {
+        var build = new TestBuild
+        {
+            UseDefaultSettings = true,
+            TestMainProject = CreateProject("Example.csproj")
+        };
+        Assert.False(build.PublishTrimmed);
+        build.SetPublishTrimmed(true);
+        var context = CreateContext(build);
+
+        var settings = build.InvokeCreatePublishSettings(context);
+
+        Assert.True(Assert.IsType<JsonElement>(settings.Properties["PublishTrimmed"]).GetBoolean());
+    }
+
+    /// <summary>
+    /// Verifies that enabling PublishTrimmed sets PublishTrimmed in single-file publish settings.
+    /// </summary>
+    [Fact]
+    public void CreateSingleFilePublishSettings_PublishTrimmedEnabled_EnablesPublishTrimmed()
+    {
+        var build = new TestBuild
+        {
+            UseDefaultSettings = true,
+            TestMainProject = CreateProject("Example.csproj")
+        };
+        build.SetPackagingTypes(ApplicationPackagingType.DotNetSingleFile);
+        build.SetPublishTrimmed(true);
+        var context = CreateContext(build);
+        var outputPath = (AbsolutePath)Path.Combine(Path.GetTempPath(), $"sf-{Guid.NewGuid():N}");
+
+        var settings = build.InvokeCreateSingleFilePublishSettings(context, outputPath);
+
+        Assert.True(Assert.IsType<JsonElement>(settings.Properties["PublishTrimmed"]).GetBoolean());
+    }
+
+    /// <summary>
+    /// Verifies that enabling ReadyToRun sets PublishReadyToRun in publish settings.
+    /// </summary>
+    [Fact]
+    public void CreatePublishSettings_ReadyToRunEnabled_EnablesPublishReadyToRun()
+    {
+        var build = new TestBuild
+        {
+            UseDefaultSettings = true,
+            TestMainProject = CreateProject("Example.csproj")
+        };
+        Assert.False(build.PublishReadyToRun);
+        build.SetReadyToRun(true);
+        var context = CreateContext(build);
+
+        var settings = build.InvokeCreatePublishSettings(context);
+
+        Assert.True(Assert.IsType<JsonElement>(settings.Properties["PublishReadyToRun"]).GetBoolean());
+    }
+
+    /// <summary>
+    /// Verifies that enabling ReadyToRun sets PublishReadyToRun in single-file publish settings.
+    /// </summary>
+    [Fact]
+    public void CreateSingleFilePublishSettings_ReadyToRunEnabled_EnablesPublishReadyToRun()
+    {
+        var build = new TestBuild
+        {
+            UseDefaultSettings = true,
+            TestMainProject = CreateProject("Example.csproj")
+        };
+        build.SetPackagingTypes(ApplicationPackagingType.DotNetSingleFile);
+        build.SetReadyToRun(true);
+        var context = CreateContext(build);
+        var outputPath = (AbsolutePath)Path.Combine(Path.GetTempPath(), $"sf-{Guid.NewGuid():N}");
+
+        var settings = build.InvokeCreateSingleFilePublishSettings(context, outputPath);
+
         Assert.True(Assert.IsType<JsonElement>(settings.Properties["PublishReadyToRun"]).GetBoolean());
     }
 
@@ -398,7 +510,7 @@ public class PublishPipelineTests
         build.SetPackagingTypes(ApplicationPackagingType.DotNetSingleFile);
         var context = CreateContext(build, "win-x64");
 
-        build.InvokePublishRuntime(context);
+        build.InvokeCopySingleFileExecutable(context);
 
         using var manifest = JsonDocument.Parse(build.CapturedRuntimeManifest);
         Assert.Equal("win-x64", manifest.RootElement.GetProperty("Runtime").GetString());
@@ -1028,11 +1140,10 @@ public class PublishPipelineTests
 
             build.InvokeCreateBundles([CreateContext(build, "win-x64", publishPath)]);
 
-            Assert.Equal(["publish", "zip:win-x64"], build.Calls);
+            Assert.Equal(["zip:win-x64"], build.Calls);
             Assert.Equal([publishPath], build.BundleOutputPaths);
             var payloadPath = Assert.Single(build.PortableZipPayloadPaths);
-            Assert.NotEqual(Path.GetFullPath(publishPath), Path.GetFullPath(payloadPath));
-            Assert.False(Directory.Exists(payloadPath));
+            Assert.Equal(Path.GetFullPath(publishPath), Path.GetFullPath(payloadPath));
         }
         finally
         {
@@ -3613,6 +3724,17 @@ public class PublishPipelineTests
             return CreatePublishSettings(context);
         }
 
+        internal DotNetPublishSettings InvokeCreateSingleFilePublishSettings(PublishRidContext context,
+            AbsolutePath outputPath)
+        {
+            return CreateSingleFilePublishSettings(context, outputPath);
+        }
+
+        internal void InvokeCopySingleFileExecutable(PublishRidContext context)
+        {
+            CopySingleFileExecutable(context);
+        }
+
         internal DotNetPublishSettings InvokeCreateInstallerPublishSettings(PublishRidContext context,
             AbsolutePath outputPath)
         {
@@ -3760,6 +3882,16 @@ public class PublishPipelineTests
         internal void SetFrameworkDependent(bool frameworkDependent)
         {
             FrameworkDependent = frameworkDependent;
+        }
+
+        internal void SetReadyToRun(bool readyToRun)
+        {
+            PublishReadyToRun = readyToRun;
+        }
+
+        internal void SetPublishTrimmed(bool publishTrimmed)
+        {
+            PublishTrimmed = publishTrimmed;
         }
 
         internal void SetPublishCleanupExtensions(params string[] extensions)
@@ -4145,6 +4277,23 @@ public class PublishPipelineTests
                 manifest.RootElement.GetProperty("PackagingType").GetString());
         }
 
+        protected override void CopySingleFileExecutable(PublishRidContext context)
+        {
+            if (UseTargetPipeline)
+            {
+                if (!PackagingTypes.Contains(ApplicationPackagingType.DotNetSingleFile))
+                    return;
+
+                var runtime = PublishRid.ParseRuntimeIdentifier(context.RuntimeIdentifier);
+                var extension = runtime.Family is PublishRidFamily.Windows ? ".exe" : ".bin";
+                var assetPath = (AbsolutePath)$"{context.BundleOutputPath}{extension}";
+                File.WriteAllText(assetPath, context.RuntimeIdentifier);
+                return;
+            }
+
+            base.CopySingleFileExecutable(context);
+        }
+
         protected override void ExecuteDotNetPublish(DotNetPublishSettings settings)
         {
             if (CaptureSingleFileInputs)
@@ -4155,6 +4304,16 @@ public class PublishPipelineTests
                     Assert.IsType<JsonElement>(settings.Properties["CustomAfterMicrosoftCommonTargets"]).GetString()!;
                 CapturedRuntimeManifest = File.ReadAllText(CapturedRuntimeManifestPath);
                 CapturedSingleFileTargets = File.ReadAllText(CapturedSingleFileTargetsPath);
+
+                if (settings.Output is not null)
+                {
+                    var runtime = settings.Runtime ?? "win-x64";
+                    var parsed = PublishRid.ParseRuntimeIdentifier(runtime);
+                    var executableName = parsed.Family is PublishRidFamily.Windows
+                        ? $"{SoftwareExecutableFileNameWithoutExtension}.exe"
+                        : SoftwareExecutableFileNameWithoutExtension;
+                    File.WriteAllText(Path.Combine(settings.Output, executableName), "executable");
+                }
             }
 
             Calls.Add("publish");

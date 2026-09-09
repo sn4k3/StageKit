@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using Fallout.Common;
 using Fallout.Common.IO;
 using Serilog;
@@ -718,7 +718,7 @@ public partial class StageKitBuild
     /// squashfuse built without zstd report <c>Squashfs image uses (null) compression</c> and refuse to mount the
     /// bundle. Set to an empty value to use the appimagetool default.
     /// </remarks>
-    [Parameter("Squashfs compression passed to appimagetool. Use an empty value for the appimagetool default.")]
+    [Parameter("Squashfs compression passed to appimagetool. Use 'default' or an empty value for the appimagetool default.")]
     public string? AppImageCompression { get; protected set; }
 
     /// <summary>
@@ -732,7 +732,8 @@ public partial class StageKitBuild
     protected virtual string CreateAppImageBuildCommand(string architecture, AbsolutePath appImageTool,
         AbsolutePath appDirPath, AbsolutePath outputPath)
     {
-        var compression = string.IsNullOrWhiteSpace(AppImageCompression)
+        var compression = string.IsNullOrWhiteSpace(AppImageCompression) ||
+                          AppImageCompression.Equals("default", StringComparison.OrdinalIgnoreCase)
             ? string.Empty
             : $"--comp {AppImageCompression.Trim().QuoteShell()} ";
 

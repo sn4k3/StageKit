@@ -1,4 +1,4 @@
-﻿using Fallout.Common;
+using Fallout.Common;
 using Fallout.Common.IO;
 using Fallout.Common.Tools.DotNet;
 using Fallout.Solutions;
@@ -42,6 +42,18 @@ public partial class StageKitBuild
     /// </summary>
     [Parameter("Publish framework-dependent applications instead of self-contained applications. Defaults to false.")]
     public bool FrameworkDependent { get; protected set; }
+
+    /// <summary>
+    /// Gets a value indicating whether applications are published with ReadyToRun (R2R) ahead-of-time compilation.
+    /// </summary>
+    [Parameter("Publish ReadyToRun (R2R) compiled applications. Defaults to false.")]
+    public bool PublishReadyToRun { get; protected set; }
+
+    /// <summary>
+    /// Gets a value indicating whether applications are published with trimming enabled.
+    /// </summary>
+    [Parameter("Publish trimmed applications. Defaults to false.")]
+    public bool PublishTrimmed { get; protected set; }
 
     /// <summary>
     /// Gets the file extensions removed directly from the publication directory after successful publishing.
@@ -143,28 +155,17 @@ public partial class StageKitBuild
     /// <returns>The configured publish settings.</returns>
     protected virtual DotNetPublishSettings CreatePublishSettings(PublishRidContext context)
     {
-        var settings = new DotNetPublishSettings()
+        return new DotNetPublishSettings()
             .SetProject(MainProject.Path)
             .SetConfiguration(Configuration)
             .SetRuntime(context.RuntimeIdentifier)
             .SetOutput(context.PublishPath)
             .SetSelfContained(!FrameworkDependent)
-            .EnablePublishReadyToRun()
-            .SetPublishSingleFile(HasPackagingType(ApplicationPackagingType.DotNetSingleFile))
+            .SetPublishReadyToRun(PublishReadyToRun)
+            .SetPublishTrimmed(PublishTrimmed)
+            .SetPublishSingleFile(false)
             .EnableNoRestore();
-
-        if (HasPackagingType(ApplicationPackagingType.DotNetSingleFile))
-        {
-            settings = settings
-                .SetProperty("DebugType", "embedded")
-                .SetProperty("PublishDocumentationFiles", false)
-                .SetProperty("IncludeAllContentForSelfExtract", true)
-                .SetProperty("IncludeNativeLibrariesForSelfExtract", true);
-        }
-
-        return settings;
     }
-
 
     /// <summary>
     /// Executes a .NET publish command.
@@ -185,7 +186,8 @@ public partial class StageKitBuild
         DotNetRestore(settings => settings
             .SetProjectFile(MainProject)
             .SetRuntime(runtimeIdentifier)
-            .EnablePublishReadyToRun());
+            .SetPublishReadyToRun(PublishReadyToRun)
+            .SetPublishTrimmed(PublishTrimmed));
     }
 
     /// <summary>
@@ -205,11 +207,8 @@ public partial class StageKitBuild
             UnixSystem.SetUnix755Executable(executablePath);
         }
 
-        if (!HasPackagingType(ApplicationPackagingType.DotNetSingleFile))
-        {
-            PublishUtilities.WriteRuntimeManifest(context.PublishPath, BuildRuntimeManifestFileName,
-                new BuildRuntime(context.RuntimeIdentifier, SoftwareVersion, false, ApplicationPackagingType.Portable));
-        }
+        PublishUtilities.WriteRuntimeManifest(context.PublishPath, BuildRuntimeManifestFileName,
+            new BuildRuntime(context.RuntimeIdentifier, SoftwareVersion, false, ApplicationPackagingType.Portable));
     }
 
     /// <summary>
@@ -223,33 +222,17 @@ public partial class StageKitBuild
     {
         BeforePublishRid?.Invoke(context);
 
-        SingleFilePublishInputs? singleFileInputs = null;
-        try
-        {
-            var settings = CreatePublishSettings(context);
-            if (HasPackagingType(ApplicationPackagingType.DotNetSingleFile))
-            {
-                singleFileInputs = CreateSingleFilePublishInputs(context);
-                settings = settings
-                    .SetProperty("FalloutBuildRuntimeManifest", singleFileInputs.ManifestPath)
-                    .SetProperty("FalloutBuildRuntimeManifestFileName", BuildRuntimeManifestFileName)
-                    .SetProperty("CustomAfterMicrosoftCommonTargets", singleFileInputs.TargetsPath);
-            }
+        var settings = CreatePublishSettings(context);
 
-            if (ConfigurePublishRid is not null)
-            {
-                settings = ConfigurePublishRid(settings, context)
-                           ?? throw new InvalidOperationException("ConfigurePublishRid returned null.");
-            }
-
-            ExecuteDotNetPublish(settings);
-            PreparePublishedOutput(context);
-            AfterPublishRid?.Invoke(context);
-        }
-        finally
+        if (ConfigurePublishRid is not null)
         {
-            singleFileInputs?.Delete();
+            settings = ConfigurePublishRid(settings, context)
+                       ?? throw new InvalidOperationException("ConfigurePublishRid returned null.");
         }
+
+        ExecuteDotNetPublish(settings);
+        PreparePublishedOutput(context);
+        AfterPublishRid?.Invoke(context);
     }
 
     /// <summary>
@@ -474,76 +457,14 @@ public partial class StageKitBuild
     }
 
     /// <summary>
-    /// Creates normal publish outputs for bundle formats that cannot use a single-file payload.
+    /// Returns the publish contexts used for bundle packaging.
     /// </summary>
     /// <param name="contexts">The primary publish contexts.</param>
     /// <returns>Contexts pointing to normal bundle payloads where required.</returns>
     protected virtual IReadOnlyCollection<PublishRidContext> CreateBundlePayloads(
         IReadOnlyCollection<PublishRidContext> contexts)
     {
-        if (!HasPackagingType(ApplicationPackagingType.DotNetSingleFile) ||
-            !HasAnyPackagingType(
-                ApplicationPackagingType.Portable,
-                ApplicationPackagingType.MacOSAppBundle,
-                ApplicationPackagingType.LinuxAppImage,
-                ApplicationPackagingType.LinuxFlatpak,
-                ApplicationPackagingType.LinuxDeb,
-                ApplicationPackagingType.LinuxRpm,
-                ApplicationPackagingType.LinuxArchPackage,
-                ApplicationPackagingType.LinuxSnap,
-                ApplicationPackagingType.MacOSDmg,
-                ApplicationPackagingType.MacOSPkg))
-        {
-            return contexts;
-        }
-
-        var bundleContexts = new List<PublishRidContext>(contexts.Count);
-        try
-        {
-            foreach (var context in contexts)
-            {
-                var runtime = PublishRid.ParseRuntimeIdentifier(context.RuntimeIdentifier);
-                var requiresNormalPayload =
-                    HasPackagingType(ApplicationPackagingType.Portable) ||
-                    (runtime.Family is PublishRidFamily.MacOS &&
-                     HasAnyPackagingType(
-                         ApplicationPackagingType.MacOSAppBundle,
-                         ApplicationPackagingType.MacOSDmg,
-                         ApplicationPackagingType.MacOSPkg)) ||
-                    (runtime.Family is PublishRidFamily.Linux &&
-                     HasAnyPackagingType(
-                         ApplicationPackagingType.LinuxAppImage,
-                         ApplicationPackagingType.LinuxFlatpak,
-                         ApplicationPackagingType.LinuxDeb,
-                         ApplicationPackagingType.LinuxRpm,
-                         ApplicationPackagingType.LinuxArchPackage,
-                         ApplicationPackagingType.LinuxSnap));
-
-                if (!requiresNormalPayload)
-                {
-                    bundleContexts.Add(context);
-                    continue;
-                }
-
-                var outputPath = BundlePayloadDirectory / Guid.NewGuid().ToString("N");
-                outputPath.CreateOrCleanDirectory();
-                ExecuteDotNetPublish(CreateBundlePublishSettings(context, outputPath));
-                bundleContexts.Add(new PublishRidContext
-                {
-                    Build = this,
-                    RuntimeIdentifier = context.RuntimeIdentifier,
-                    PublishPath = outputPath,
-                    BundleOutputPath = context.BundleOutputPath
-                });
-            }
-
-            return bundleContexts;
-        }
-        catch
-        {
-            DeleteBundlePayloads(bundleContexts, contexts);
-            throw;
-        }
+        return contexts;
     }
 
     /// <summary>

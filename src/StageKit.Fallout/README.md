@@ -18,7 +18,7 @@ exposes ready-made targets to restore, compile, run, and publish an application 
 - Software metadata (name, company, RDNS, version, license, repository URL, tags) resolved from the main project's
   MSBuild properties
 - Ready-made `Print`, `Clean`, `Restore`, `Compile`, `Run`, `Publish`, and `GenerateInstallScript` targets
-- Self-contained + ReadyToRun publish by default, with optional framework-dependent deployment
+- Self-contained publish by default, with optional ReadyToRun and framework-dependent deployment
 - Bundle creation: portable zip, .NET single-file, WiX installer, macOS `.app`/DMG/PKG, Linux AppImage, Flatpak, Debian,
   RPM, Arch Linux, and Snap packages
 - Multi-architecture macOS bundles (`osx-x64` + `osx-arm64` in one `.app`)
@@ -149,6 +149,9 @@ Declared with Fallout's `[Parameter]` attribute, so each can be supplied on the 
 | `PublishMultiArch`          | `false`                                                     | Create one macOS app bundle containing both x64 and arm64 executables. Requires both macOS RIDs. |
 | `DeletePublishDirectories`  | `false`                                                     | Delete raw publish directories after publishing.                                                 |
 | `UseSingleFileForInstaller` | `false`                                                     | Use the single-file executable as the Windows installer payload.                                 |
+| ReadyToRun                | alse                                                        | Publish ReadyToRun (R2R) compiled applications.                                                  |
+| PublishTrimmed            | alse                                                        | Publish trimmed applications.                                                                    |
+| AppImageCompression       | null                                                        | Squashfs compression passed to appimagetool. Use 'default' for appimagetool default.            |
 
 ## Software metadata
 

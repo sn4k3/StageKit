@@ -13,27 +13,29 @@ public partial class StageKitBuild
     /// Creates the publish settings used for an installer payload.
     /// </summary>
     /// <param name="context">The runtime publish context.</param>
-    /// <param name="outputPath">The temporary normal-publish output path.</param>
-    /// <returns>Settings for a non-single-file publish.</returns>
+    /// <param name="outputPath">The temporary publish output path.</param>
+    /// <returns>Settings for the installer publish.</returns>
     protected virtual DotNetPublishSettings CreateWindowsInstallerPublishSettings(
         PublishRidContext context,
         AbsolutePath outputPath)
     {
-        return CreatePublishSettings(context)
-            .SetOutput(outputPath)
-            .SetPublishSingleFile(false)
-            .SetProperty("DebugType", "portable")
-            .SetProperty("PublishDocumentationFiles", true)
-            .SetProperty("IncludeAllContentForSelfExtract", false)
-            .SetProperty("IncludeNativeLibrariesForSelfExtract", false)
-            .DisableNoRestore();
+        return UseSingleFileForInstaller
+            ? CreateSingleFilePublishSettings(context, outputPath)
+            : CreatePublishSettings(context)
+                .SetOutput(outputPath)
+                .SetPublishSingleFile(false)
+                .SetProperty("DebugType", "portable")
+                .SetProperty("PublishDocumentationFiles", true)
+                .SetProperty("IncludeAllContentForSelfExtract", false)
+                .SetProperty("IncludeNativeLibrariesForSelfExtract", false)
+                .DisableNoRestore();
     }
 
     /// <summary>
-    /// Publishes the normal, non-single-file payload used by an installer.
+    /// Publishes the payload used by an installer when custom staging is required.
     /// </summary>
     /// <param name="context">The runtime publish context.</param>
-    /// <param name="outputPath">The temporary normal-publish output path.</param>
+    /// <param name="outputPath">The temporary publish output path.</param>
     protected virtual void PublishWindowsInstallerPayload(PublishRidContext context, AbsolutePath outputPath)
     {
         outputPath.DeleteDirectory();
@@ -71,8 +73,7 @@ public partial class StageKitBuild
         try
         {
             var installerSourcePath = context.PublishPath;
-            if (HasPackagingType(ApplicationPackagingType.DotNetSingleFile) &&
-                !UseSingleFileForInstaller)
+            if (UseSingleFileForInstaller)
             {
                 var installerPublishPath = InstallerPayloadDirectory / Guid.NewGuid().ToString("N");
                 normalPublishPath = installerPublishPath;
