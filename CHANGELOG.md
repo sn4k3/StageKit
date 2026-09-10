@@ -1,4 +1,4 @@
-# v0.3.4 (09/09/2026)
+# v0.3.4 (10/09/2026)
 
 - Add the `GenerateWindowsWixInstaller` Fallout target, which scaffolds `builds/<SoftwareName>.WixInstaller` with the
   WiX project, `Package.wxs`, `Strings.en-us.wxl`, a readme, a placeholder `License.rtf`, and generated placeholder
@@ -7,7 +7,7 @@
 - Replace existing same-version Windows installations when installing a rebuilt MSI instead of registering another
   product.
 - Allow custom Windows installer welcome artwork and header logos, including the installation-options page.
-- Add Windows installer checkboxes for Start menu and Desktop shortcuts (enabled by default) and starting the app after
+- Add Windows installer checkboxes for Start menu and Desktop shortcuts (enabled by default and restored from the registry on rerun/upgrade) and starting the app after
   installation (disabled by default).
 - Prefer RPM assets on AlmaLinux in generated installers, and retain the application-name casing for installed AppImage
   and .NET single-file names

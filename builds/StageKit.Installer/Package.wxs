@@ -14,6 +14,33 @@
         <Property Id="CREATESTARTMENUSHORTCUT" Value="1" Secure="yes"/>
         <Property Id="CREATEDESKTOPSHORTCUT" Value="1" Secure="yes"/>
 
+        <Property Id="STARTMENUSHORTCUT_REG" Secure="yes">
+            <RegistrySearch Id="SearchStartMenuShortcut"
+                            Root="HKCU"
+                            Key="Software\$(var.Company)\$(var.ApplicationName)\Installer"
+                            Name="StartMenuShortcut"
+                            Type="raw"/>
+        </Property>
+        <Property Id="DESKTOPSHORTCUT_REG" Secure="yes">
+            <RegistrySearch Id="SearchDesktopShortcut"
+                            Root="HKCU"
+                            Key="Software\$(var.Company)\$(var.ApplicationName)\Installer"
+                            Name="DesktopShortcut"
+                            Type="raw"/>
+        </Property>
+
+        <SetProperty Id="CREATESTARTMENUSHORTCUT" Value="1" After="AppSearch" Sequence="ui"
+                     Condition="STARTMENUSHORTCUT_REG = &quot;#1&quot; OR STARTMENUSHORTCUT_REG = &quot;1&quot;"/>
+        <SetProperty Id="CREATESTARTMENUSHORTCUT" Action="Set_CREATESTARTMENUSHORTCUT_Unchecked"
+                     Value="{}" After="AppSearch" Sequence="ui"
+                     Condition="STARTMENUSHORTCUT_REG = &quot;#0&quot; OR STARTMENUSHORTCUT_REG = &quot;0&quot; OR ((WIX_UPGRADE_DETECTED OR Installed) AND NOT STARTMENUSHORTCUT_REG)"/>
+
+        <SetProperty Id="CREATEDESKTOPSHORTCUT" Value="1" After="AppSearch" Sequence="ui"
+                     Condition="DESKTOPSHORTCUT_REG = &quot;#1&quot; OR DESKTOPSHORTCUT_REG = &quot;1&quot;"/>
+        <SetProperty Id="CREATEDESKTOPSHORTCUT" Action="Set_CREATEDESKTOPSHORTCUT_Unchecked"
+                     Value="{}" After="AppSearch" Sequence="ui"
+                     Condition="DESKTOPSHORTCUT_REG = &quot;#0&quot; OR DESKTOPSHORTCUT_REG = &quot;0&quot; OR ((WIX_UPGRADE_DETECTED OR Installed) AND NOT DESKTOPSHORTCUT_REG)"/>
+
         <CustomAction Id="LaunchApplication" FileRef="MainExecutable" ExeCommand=""
                       Execute="immediate" Impersonate="yes" Return="asyncNoWait"/>
 

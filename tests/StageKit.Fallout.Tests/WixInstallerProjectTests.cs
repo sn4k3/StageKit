@@ -1,4 +1,4 @@
-﻿using System.Buffers.Binary;
+using System.Buffers.Binary;
 using System.IO.Compression;
 using System.Text;
 using Fallout.Common.IO;
@@ -52,6 +52,10 @@ public sealed class WixInstallerProjectTests
             Assert.Contains("!(bindpath.Publish)", package, StringComparison.Ordinal);
             Assert.Contains("WixUI_InstallDir", package, StringComparison.Ordinal);
             Assert.Contains("InstallOptionsDlg", package, StringComparison.Ordinal);
+            Assert.Contains("SearchStartMenuShortcut", package, StringComparison.Ordinal);
+            Assert.Contains("SearchDesktopShortcut", package, StringComparison.Ordinal);
+            Assert.Contains("Set_CREATESTARTMENUSHORTCUT_Unchecked", package, StringComparison.Ordinal);
+            Assert.Contains("Set_CREATEDESKTOPSHORTCUT_Unchecked", package, StringComparison.Ordinal);
 
             Assert.StartsWith(@"{\rtf1", File.ReadAllText(Path.Combine(resourcesDirectory, "License.rtf")),
                 StringComparison.Ordinal);
