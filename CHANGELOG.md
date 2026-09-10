@@ -1,4 +1,4 @@
-# v0.3.4 (10/09/2026)
+# v0.3.5 (10/09/2026)
 
 - Add the `GenerateWindowsWixInstaller` Fallout target, which scaffolds `builds/<SoftwareName>.WixInstaller` with the
   WiX project, `Package.wxs`, `Strings.en-us.wxl`, a readme, a placeholder `License.rtf`, and generated placeholder
@@ -12,6 +12,9 @@
 - Prefer RPM assets on AlmaLinux in generated installers, and retain the application-name casing for installed AppImage
   and .NET single-file names
 - Stop Linux `speaker-test` tones at the requested duration and use macOS `afplay` for an audible system sound
+
+# v0.3.4 (09/09/2026)
+
 - Allow set AppImage squashfs compression in Fallout to customize or override compression
 - Decouple primary directory publish from `DotNetSingleFile` packaging so that directory and portable archive publish
   retains all runtime assemblies and native dependencies
