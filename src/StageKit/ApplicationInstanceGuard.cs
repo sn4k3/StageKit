@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using StageKit.Primitives;
+using StageKit.Runtime;
 
 namespace StageKit;
 
@@ -28,7 +29,8 @@ public sealed class ApplicationInstanceGuard : DisposableObject
         // Do not call ReleaseMutex: it is thread-affine and throws if disposal runs on a different thread than Acquire.
         // Disposing the handle releases ownership from any thread. If still owned, the OS marks the mutex abandoned, which
         // Acquire already treats as primary via AbandonedMutexException.
-        _primaryProcess?.Dispose();
+        if (!IsPrimary)
+            _primaryProcess?.Dispose();
         _primaryProcess = null;
         _mutex.Dispose();
     }
@@ -95,12 +97,12 @@ public sealed class ApplicationInstanceGuard : DisposableObject
 
             if (IsPrimary)
             {
-                _primaryProcess = Process.GetCurrentProcess();
+                _primaryProcess = EntryApplication.CurrentProcess;
                 return _primaryProcess;
             }
 
-            using var currentProcess = Process.GetCurrentProcess();
-            foreach (var process in Process.GetProcessesByName(currentProcess.ProcessName).OrderBy(p => p.Id))
+            foreach (var process in Process.GetProcessesByName(EntryApplication.ProcessName)
+                         .OrderBy(p => p.Id))
             {
                 if (process.Id == Environment.ProcessId)
                 {

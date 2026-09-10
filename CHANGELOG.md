@@ -1,3 +1,10 @@
+# v0.3.6 (10/09/2026)
+
+- Add the `EntryApplication.CurrentProcess` cached property to expose the current process
+- Hardens Fallout main-project detection by ignoring missing or non-boolean `FalloutMainProject` values
+- Updates host GPU reporting so `GraphicsCardName` returns all detected adapter names
+- Reshapes the Linux package-manager command helper into the newer extension-property style.
+
 # v0.3.5 (10/09/2026)
 
 - Add the `GenerateWindowsWixInstaller` Fallout target, which scaffolds `builds/<SoftwareName>.WixInstaller` with the
@@ -7,8 +14,8 @@
 - Replace existing same-version Windows installations when installing a rebuilt MSI instead of registering another
   product.
 - Allow custom Windows installer welcome artwork and header logos, including the installation-options page.
-- Add Windows installer checkboxes for Start menu and Desktop shortcuts (enabled by default and restored from the registry on rerun/upgrade) and starting the app after
-  installation (disabled by default).
+- Add Windows installer checkboxes for Start menu and Desktop shortcuts (enabled by default and restored from the
+  registry on rerun/upgrade) and starting the app after installation (disabled by default).
 - Prefer RPM assets on AlmaLinux in generated installers, and retain the application-name casing for installed AppImage
   and .NET single-file names
 - Stop Linux `speaker-test` tones at the requested duration and use macOS `afplay` for an audible system sound

@@ -141,6 +141,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void RefreshRuntime()
     {
+        var proc = EntryApplication.GetCurrentProcessRefresh();
         var graphicsCardNames = HostSystem.GraphicsCardNames;
         RuntimeValues =
         [
@@ -150,12 +151,14 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             new RuntimeValue("System manufacturer", HostSystem.SystemManufacturer ?? "Unavailable"),
             new RuntimeValue("System model", HostSystem.SystemModel ?? "Unavailable"),
             new RuntimeValue("System uptime", HostSystem.SystemUptime.ToString(@"d\.hh\:mm\:ss")),
+            new RuntimeValue("StageKit uptime", EntryApplication.ProcessUptime.ToString(@"d\.hh\:mm\:ss")),
             new RuntimeValue("Processor", HostSystem.ProcessorName ?? "Unavailable"),
             new RuntimeValue(
                 "Graphics cards",
                 graphicsCardNames.Count > 0 ? string.Join(", ", graphicsCardNames) : "Unavailable"),
             new RuntimeValue("Packaging", EntryApplication.PackagingType.ToString()),
-            new RuntimeValue("Session", EntryApplication.ProcessSessionId.ToString())
+            new RuntimeValue("Session", EntryApplication.ProcessSessionId.ToString()),
+            new RuntimeValue("Working set", ConverterExtension.ToFileSizeString(Environment.WorkingSet)),
         ];
         RuntimeReport = RuntimeDiagnostics.GetReport();
         OnPropertyChanged(nameof(RuntimeValues));

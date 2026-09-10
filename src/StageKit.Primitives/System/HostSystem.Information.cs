@@ -80,17 +80,16 @@ public static partial class HostSystem
     }
 
     /// <summary>
-    /// Gets the first graphics-adapter display name reported by the operating system, or <see langword="null"/> when
-    /// no adapter can be determined.
+    /// Gets a comma-separated list of the graphics-adapter display names reported by the operating system, or <see langword="null"/> when no adapters can be determined.
     /// </summary>
-    public static string? GraphicsCardName => GraphicsCardNames.FirstOrDefault();
+    public static string? GraphicsCardName => string.Join(", ", GraphicsCardNames);
 
     /// <summary>
     /// Gets the first graphics-adapter display name reported by the operating system, or <see langword="null"/> when
     /// no adapter can be determined.
     /// </summary>
     /// <remarks>Use <see cref="GraphicsCardName"/> for new code.</remarks>
-    public static string? GraphicCardName => GraphicsCardName;
+    public static string? GraphicCardName => GraphicsCardNames.FirstOrDefault();
 
     private static string GetOperatingSystemName()
     {

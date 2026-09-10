@@ -88,8 +88,7 @@ public static class RuntimeDiagnostics
 
         try
         {
-            using var process = Process.GetCurrentProcess();
-            process.Refresh();
+            var process = EntryApplication.GetCurrentProcessRefresh();
             privilegedProcessorTime = process.PrivilegedProcessorTime;
             userProcessorTime = process.UserProcessorTime;
             workingSetBytes = process.WorkingSet64;
@@ -144,12 +143,14 @@ public static class RuntimeDiagnostics
     /// <summary>
     /// Returns a formatted diagnostic report for the current runtime, process, and entry application.
     /// </summary>
+    /// <param name="includeProcessSnapshot">True to include the process snapshot; otherwise, false.</param>
     /// <param name="includeLoadedAssemblies">True to append the currently loaded assembly list; otherwise, false.</param>
     /// <returns>A formatted diagnostic report.</returns>
-    public static string GetReport(bool includeLoadedAssemblies = false)
+    public static string GetReport(bool includeProcessSnapshot = true, bool includeLoadedAssemblies = false)
     {
         return GetReport(new RuntimeDiagnosticsOptions
         {
+            IncludeProcessSnapshot = includeProcessSnapshot,
             IncludeLoadedAssemblies = includeLoadedAssemblies,
         });
     }

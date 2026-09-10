@@ -17,7 +17,8 @@ public static class LinuxRuntime
     /// <summary>
     /// Gets the package manager used by the Linux runtime environment.
     /// </summary>
-    public static LinuxPackageManager PackageManager => _packageManager ??= GetLinuxPackageManager();
+    public static LinuxPackageManager PackageManager =>
+        _packageManager ??= GetLinuxPackageManager();
 
     /// <summary>
     /// Gets the Linux distribution information.
@@ -33,28 +34,27 @@ public static class LinuxRuntime
     [field: AllowNull]
     public static Dictionary<string, string> OsRelease => field ??= GetOsRelease();
 
-    /// <summary>
-    /// Converts the specified <see cref="LinuxPackageManager"/> value to its corresponding command name.
-    /// </summary>
-    /// <param name="value">The <see cref="LinuxPackageManager"/> value.</param>
-    /// <returns>The command name corresponding to the specified <see cref="LinuxPackageManager"/> value.</returns>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown when the specified <see cref="LinuxPackageManager"/> value is not recognized.</exception>
-    public static string ToCommandName(this LinuxPackageManager value)
+    extension(LinuxPackageManager value)
     {
-        return value switch
-        {
-            LinuxPackageManager.Unknown => "unknown",
-            LinuxPackageManager.Apt => "apt",
-            LinuxPackageManager.Dnf5 => "dnf5",
-            LinuxPackageManager.Dnf => "dnf",
-            LinuxPackageManager.Yum => "yum",
-            LinuxPackageManager.Zypper => "zypper",
-            LinuxPackageManager.Pacman => "pacman",
-            LinuxPackageManager.Apk => "apk",
-            LinuxPackageManager.Xbps => "xbps-install",
-            LinuxPackageManager.Emerge => "emerge",
-            _ => throw new ArgumentOutOfRangeException(nameof(value), value, null)
-        };
+        /// <summary>
+        /// Gets the command name corresponding to the specified <see cref="LinuxPackageManager"/> value.
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException"></exception>
+        public string CommandName =>
+            value switch
+            {
+                LinuxPackageManager.Unknown => "unknown",
+                LinuxPackageManager.Apt => "apt",
+                LinuxPackageManager.Dnf5 => "dnf5",
+                LinuxPackageManager.Dnf => "dnf",
+                LinuxPackageManager.Yum => "yum",
+                LinuxPackageManager.Zypper => "zypper",
+                LinuxPackageManager.Pacman => "pacman",
+                LinuxPackageManager.Apk => "apk",
+                LinuxPackageManager.Xbps => "xbps-install",
+                LinuxPackageManager.Emerge => "emerge",
+                _ => throw new ArgumentOutOfRangeException(nameof(value), value, null),
+            };
     }
 
     /// <summary>
@@ -67,8 +67,7 @@ public static class LinuxRuntime
             return LinuxPackageManager.Unknown;
 
         // Debian / Ubuntu
-        if (File.Exists("/usr/bin/apt") ||
-            File.Exists("/usr/bin/apt-get"))
+        if (File.Exists("/usr/bin/apt") || File.Exists("/usr/bin/apt-get"))
             return LinuxPackageManager.Apt;
 
         // Fedora / RHEL
@@ -94,9 +93,7 @@ public static class LinuxRuntime
             return LinuxPackageManager.Emerge;
 
         // Alpine Linux
-        if (File.Exists("/sbin/apk") ||
-            File.Exists("/usr/sbin/apk") ||
-            File.Exists("/usr/bin/apk"))
+        if (File.Exists("/sbin/apk") || File.Exists("/usr/sbin/apk") || File.Exists("/usr/bin/apk"))
             return LinuxPackageManager.Apk;
 
         // Void Linux
@@ -134,12 +131,9 @@ public static class LinuxRuntime
             var key = line[..index];
             var value = line[(index + 1)..].Trim();
 
-            if (value is ['"', _, ..] &&
-                value[^1] == '"')
+            if (value is ['"', _, ..] && value[^1] == '"')
             {
-                value = value[1..^1]
-                    .Replace("\\\"", "\"")
-                    .Replace("\\\\", "\\");
+                value = value[1..^1].Replace("\\\"", "\"").Replace("\\\\", "\\");
             }
 
             values[key] = value;
@@ -159,10 +153,12 @@ public static class LinuxRuntime
             values.GetValueOrDefault("VERSION_ID"),
             values.GetValueOrDefault("VERSION_CODENAME"),
             values.GetValueOrDefault("VERSION"),
-            values.GetValueOrDefault("ID_LIKE")?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? [],
+            values.GetValueOrDefault("ID_LIKE")?.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                ?? [],
             values.GetValueOrDefault("HOME_URL"),
             values.GetValueOrDefault("SUPPORT_URL"),
             values.GetValueOrDefault("BUG_REPORT_URL"),
-            values.GetValueOrDefault("PRIVACY_POLICY_URL"));
+            values.GetValueOrDefault("PRIVACY_POLICY_URL")
+        );
     }
 }

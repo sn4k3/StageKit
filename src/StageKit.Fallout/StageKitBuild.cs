@@ -131,11 +131,19 @@ public abstract partial class StageKitBuild : FalloutBuild
             var projects = Solution.AllProjects;
             if (field is null)
             {
-                var candidates = projects.Where(p => Convert.ToBoolean(GetProjectProperty(p, "FalloutMainProject")))
+                var candidates = projects
+                    .Where(p =>
+                    {
+                        var property = GetProjectProperty(p, "FalloutMainProject");
+                        if (string.IsNullOrWhiteSpace(property)) return false;
+                        return bool.TryParse(property, out var result) && result;
+                    })
                     .ToArray();
                 if (candidates.Length == 0)
                 {
-                    candidates = projects.Where(p => !IsExcludedByName(p) && IsRunnableProject(p)).ToArray();
+                    candidates = projects
+                        .Where(p => !IsExcludedByName(p) && IsRunnableProject(p))
+                        .ToArray();
                     if (candidates.Length == 0)
                     {
                         throw new InvalidOperationException(

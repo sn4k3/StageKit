@@ -268,23 +268,6 @@ public static class EntryApplication
     });
 
     /// <summary>
-    /// Provides a lazily initialized string containing the current process name.
-    /// </summary>
-    /// <remarks>This value is determined based on the process path if available; otherwise, it falls back to
-    /// the process name.</remarks>
-    private static readonly Lazy<string> ProcessNameLazy = new(() =>
-    {
-        var processName = Path.GetFileName(Environment.ProcessPath);
-        if (processName is null)
-        {
-            using var currentProcess = Process.GetCurrentProcess();
-            processName = currentProcess.ProcessName;
-        }
-
-        return processName;
-    });
-
-    /// <summary>
     /// Provides a lazily initialized value that indicates whether the current process is a .NET host process (such as
     /// 'dotnet' or 'dotnet.exe').
     /// </summary>
@@ -395,6 +378,11 @@ public static class EntryApplication
 
         return ApplicationPackagingType.Portable;
     });
+
+    /// <summary>
+    /// Provides lazy initialization for retrieving the current process information using <see cref="Process.GetCurrentProcess"/>.
+    /// </summary>
+    private static readonly Lazy<Process> CurrentProcessLazy = new(Process.GetCurrentProcess);
 
     #endregion
 
@@ -552,14 +540,17 @@ public static class EntryApplication
     public static TimeSpan ProcessUptime => Stopwatch.GetElapsedTime(ProcessStartingTimestamp);
 
     /// <summary>
-    /// Gets the full name of the current process, including .exe for Windows.
+    /// Gets the current process name with extension, including .exe for Windows.
     /// </summary>
-    public static string ProcessFullName => ProcessFullNameLazy.Value;
+    /// <example>StageKit.exe [Windows]<br/>
+    /// StageKit [linux]</example>
+    public static string ProcessNameWithExtension => ProcessFullNameLazy.Value;
 
     /// <summary>
     /// Gets the name of the current process.
     /// </summary>
-    public static string ProcessName => ProcessNameLazy.Value;
+    /// <example>StageKit</example>
+    public static string ProcessName => CurrentProcess.ProcessName;
 
     /// <summary>
     /// Gets the application packaging type currently in use.
@@ -663,7 +654,7 @@ public static class EntryApplication
     /// <summary>
     /// Checks if the application is running under a dotnet process.
     /// </summary>
-    [MemberNotNullWhen(true, nameof(ProcessFullName), nameof(ProcessName), nameof(ExecutablePath),
+    [MemberNotNullWhen(true, nameof(ProcessNameWithExtension), nameof(ProcessName), nameof(ExecutablePath),
         nameof(ExecutableName),
         nameof(BaseDirectory))]
     public static bool IsRunningFromDotNetProcess => IsRunningFromDotNetProcessLazy.Value;
@@ -761,6 +752,13 @@ public static class EntryApplication
     public static string? ProcessPath => Environment.ProcessPath;
 
     /// <summary>
+    /// Gets the current process information.
+    /// </summary>
+    /// <remarks>This property is cached, use Refresh to get the latest process information or use <see cref="GetCurrentProcessRefresh"/> instead.<br/>
+    /// [!] Do not Dispose the returned <see cref="Process"/> instance.</remarks>
+    public static Process CurrentProcess => CurrentProcessLazy.Value;
+
+    /// <summary>
     /// Gets a formatted string containing the names and versions of all assemblies currently loaded in the application domain.
     /// </summary>
     /// <remarks>The assemblies are listed in the order they are loaded into the current application domain.
@@ -810,14 +808,24 @@ public static class EntryApplication
 
     #region Methods
 
+    /// <summary>
+    /// Refreshes the current process information and returns the updated <see cref="Process"/> instance.
+    /// </summary>
+    /// <remarks>[!] Do not Dispose the returned <see cref="Process"/> instance.</remarks>
+    /// <returns>The updated <see cref="Process"/> instance.</returns>
+    public static Process GetCurrentProcessRefresh()
+    {
+        CurrentProcess.Refresh();
+        return CurrentProcess;
+    }
+
     private static long GetProcessStartingTimestamp()
     {
         var currentTimestamp = Stopwatch.GetTimestamp();
 
         try
         {
-            using var process = Process.GetCurrentProcess();
-            var elapsedSinceProcessStart = DateTime.UtcNow - process.StartTime.ToUniversalTime();
+            var elapsedSinceProcessStart = DateTime.UtcNow - CurrentProcess.StartTime.ToUniversalTime();
             if (elapsedSinceProcessStart <= TimeSpan.Zero) return currentTimestamp;
 
             var elapsedTimestampTicks = (long)(elapsedSinceProcessStart.TotalSeconds * Stopwatch.Frequency);
@@ -1042,7 +1050,7 @@ public static class EntryApplication
         info[nameof(ProcessSessionId)] = ProcessSessionId.ToString();
         info[nameof(ProcessStartingTimestamp)] = ProcessStartingTimestamp.ToString();
         info[nameof(ProcessUptime)] = ProcessUptime.ToString("c");
-        info[nameof(ProcessFullName)] = ProcessFullName;
+        info[nameof(ProcessNameWithExtension)] = ProcessNameWithExtension;
         info[nameof(ProcessName)] = ProcessName;
 
         // Packaging type
@@ -1142,7 +1150,7 @@ public static class EntryApplication
             if (IsRunningFromDotNetProcess)
             {
                 var args = runArguments is null ? $"\"{ExecutablePath}\"" : $"\"{ExecutablePath}\" {runArguments}";
-                exitCode = Utilities.StartProcess(Environment.ProcessPath ?? ProcessFullName, args);
+                exitCode = Utilities.StartProcess(Environment.ProcessPath ?? ProcessNameWithExtension, args);
             }
             else
             {
@@ -1194,7 +1202,7 @@ public static class EntryApplication
                 };
                 dotnetArguments.AddRange(runArguments);
 
-                return Utilities.StartProcess(Environment.ProcessPath ?? ProcessFullName, dotnetArguments) == 0;
+                return Utilities.StartProcess(Environment.ProcessPath ?? ProcessNameWithExtension, dotnetArguments) == 0;
             }
 
             return Utilities.StartProcess(ExecutablePath, runArguments) == 0;
