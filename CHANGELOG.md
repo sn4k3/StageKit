@@ -1,5 +1,9 @@
 # v0.3.4 (09/09/2026)
 
+- Add the `GenerateWindowsWixInstaller` Fallout target, which scaffolds `builds/<SoftwareName>.WixInstaller` with the
+  WiX project, `Package.wxs`, `Strings.en-us.wxl`, a readme, a placeholder `License.rtf`, and generated placeholder
+  banner and dialog artwork at the sizes WiX expects. Upgrade codes are generated once per platform, and the target
+  fails instead of overwriting an existing installer project so those codes and any custom authoring survive
 - Replace existing same-version Windows installations when installing a rebuilt MSI instead of registering another
   product.
 - Allow custom Windows installer welcome artwork and header logos, including the installation-options page.

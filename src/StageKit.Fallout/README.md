@@ -17,7 +17,8 @@ exposes ready-made targets to restore, compile, run, and publish an application 
 - Solution and main-project discovery, preferring `.slnx` over `.sln`
 - Software metadata (name, company, RDNS, version, license, repository URL, tags) resolved from the main project's
   MSBuild properties
-- Ready-made `Print`, `Clean`, `Restore`, `Compile`, `Run`, `Publish`, and `GenerateInstallScript` targets
+- Ready-made `Print`, `Clean`, `Restore`, `Compile`, `Run`, `Publish`, `GenerateInstallScript`, and
+  `GenerateWindowsWixInstaller` targets
 - Self-contained publish by default, with optional ReadyToRun and framework-dependent deployment
 - Bundle creation: portable zip, .NET single-file, WiX installer, macOS `.app`/DMG/PKG, Linux AppImage, Flatpak, Debian,
   RPM, Arch Linux, and Snap packages
@@ -93,10 +94,10 @@ available, Fallout extracts the AppImage tool before running it. macOS DMG/PKG c
 
 ```
 build.ps1 / build.sh
-  └─ bootstrap the .NET SDK if absent, then `dotnet tool restore`
-      └─ dotnet fallout <target> [parameters]
-          └─ compiles and runs builds/build/build.csproj  (configured by .fallout/parameters.json)
-              └─ Build : StageKitBuild
+  └── bootstrap the .NET SDK if absent, then `dotnet tool restore`
+      └── dotnet fallout <target> [parameters]
+          └── compiles and runs builds/build/build.csproj  (configured by .fallout/parameters.json)
+              └── Build : StageKitBuild
 ```
 
 `.fallout/parameters.json` points Fallout at the solution and the build project:
@@ -133,6 +134,7 @@ Run a target:
 | `Run`                   | `Compile`             | `dotnet run` on `MainProject` with `--no-build --no-restore`.                                                          |
 | `Publish`               | `Restore`             | Publishes every runtime identifier in `RIds` and creates the packaging formats selected by `PackagingTypes`.           |
 | `GenerateInstallScript` | —                     | Generates Bash and Windows PowerShell install/uninstall scripts for compatible GitHub release assets.                  |
+| `GenerateWindowsWixInstaller` | —               | Scaffolds `builds/<SoftwareName>.WixInstaller`, the WiX project `Publish` builds into an MSI. Fails when it exists.    |
 
 `DependOnTargets` lets a derived build inject extra targets into `Compile`, `Run`, and `Publish`.
 
@@ -149,8 +151,8 @@ Declared with Fallout's `[Parameter]` attribute, so each can be supplied on the 
 | `PublishMultiArch`          | `false`                                                     | Create one macOS app bundle containing both x64 and arm64 executables. Requires both macOS RIDs. |
 | `DeletePublishDirectories`  | `false`                                                     | Delete raw publish directories after publishing.                                                 |
 | `UseSingleFileForInstaller` | `false`                                                     | Use the single-file executable as the Windows installer payload.                                 |
-| ReadyToRun                  | alse                                                        | Publish ReadyToRun (R2R) compiled applications.                                                  |
-| PublishTrimmed              | alse                                                        | Publish trimmed applications.                                                                    |
+| ReadyToRun                  | false                                                        | Publish ReadyToRun (R2R) compiled applications.                                                  |
+| PublishTrimmed              | false                                                        | Publish trimmed applications.                                                                    |
 | AppImageCompression         | null                                                        | Squashfs compression passed to appimagetool. Use 'default' for appimagetool default.             |
 
 ## Software metadata
@@ -225,6 +227,31 @@ PackagingTypes =
 Duplicate values and `None` are removed while preserving selection order. Formats whose host requirement is unmet are
 skipped with a warning rather than failing the build. Set `PackagingTypes` to `[]` to publish runtime outputs without
 creating packages.
+
+### Windows installer project
+
+`Publish` builds every WiX project in the solution when `PackagingTypes` contains `WindowsInstaller`. Run
+`GenerateWindowsWixInstaller` once to scaffold that project:
+
+```powershell
+./build.ps1 GenerateWindowsWixInstaller
+```
+
+It writes `builds/<SoftwareName>.WixInstaller` with the project file, `Package.wxs`, `Strings.en-us.wxl`, a readme,
+a placeholder `Resources/License.rtf`, and placeholder `Resources/InstallerBannerImage.png` (493 × 58) and
+`Resources/InstallerDialogImage.png` (493 × 312) artwork. The generated wizard offers Start menu, desktop shortcut,
+and launch-after-install options, and upgrades same-version installations in place. Every product-specific value —
+publish payload, application name, executable name, version, platform, and asset name — is passed by the pipeline at
+build time, so the project builds without editing.
+
+Two upgrade codes are generated, one per platform, and written into the project. **They must stay stable**: changing
+one makes Windows treat later installers as a different product instead of an upgrade. For that reason the target
+refuses to overwrite an existing project and fails when `builds/<SoftwareName>.WixInstaller` already exists and is not
+empty. Delete the directory to regenerate it, and add the project to the solution so `InstallerProjects` finds it.
+
+Override `WindowsWixInstallerProjectName`, `WindowsWixInstallerDirectory`, `WindowsWixInstallerProjectFile`,
+`CreateWindowsWixInstallerLicense()`, or `CreateWindowsWixInstallerUpgradeCode()` in a derived build to change the
+destination, scaffold the real license, or supply pre-agreed upgrade codes.
 
 ### Installation script
 

@@ -15,6 +15,11 @@
         <InstallerBannerImage>$(MSBuildProjectDirectory)\Resources\InstallerBannerImage.png</InstallerBannerImage>
     </PropertyGroup>
 
+    <PropertyGroup Condition="'$(ArtifactsPath)' != ''">
+        <OutputPath>$(ArtifactsPath)\bin\$(MSBuildProjectName)\$(Configuration)\</OutputPath>
+        <IntermediateOutputPath>$(ArtifactsPath)\obj\$(MSBuildProjectName)\$(Configuration)\</IntermediateOutputPath>
+    </PropertyGroup>
+
     <PropertyGroup Condition="'$(Platform)' == 'x64'">
         <UpgradeCode>363E3F2A-9A03-4342-89DA-04012BC337F8</UpgradeCode>
     </PropertyGroup>
