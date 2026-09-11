@@ -52,6 +52,32 @@ public sealed class WixInstallerProjectTests
             Assert.Contains("!(bindpath.Publish)", package, StringComparison.Ordinal);
             Assert.Contains("WixUI_InstallDir", package, StringComparison.Ordinal);
             Assert.Contains("InstallOptionsDlg", package, StringComparison.Ordinal);
+            Assert.Contains("Id=\"WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT\" Value=\"Start program after install\"",
+                package, StringComparison.Ordinal);
+            Assert.Contains("WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1", package, StringComparison.Ordinal);
+            Assert.DoesNotContain("Property=\"STARTAFTERINSTALL\"", package, StringComparison.Ordinal);
+            Assert.Contains("<?define InstallerRegistryKey =", package, StringComparison.Ordinal);
+            Assert.Equal(7, package.Split("Key=\"$(var.InstallerRegistryKey)\"").Length - 1);
+            Assert.DoesNotContain("Key=\"Software\\$(var.Company)\\$(var.ApplicationName)\\Installer\"", package,
+                StringComparison.Ordinal);
+            Assert.Contains("SearchInstallLocation", package, StringComparison.Ordinal);
+            Assert.Contains("<Component Id=\"InstallLocationRegistryComponent\" Guid=\"\">", package,
+                StringComparison.Ordinal);
+            Assert.Contains("<Component Id=\"InstalledStateRegistryComponent\" Guid=\"*\">", package,
+                StringComparison.Ordinal);
+            Assert.Contains("<RegistryKey Root=\"HKLM\" Key=\"$(var.InstallerRegistryKey)\">", package,
+                StringComparison.Ordinal);
+            Assert.Contains("Name=\"InstallLocation\" Type=\"string\" Value=\"[INSTALLFOLDER]\"", package,
+                StringComparison.Ordinal);
+            Assert.Contains("Name=\"ProductCode\" Type=\"string\" Value=\"[ProductCode]\" KeyPath=\"yes\"", package,
+                StringComparison.Ordinal);
+            Assert.Contains("Name=\"Version\" Type=\"string\" Value=\"$(var.BuildVersion)\"", package,
+                StringComparison.Ordinal);
+            Assert.Contains("Name=\"Architecture\" Type=\"string\" Value=\"$(var.Platform)\"", package,
+                StringComparison.Ordinal);
+            Assert.Contains("Name=\"ExecutablePath\" Type=\"string\"", package, StringComparison.Ordinal);
+            Assert.Contains("Value=\"[INSTALLFOLDER]$(var.ApplicationExecutableName).exe\"", package,
+                StringComparison.Ordinal);
             Assert.Contains("SearchStartMenuShortcut", package, StringComparison.Ordinal);
             Assert.Contains("SearchDesktopShortcut", package, StringComparison.Ordinal);
             Assert.Contains("Set_CREATESTARTMENUSHORTCUT_Unchecked", package, StringComparison.Ordinal);

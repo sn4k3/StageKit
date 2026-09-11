@@ -258,8 +258,9 @@ internal static class WixInstallerProject
                     break;
                 default:
                     if (character < 128) builder.Append(character);
-                    else builder.Append("\\u").Append(((short)character).ToString(CultureInfo.InvariantCulture))
-                        .Append('?');
+                    else
+                        builder.Append("\\u").Append(((short)character).ToString(CultureInfo.InvariantCulture))
+                            .Append('?');
                     break;
             }
         }
@@ -361,6 +362,7 @@ internal static class WixInstallerProject
         """
         <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
              xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+            <?define InstallerRegistryKey = "Software\$(var.Company)\$(var.ApplicationName)\Installer" ?>
             <Package Name="$(var.ApplicationName)"
                      Manufacturer="$(var.Company)"
                      Version="$(var.BuildVersion)"
@@ -374,18 +376,28 @@ internal static class WixInstallerProject
                 <MediaTemplate EmbedCab="yes"/>
                 <Property Id="CREATESTARTMENUSHORTCUT" Value="1" Secure="yes"/>
                 <Property Id="CREATEDESKTOPSHORTCUT" Value="1" Secure="yes"/>
+                <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Start program after install"/>
+
+                <!-- Restore the directory chosen by the previous installation before the UI is shown. -->
+                <Property Id="INSTALLFOLDER" Secure="yes">
+                    <RegistrySearch Id="SearchInstallLocation"
+                                    Root="HKLM"
+                                    Key="$(var.InstallerRegistryKey)"
+                                    Name="InstallLocation"
+                                    Type="raw"/>
+                </Property>
 
                 <Property Id="STARTMENUSHORTCUT_REG" Secure="yes">
                     <RegistrySearch Id="SearchStartMenuShortcut"
                                     Root="HKCU"
-                                    Key="Software\$(var.Company)\$(var.ApplicationName)\Installer"
+                                    Key="$(var.InstallerRegistryKey)"
                                     Name="StartMenuShortcut"
                                     Type="raw"/>
                 </Property>
                 <Property Id="DESKTOPSHORTCUT_REG" Secure="yes">
                     <RegistrySearch Id="SearchDesktopShortcut"
                                     Root="HKCU"
-                                    Key="Software\$(var.Company)\$(var.ApplicationName)\Installer"
+                                    Key="$(var.InstallerRegistryKey)"
                                     Name="DesktopShortcut"
                                     Type="raw"/>
                 </Property>
@@ -419,11 +431,33 @@ internal static class WixInstallerProject
                                   KeyPath="yes"/>
                         </Component>
 
+                        <!-- Keep only the selected directory after uninstall so a later install can restore it. -->
+                        <Component Id="InstallLocationRegistryComponent" Guid="">
+                            <RegistryValue Root="HKLM"
+                                           Key="$(var.InstallerRegistryKey)"
+                                           Name="InstallLocation" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes"/>
+                        </Component>
+
+                        <!-- Installed-product metadata is MSI-managed and removed during a full uninstall. -->
+                        <Component Id="InstalledStateRegistryComponent" Guid="*">
+                            <RegistryKey Root="HKLM" Key="$(var.InstallerRegistryKey)">
+                                <RegistryValue Name="ProductCode" Type="string" Value="[ProductCode]" KeyPath="yes"/>
+                                <RegistryValue Name="Version" Type="string" Value="$(var.BuildVersion)"/>
+                                <RegistryValue Name="Architecture" Type="string" Value="$(var.Platform)"/>
+                                <RegistryValue Name="ExecutablePath" Type="string"
+                                               Value="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe"/>
+                            </RegistryKey>
+                        </Component>
+
                         <Component Id="StartMenuShortcutComponent" Guid="*" Condition="CREATESTARTMENUSHORTCUT = 1">
                             <Shortcut Id="StartMenuShortcut" Directory="ApplicationProgramsFolder"
                                       Name="$(var.ApplicationName)" Target="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe"
                                       WorkingDirectory="INSTALLFOLDER"/>
-                            <RegistryValue Root="HKCU" Key="Software\$(var.Company)\$(var.ApplicationName)\Installer"
+                            <Shortcut Id="StartMenuUninstallShortcut" Directory="ApplicationProgramsFolder"
+                                     Name="Uninstall $(var.ApplicationName)" Target="[System64Folder]msiexec.exe"
+                                     Description="Uninstalls $(var.ApplicationName) and all of its components"
+                                     Arguments="/i [ProductCode]"/>
+                            <RegistryValue Root="HKCU" Key="$(var.InstallerRegistryKey)"
                                            Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes"/>
                             <RemoveFolder Id="RemoveApplicationProgramsFolder"
                                           Directory="ApplicationProgramsFolder"
@@ -434,7 +468,7 @@ internal static class WixInstallerProject
                             <Shortcut Id="DesktopShortcut" Directory="DesktopFolder"
                                       Name="$(var.ApplicationName)" Target="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe"
                                       WorkingDirectory="INSTALLFOLDER"/>
-                            <RegistryValue Root="HKCU" Key="Software\$(var.Company)\$(var.ApplicationName)\Installer"
+                            <RegistryValue Root="HKCU" Key="$(var.InstallerRegistryKey)"
                                            Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes"/>
                         </Component>
 
@@ -455,7 +489,8 @@ internal static class WixInstallerProject
                     <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog"
                              Value="InstallOptionsDlg" Order="2" Condition="NOT Installed"/>
                     <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApplication"
-                             Order="1" Condition="STARTAFTERINSTALL = 1 AND NOT Installed AND NOT WIX_UPGRADE_DETECTED"/>
+                             Order="1"
+                             Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed AND NOT WIX_UPGRADE_DETECTED"/>
                     <Dialog Id="InstallOptionsDlg" Width="370" Height="270" Title="[ProductName] v[ProductVersion] Setup">
                         <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44"
                                  TabSkip="yes" Text="!(loc.InstallDirDlgBannerBitmap)"/>
@@ -466,8 +501,6 @@ internal static class WixInstallerProject
                                  Property="CREATESTARTMENUSHORTCUT" CheckBoxValue="1" Text="Create Start menu shortcut"/>
                         <Control Id="Desktop" Type="CheckBox" X="20" Y="105" Width="330" Height="18"
                                  Property="CREATEDESKTOPSHORTCUT" CheckBoxValue="1" Text="Create Desktop shortcut"/>
-                        <Control Id="Launch" Type="CheckBox" X="20" Y="135" Width="330" Height="18"
-                                 Property="STARTAFTERINSTALL" CheckBoxValue="1" Text="Start program after install"/>
                         <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0"/>
                         <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
                             <Publish Event="NewDialog" Value="LicenseAgreementDlg"/>
@@ -563,6 +596,11 @@ internal static class WixInstallerProject
         3. Replace the placeholder artwork in `Resources/`.
         4. Keep the generated `UpgradeCode` values stable; changing one makes Windows treat future
            installers as a different product instead of an upgrade.
+
+        The installer lets users choose `INSTALLFOLDER` and records the selected directory in the machine registry.
+        A later install or upgrade restores the directory as the default, including after a full uninstall. The current
+        MSI product code, software version, architecture, and executable path are recorded while the product is installed
+        and removed during a full uninstall.
 
         ## Installer artwork
 

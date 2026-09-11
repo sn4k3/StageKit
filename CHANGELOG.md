@@ -1,3 +1,12 @@
+# v0.3.8 (/09/2026)
+
+- Add a uninstall software shortcut to start menu in the Wix template
+- Let users choose the WiX installation directory and restore the last directory on later installs, upgrades, and
+  reinstalls
+- Record the installed MSI product code, software version, architecture, and executable path alongside the remembered
+  installation directory, while removing installed-product metadata during uninstall
+- Move the optional "Start program after install" checkbox to the completion page
+
 # v0.3.7 (11/09/2026)
 
 - Remove `<TargetFramework>net10.0</TargetFramework>` from WixInstaller template
