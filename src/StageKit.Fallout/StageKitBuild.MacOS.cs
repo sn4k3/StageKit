@@ -161,11 +161,11 @@ public partial class StageKitBuild
     /// <param name="context">The macOS runtime publish context.</param>
     protected virtual void CreateMacOSApp(PublishRidContext context)
     {
-        Log.Information("Creating and compressing macOS application bundle for {Rid}",
-            context.RuntimeIdentifier);
-
         var stagingPath = PublishStagingDirectory / Guid.NewGuid().ToString("N");
         var archivePath = (AbsolutePath)$"{context.BundleOutputPath}.zip";
+        
+        Log.Information("Creating and compressing {fileName} macOS application bundle for {Rid}",
+            archivePath.Name, context.RuntimeIdentifier);
 
         try
         {
@@ -188,13 +188,14 @@ public partial class StageKitBuild
     protected virtual void CreateMultiArchMacOSApp(PublishRidContext x64Context,
         PublishRidContext arm64Context)
     {
-        Log.Information(
-            "Creating and compressing multi-architecture macOS application bundle for {X64Rid} and {Arm64Rid}",
-            x64Context.RuntimeIdentifier, arm64Context.RuntimeIdentifier);
-
         var stagingPath = PublishStagingDirectory / Guid.NewGuid().ToString("N");
         var archivePath = (AbsolutePath)$"{GetMultiArchMacOSBundleOutputPath(x64Context)}.zip";
 
+        Log.Information(
+            "Creating and compressing {fileName} multi-architecture macOS application bundle for {X64Rid} and {Arm64Rid}",
+            archivePath.Name, x64Context.RuntimeIdentifier, arm64Context.RuntimeIdentifier);
+
+        
         try
         {
             stagingPath.DeleteDirectory();

@@ -44,7 +44,7 @@ public partial class StageKitBuild
         if (!HasPackagingType(ApplicationPackagingType.DotNetSingleFile))
             return;
 
-        Log.Information("Creating single-file application bundle for {Rid}", context.RuntimeIdentifier);
+        Log.Information("Creating {fileName} single-file application bundle for {Rid}", GetSingleFileAssetPath(context).Name, context.RuntimeIdentifier);
 
         var temporaryDirectory = SingleFileInputsDirectory / Guid.NewGuid().ToString("N");
         temporaryDirectory.CreateDirectory();

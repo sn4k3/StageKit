@@ -1,5 +1,5 @@
 ﻿<Solution>
-    <Folder Name="/Root/">
+    <Folder Name="/root/">
         <File Path=".gitignore" />
         <File Path="CHANGELOG.md" />
         <File Path="CLAUDE.md" />

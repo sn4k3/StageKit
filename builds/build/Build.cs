@@ -30,8 +30,6 @@ internal class Build : StageKitBuild
             ApplicationPackagingType.MacOSPkg,
             ApplicationPackagingType.DotNetSingleFile
         ];
-        
-        PublishReadyToRun = true;
     }
 
     /// <summary>

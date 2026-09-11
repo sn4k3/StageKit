@@ -82,12 +82,12 @@ public partial class StageKitBuild
     /// <param name="architecture">The AppImage target architecture.</param>
     protected virtual void CreateLinuxAppImage(PublishRidContext context, string architecture)
     {
-        Log.Information("Creating Linux AppImage bundle for {Rid} ({Architecture})",
-            context.RuntimeIdentifier, architecture);
-
         var appDirPath = AppImageStagingDirectory / Guid.NewGuid().ToString("N");
         var outputPath = (AbsolutePath)$"{context.BundleOutputPath}.AppImage";
         var temporaryOutputPath = CreateTemporaryAppImageOutputPath(outputPath);
+        
+        Log.Information("Creating {fileName} Linux AppImage bundle for {Rid} ({Architecture})",
+            outputPath.Name, context.RuntimeIdentifier, architecture);
 
         try
         {

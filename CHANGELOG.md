@@ -1,4 +1,4 @@
-# v0.3.8 (/09/2026)
+# v0.3.8 (11/09/2026)
 
 - Let users choose between per-user and per-machine WiX installation scopes
 - Let installer developers enforce `perUser` or `perMachine` through the WiX `InstallerScope` property while defaulting

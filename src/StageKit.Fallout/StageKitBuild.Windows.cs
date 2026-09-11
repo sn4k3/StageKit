@@ -65,8 +65,8 @@ public partial class StageKitBuild
             return;
         }
 
-        Log.Information("Creating Windows installer bundle for {Rid} ({Platform})",
-            context.RuntimeIdentifier, platform);
+        Log.Information("Creating {fileName} Windows installer bundle for {Rid} ({Platform})",
+            string.Concat(context.BundleOutputPath.Name, ".msi"), context.RuntimeIdentifier, platform);
 
         var stagingPath = PublishStagingDirectory / Guid.NewGuid().ToString("N");
         AbsolutePath? normalPublishPath = null;

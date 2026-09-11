@@ -25,10 +25,10 @@ public partial class StageKitBuild
     /// <param name="context">The runtime publish context.</param>
     internal virtual void CreatePortableZip(PublishRidContext context)
     {
-        Log.Information("Compressing portable application bundle for {Rid}", context.RuntimeIdentifier);
-
         var stagingPath = PublishStagingDirectory / Guid.NewGuid().ToString("N");
         var archivePath = (AbsolutePath)$"{context.BundleOutputPath}.zip";
+        
+        Log.Information("Compressing {name} portable application bundle for {Rid}", archivePath.Name, context.RuntimeIdentifier);
 
         try
         {
