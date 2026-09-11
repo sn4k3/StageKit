@@ -114,6 +114,17 @@ public class LinuxAppBundleTests
     }
 
     [Fact]
+    public void GetAppStreamMetadata_Authors_UsesDeveloperElement()
+    {
+        var document = XDocument.Parse(LinuxAppBundle.GetAppStreamMetadata(CreateOptions()));
+        var developer = document.Descendants("developer").Single();
+
+        Assert.Equal("org.example", developer.Attribute("id")?.Value);
+        Assert.Equal("Example Authors", developer.Element("name")?.Value);
+        Assert.Empty(document.Descendants("developer_name"));
+    }
+
+    [Fact]
     public void GetAppStreamMetadata_ScreenshotsAndEmail_ProducesOrderedEscapedMetadata()
     {
         var options = CreateOptions();
@@ -132,7 +143,7 @@ public class LinuxAppBundleTests
         var screenshotElements = document.Descendants("screenshot").ToArray();
 
         Assert.StartsWith("<?xml version=\"1.0\" encoding=\"UTF-8\"?>", metadata, StringComparison.Ordinal);
-        Assert.Equal("Example & Tool", document.Descendants("name").Single().Value);
+        Assert.Equal("Example & Tool", document.Root?.Element("name")?.Value);
         Assert.Equal("Creates <portable> bundles & metadata.",
             document.Descendants("description").Single().Element("p")?.Value);
         Assert.Equal("maintainer@example.com", document.Descendants("update_contact").Single().Value);
@@ -144,6 +155,7 @@ public class LinuxAppBundleTests
         Assert.Equal("https://example.com/screens/options.png", screenshotElements[1].Element("image")?.Value);
         Assert.DoesNotContain('\n', document.Descendants("summary").Single().Value);
         Assert.True(document.Descendants("summary").Single().Value.Length <= 78);
+        Assert.False(document.Descendants("summary").Single().Value.EndsWith('.'));
     }
 
     [Fact]
@@ -248,6 +260,7 @@ public class LinuxAppBundleTests
             Description = "A reusable example application.",
             License = "MIT",
             RepositoryUrl = "https://example.com/project",
+            DeveloperId = "org.example",
             Authors = "Example Authors"
         };
     }

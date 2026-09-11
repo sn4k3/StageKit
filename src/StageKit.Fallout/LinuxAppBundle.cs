@@ -134,7 +134,8 @@ public static partial class LinuxAppBundle
 
         component.Add(
             new XElement("url", new XAttribute("type", "homepage"), options.RepositoryUrl),
-            new XElement("developer_name", options.Authors));
+            new XElement("developer", new XAttribute("id", options.DeveloperId),
+                new XElement("name", options.Authors)));
 
         if (!string.IsNullOrWhiteSpace(options.UpdateContact))
         {
@@ -242,6 +243,7 @@ public static partial class LinuxAppBundle
         ArgumentException.ThrowIfNullOrWhiteSpace(options.Description);
         ArgumentException.ThrowIfNullOrWhiteSpace(options.License);
         ArgumentException.ThrowIfNullOrWhiteSpace(options.RepositoryUrl);
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.DeveloperId);
         ArgumentException.ThrowIfNullOrWhiteSpace(options.Authors);
         ValidateList(options.Categories, nameof(options.Categories));
     }
@@ -276,7 +278,7 @@ public static partial class LinuxAppBundle
     private static string NormalizeSummary(string value)
     {
         var summary = WhitespaceRunRegex().Replace(value, " ").Trim();
-        return summary.Length <= 78 ? summary : summary[..78].TrimEnd();
+        return (summary.Length <= 78 ? summary : summary[..78].TrimEnd()).TrimEnd('.');
     }
 
     private static string AppendCustomBlock(string content, string? customBlock)

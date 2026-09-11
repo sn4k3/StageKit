@@ -242,7 +242,8 @@ placeholder `Resources/License.rtf`, and placeholder `Resources/InstallerBannerI
 `Resources/InstallerDialogImage.png` (493 × 312) artwork. The generated wizard lets the user choose a per-user or
 per-machine installation and offers Start menu, desktop shortcut, and launch-after-install options. It accepts older and
 same-version packages as major upgrades. Every product-specific value — publish payload, application name, executable
-name, version, platform, and asset name — is passed by the pipeline at build time, so the project builds without editing.
+name, version, platform, and asset name — is passed by the pipeline at build time, so the project builds without
+editing.
 
 The generated project defines `InstallerScope` as `perMachineOrUser`, allowing users to choose their scope while
 defaulting to a non-elevated per-user installation. Set the property to `perUser` or `perMachine` in the `.wixproj` to
@@ -363,11 +364,12 @@ Debian, RPM, and Arch Linux payloads install the application under `/usr/lib/<pa
 `/usr/bin/<package>`. When selecting `LinuxDeb`, set
 `LinuxAppBundleOptions.DebPackageMaintainer` to `Full Name <email@example.com>`. Snap defaults to the `core24` base,
 strict confinement, common desktop interfaces, and the `libicu74` stage package required by self-contained .NET apps;
-customize `SnapBase`, `SnapConfinement`, `SnapPlugs`, or `SnapStagePackages` through `LinuxAppBundleOptions`.
-Stage-package names are base-specific, so update `SnapStagePackages` when changing `SnapBase`. Native package tools and
-the selected Flatpak/Snap runtime bases must already be available on the build host. Debian payloads are staged in the
-operating system's temporary directory so `dpkg-deb` receives valid Unix permissions even when the repository is on a
-Windows-mounted WSL path such as `/mnt/c` or `/mnt/d`.
+customize `DeveloperId`, `SnapBase`, `SnapConfinement`, `SnapPlugs`, or `SnapStagePackages` through
+`LinuxAppBundleOptions`. `DeveloperId` defaults to `CompanyRDNS` and identifies the publishing organization in AppStream
+metadata. Stage-package names are base-specific, so update `SnapStagePackages` when changing `SnapBase`. Native package
+tools and the selected Flatpak/Snap runtime bases must already be available on the build host. Debian payloads are
+staged in the operating system's temporary directory so `dpkg-deb` receives valid Unix permissions even when the
+repository is on a Windows-mounted WSL path such as `/mnt/c` or `/mnt/d`.
 
 Set `LinuxAppBundleOptions.FlatpakAllowHostCommandExecution` to `true` when a Flatpak application must use
 `flatpak-spawn --host`. This adds the broad `--talk-name=org.freedesktop.Flatpak` sandbox permission and is disabled by

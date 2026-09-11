@@ -1,3 +1,9 @@
+# v0.3.9 (/09/2026)
+
+- Enforce a configurable macOS minimum runtime version in the generated installation script, defaulting to macOS 13.0
+- Emit current AppStream developer metadata, including a configurable developer ID, for Linux application bundles
+- Normalize AppStream summaries by removing trailing periods
+
 # v0.3.8 (11/09/2026)
 
 - Let users choose between per-user and per-machine WiX installation scopes

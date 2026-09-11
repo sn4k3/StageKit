@@ -10,6 +10,12 @@
         <File Path="build.ps1" />
         <File Path="build.sh" />
     </Folder>
+    <Folder Name="/root/scripts/">
+        <File Path="scripts/install-stagekit.ps1" />
+        <File Path="scripts/install-stagekit.sh" />
+        <File Path="scripts/uninstall-stagekit.ps1" />
+        <File Path="scripts/uninstall-stagekit.sh" />
+    </Folder>
     <Folder Name="/src/">
         <Project Path="src/StageKit.Fallout/StageKit.Fallout.csproj" />
         <Project Path="src/StageKit.Primitives/StageKit.Primitives.csproj" />

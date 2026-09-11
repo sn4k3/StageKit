@@ -28,6 +28,7 @@ public class LinuxAppBundleOptions
         Description = build.SoftwareDescription;
         License = build.SoftwareLicense;
         RepositoryUrl = build.SoftwareRepositoryUrl;
+        DeveloperId = build.SoftwareCompanyRdns;
         Authors = build.SoftwareAuthors;
         DebPackageMaintainer = build.SoftwarePackageMaintainersRFC822;
         Keywords = build.SoftwarePackageTagsList.ToList();
@@ -63,6 +64,12 @@ public class LinuxAppBundleOptions
     /// Gets the project homepage or repository URL.
     /// </summary>
     public required string RepositoryUrl { get; set; }
+
+    /// <summary>
+    /// Gets the reverse-DNS identifier of the developer or publishing organization in AppStream metadata.
+    /// </summary>
+    /// <example><c>com.example</c></example>
+    public required string DeveloperId { get; set; }
 
     /// <summary>
     /// Gets the developer or author name displayed in application stores.

@@ -76,6 +76,10 @@ public class InstallScriptTests
         Assert.Contains("--list-changelog", script, StringComparison.Ordinal);
         Assert.Contains("list_changelogs", script, StringComparison.Ordinal);
         Assert.Contains("CHANGELOG_LIMIT='20'", script, StringComparison.Ordinal);
+        Assert.Contains("MACOS_MINIMUM_VERSION='13.0'", script, StringComparison.Ordinal);
+        Assert.Contains("check_macos_version()", script, StringComparison.Ordinal);
+        Assert.Contains("macOS ${MACOS_MINIMUM_VERSION} or newer is required", script,
+            StringComparison.Ordinal);
         Assert.Contains("--list-changelog [LIMIT]", script, StringComparison.Ordinal);
         Assert.Contains("print_release_changelogs \"$remaining\"", script, StringComparison.Ordinal);
         Assert.Contains("release.get(\"body\")", script, StringComparison.Ordinal);

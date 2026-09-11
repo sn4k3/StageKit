@@ -3508,6 +3508,7 @@ public class PublishPipelineTests
             Description = "Configured description",
             License = "MIT",
             RepositoryUrl = "https://example.test/repository",
+            DeveloperId = "org.example",
             Authors = "Example Authors",
             ExecutableName = executableName,
             IconName = iconName,
