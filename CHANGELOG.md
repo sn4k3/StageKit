@@ -1,5 +1,11 @@
 # v0.3.8 (/09/2026)
 
+- Let users choose between per-user and per-machine WiX installation scopes
+- Let installer developers enforce `perUser` or `perMachine` through the WiX `InstallerScope` property while defaulting
+  to user-selectable scope
+- Add optional SHA-256 Authenticode signing for the staged Windows executable and final MSI
+- Prevent x64 installers from running under ARM64 emulation when a native ARM64 installer is available
+- Allow older and same-version MSI packages to replace the installed version
 - Add a uninstall software shortcut to start menu in the Wix template
 - Let users choose the WiX installation directory and restore the last directory on later installs, upgrades, and
   reinstalls

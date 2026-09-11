@@ -1,56 +1,107 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
-     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
     <?define InstallerRegistryKey = "Software\$(var.Company)\$(var.ApplicationName)\Installer" ?>
+    <?if $(var.InstallerScope) = "perMachineOrUser" ?>
+    <?define PackageScope = "perUserOrMachine" ?>
+    <?else ?>
+    <?define PackageScope = "$(var.InstallerScope)" ?>
+    <?endif ?>
     <Package Name="$(var.ApplicationName)"
              Manufacturer="$(var.Company)"
              Version="$(var.BuildVersion)"
              UpgradeCode="$(var.UpgradeCode)"
              Language="1033"
-             Scope="perMachine"
+             Scope="$(var.PackageScope)"
              Compressed="yes">
-        <!-- Rebuilt MSIs have new product codes; replace existing same-version installations. -->
-        <MajorUpgrade AllowSameVersionUpgrades="yes"
-                      DowngradeErrorMessage="A newer version of [ProductName] is already installed."/>
+        <!-- AllowDowngrades also makes same-version packages related major upgrades. -->
+        <MajorUpgrade AllowDowngrades="yes"/>
         <MediaTemplate EmbedCab="yes"/>
+        <util:QueryNativeMachine/>
+        <Launch Condition='Installed OR WIX_UPGRADE_DETECTED OR ("$(sys.BUILDARCH)" ~= "x64" IMP WIX_NATIVE_MACHINE = 34404)'
+                Message="This x64 installer cannot be installed on an ARM64 device. Use the ARM64 installer instead."/>
+        <?if $(var.InstallerScope) = "perMachine" ?>
+        <Property Id="INSTALLSCOPE" Value="perMachine" Secure="yes"/>
+        <?else ?>
+        <Property Id="INSTALLSCOPE" Value="perUser" Secure="yes"/>
+        <?endif ?>
         <Property Id="CREATESTARTMENUSHORTCUT" Value="1" Secure="yes"/>
         <Property Id="CREATEDESKTOPSHORTCUT" Value="1" Secure="yes"/>
         <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Start program after install"/>
 
         <!-- Restore the directory chosen by the previous installation before the UI is shown. -->
-        <Property Id="INSTALLFOLDER" Secure="yes">
-            <RegistrySearch Id="SearchInstallLocation"
+        <Property Id="MACHINEINSTALLFOLDER" Secure="yes">
+            <RegistrySearch Id="SearchMachineInstallLocation"
                             Root="HKLM"
                             Key="$(var.InstallerRegistryKey)"
                             Name="InstallLocation"
                             Type="raw"/>
         </Property>
+        <Property Id="USERINSTALLFOLDER" Secure="yes">
+            <RegistrySearch Id="SearchUserInstallLocation"
+                            Root="HKCU"
+                            Key="$(var.InstallerRegistryKey)"
+                            Name="InstallLocation"
+                            Type="raw"/>
+        </Property>
+        <Property Id="MACHINEPROGRAMFILESFOLDER" Secure="yes">
+            <RegistrySearch Id="SearchMachineProgramFilesFolder"
+                            Root="HKLM"
+                            Key="SOFTWARE\Microsoft\Windows\CurrentVersion"
+                            Name="ProgramW6432Dir"
+                            Type="raw"
+                            Bitness="always64"/>
+        </Property>
 
-        <Property Id="STARTMENUSHORTCUT_REG" Secure="yes">
-            <RegistrySearch Id="SearchStartMenuShortcut"
+        <?if $(var.InstallerScope) = "perMachineOrUser" ?>
+        <SetProperty Id="INSTALLSCOPE" Action="Set_INSTALLSCOPE_PerUser" Value="perUser"
+                     After="AppSearch" Sequence="ui"
+                     Condition="USERINSTALLFOLDER AND NOT MACHINEINSTALLFOLDER"/>
+        <SetProperty Id="INSTALLSCOPE" Action="Set_INSTALLSCOPE_PerMachine" Value="perMachine"
+                     After="Set_INSTALLSCOPE_PerUser" Sequence="ui"
+                     Condition="MACHINEINSTALLFOLDER AND NOT USERINSTALLFOLDER"/>
+        <?endif ?>
+
+        <Property Id="STARTMENUSHORTCUT_USER_REG" Secure="yes">
+            <RegistrySearch Id="SearchUserStartMenuShortcut"
                             Root="HKCU"
                             Key="$(var.InstallerRegistryKey)"
                             Name="StartMenuShortcut"
                             Type="raw"/>
         </Property>
-        <Property Id="DESKTOPSHORTCUT_REG" Secure="yes">
-            <RegistrySearch Id="SearchDesktopShortcut"
+        <Property Id="STARTMENUSHORTCUT_MACHINE_REG" Secure="yes">
+            <RegistrySearch Id="SearchMachineStartMenuShortcut"
+                            Root="HKLM"
+                            Key="$(var.InstallerRegistryKey)"
+                            Name="StartMenuShortcut"
+                            Type="raw"/>
+        </Property>
+        <Property Id="DESKTOPSHORTCUT_USER_REG" Secure="yes">
+            <RegistrySearch Id="SearchUserDesktopShortcut"
                             Root="HKCU"
+                            Key="$(var.InstallerRegistryKey)"
+                            Name="DesktopShortcut"
+                            Type="raw"/>
+        </Property>
+        <Property Id="DESKTOPSHORTCUT_MACHINE_REG" Secure="yes">
+            <RegistrySearch Id="SearchMachineDesktopShortcut"
+                            Root="HKLM"
                             Key="$(var.InstallerRegistryKey)"
                             Name="DesktopShortcut"
                             Type="raw"/>
         </Property>
 
         <SetProperty Id="CREATESTARTMENUSHORTCUT" Value="1" After="AppSearch" Sequence="ui"
-                     Condition="STARTMENUSHORTCUT_REG = &quot;#1&quot; OR STARTMENUSHORTCUT_REG = &quot;1&quot;"/>
+                     Condition="STARTMENUSHORTCUT_USER_REG = &quot;#1&quot; OR STARTMENUSHORTCUT_MACHINE_REG = &quot;#1&quot;"/>
         <SetProperty Id="CREATESTARTMENUSHORTCUT" Action="Set_CREATESTARTMENUSHORTCUT_Unchecked"
                      Value="{}" After="AppSearch" Sequence="ui"
-                     Condition="STARTMENUSHORTCUT_REG = &quot;#0&quot; OR STARTMENUSHORTCUT_REG = &quot;0&quot; OR ((WIX_UPGRADE_DETECTED OR Installed) AND NOT STARTMENUSHORTCUT_REG)"/>
+                     Condition="STARTMENUSHORTCUT_USER_REG = &quot;#0&quot; OR STARTMENUSHORTCUT_MACHINE_REG = &quot;#0&quot; OR ((WIX_UPGRADE_DETECTED OR Installed) AND NOT STARTMENUSHORTCUT_USER_REG AND NOT STARTMENUSHORTCUT_MACHINE_REG)"/>
 
         <SetProperty Id="CREATEDESKTOPSHORTCUT" Value="1" After="AppSearch" Sequence="ui"
-                     Condition="DESKTOPSHORTCUT_REG = &quot;#1&quot; OR DESKTOPSHORTCUT_REG = &quot;1&quot;"/>
+                     Condition="DESKTOPSHORTCUT_USER_REG = &quot;#1&quot; OR DESKTOPSHORTCUT_MACHINE_REG = &quot;#1&quot;"/>
         <SetProperty Id="CREATEDESKTOPSHORTCUT" Action="Set_CREATEDESKTOPSHORTCUT_Unchecked"
                      Value="{}" After="AppSearch" Sequence="ui"
-                     Condition="DESKTOPSHORTCUT_REG = &quot;#0&quot; OR DESKTOPSHORTCUT_REG = &quot;0&quot; OR ((WIX_UPGRADE_DETECTED OR Installed) AND NOT DESKTOPSHORTCUT_REG)"/>
+                     Condition="DESKTOPSHORTCUT_USER_REG = &quot;#0&quot; OR DESKTOPSHORTCUT_MACHINE_REG = &quot;#0&quot; OR ((WIX_UPGRADE_DETECTED OR Installed) AND NOT DESKTOPSHORTCUT_USER_REG AND NOT DESKTOPSHORTCUT_MACHINE_REG)"/>
 
         <CustomAction Id="LaunchApplication" FileRef="MainExecutable" ExeCommand=""
                       Execute="immediate" Impersonate="yes" Return="asyncNoWait"/>
@@ -71,14 +122,14 @@
 
                 <!-- Keep only the selected directory after uninstall so a later install can restore it. -->
                 <Component Id="InstallLocationRegistryComponent" Guid="">
-                    <RegistryValue Root="HKLM"
+                    <RegistryValue Root="HKMU"
                                    Key="$(var.InstallerRegistryKey)"
                                    Name="InstallLocation" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes"/>
                 </Component>
 
                 <!-- Installed-product metadata is MSI-managed and removed during a full uninstall. -->
                 <Component Id="InstalledStateRegistryComponent" Guid="*">
-                    <RegistryKey Root="HKLM" Key="$(var.InstallerRegistryKey)">
+                    <RegistryKey Root="HKMU" Key="$(var.InstallerRegistryKey)">
                         <RegistryValue Name="ProductCode" Type="string" Value="[ProductCode]" KeyPath="yes"/>
                         <RegistryValue Name="Version" Type="string" Value="$(var.BuildVersion)"/>
                         <RegistryValue Name="Architecture" Type="string" Value="$(var.Platform)"/>
@@ -135,9 +186,26 @@
                 <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0"/>
                 <Control Id="Title" Type="Text" X="15" Y="15" Width="280" Height="20"
                          Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Installation options"/>
-                <Control Id="StartMenu" Type="CheckBox" X="20" Y="75" Width="330" Height="18"
+                <?if $(var.InstallerScope) = "perMachineOrUser" ?>
+                <Control Id="InstallScope" Type="RadioButtonGroup" X="20" Y="60" Width="330" Height="45"
+                         Property="INSTALLSCOPE">
+                    <RadioButtonGroup Property="INSTALLSCOPE">
+                        <RadioButton Value="perMachine" X="0" Y="0" Width="310" Height="16"
+                                     Text="Install for all users (requires administrator privileges)"/>
+                        <RadioButton Value="perUser" X="0" Y="22" Width="310" Height="16"
+                                     Text="Install only for me"/>
+                    </RadioButtonGroup>
+                </Control>
+                <?elseif $(var.InstallerScope) = "perUser" ?>
+                <Control Id="InstallScopeFixed" Type="Text" X="20" Y="65" Width="330" Height="30"
+                         Text="This application will be installed only for the current user."/>
+                <?else ?>
+                <Control Id="InstallScopeFixed" Type="Text" X="20" Y="65" Width="330" Height="30"
+                         Text="This application will be installed for all users and requires administrator privileges."/>
+                <?endif ?>
+                <Control Id="StartMenu" Type="CheckBox" X="20" Y="125" Width="330" Height="18"
                          Property="CREATESTARTMENUSHORTCUT" CheckBoxValue="1" Text="Create Start menu shortcut"/>
-                <Control Id="Desktop" Type="CheckBox" X="20" Y="105" Width="330" Height="18"
+                <Control Id="Desktop" Type="CheckBox" X="20" Y="155" Width="330" Height="18"
                          Property="CREATEDESKTOPSHORTCUT" CheckBoxValue="1" Text="Create Desktop shortcut"/>
                 <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0"/>
                 <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
@@ -145,7 +213,27 @@
                 </Control>
                 <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes"
                          Text="!(loc.WixUINext)">
-                    <Publish Event="NewDialog" Value="InstallDirDlg"/>
+                    <?if $(var.InstallerScope) = "perMachineOrUser" ?>
+                    <Publish Property="ALLUSERS" Value="2" Order="1"
+                             Condition="INSTALLSCOPE = &quot;perUser&quot;"/>
+                    <Publish Property="MSIINSTALLPERUSER" Value="1" Order="2"
+                             Condition="INSTALLSCOPE = &quot;perUser&quot;"/>
+                    <Publish Property="ALLUSERS" Value="2" Order="3"
+                             Condition="INSTALLSCOPE = &quot;perMachine&quot;"/>
+                    <Publish Property="MSIINSTALLPERUSER" Value="{}" Order="4"
+                             Condition="INSTALLSCOPE = &quot;perMachine&quot;"/>
+                    <?endif ?>
+                    <Publish Property="INSTALLFOLDER" Value="[USERINSTALLFOLDER]" Order="5"
+                             Condition="INSTALLSCOPE = &quot;perUser&quot; AND USERINSTALLFOLDER"/>
+                    <Publish Property="INSTALLFOLDER" Value="[LocalAppDataFolder]Programs\$(var.ApplicationName)"
+                             Order="6"
+                             Condition="INSTALLSCOPE = &quot;perUser&quot; AND NOT USERINSTALLFOLDER"/>
+                    <Publish Property="INSTALLFOLDER" Value="[MACHINEINSTALLFOLDER]" Order="7"
+                             Condition="INSTALLSCOPE = &quot;perMachine&quot; AND MACHINEINSTALLFOLDER"/>
+                    <Publish Property="INSTALLFOLDER" Value="[MACHINEPROGRAMFILESFOLDER]\$(var.ApplicationName)"
+                             Order="8"
+                             Condition="INSTALLSCOPE = &quot;perMachine&quot; AND NOT MACHINEINSTALLFOLDER"/>
+                    <Publish Event="NewDialog" Value="InstallDirDlg" Order="9"/>
                 </Control>
                 <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes"
                          Text="!(loc.WixUICancel)">

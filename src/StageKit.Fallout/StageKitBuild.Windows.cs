@@ -137,6 +137,9 @@ public partial class StageKitBuild
             .SetProperty("BuildVersion", SoftwareVersion)
             .SetProperty("ApplicationName", SoftwareName)
             .SetProperty("ApplicationExecutableName", SoftwareExecutableFileNameWithoutExtension)
+            .SetProperty("AuthenticodeCertificateThumbprint", WindowsAuthenticodeCertificateThumbprint ?? string.Empty)
+            .SetProperty("AuthenticodeTimestampUrl", WindowsAuthenticodeTimestampUrl)
+            .SetProperty("SignToolPath", WindowsSignToolPath)
             .SetProperty("OutputName", context.BundleOutputPath.Name);
     }
 

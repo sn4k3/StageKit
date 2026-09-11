@@ -4,15 +4,20 @@
         <TargetFrameworks></TargetFrameworks>
         <OutputType>Package</OutputType>
         <AcceptEula>wix7</AcceptEula>
-        <!-- Same-version replacement is intentional (MajorUpgrade.AllowSameVersionUpgrades). -->
+        <!-- ICE61 requires an upper version bound, which intentionally conflicts with allowed downgrades. -->
         <SuppressIces>$(SuppressIces);ICE61</SuppressIces>
         <!-- Keep the MSI in the output root while resolving English UI strings. -->
         <Cultures>neutral,en-US</Cultures>
         <InstallerPlatform>$(Platform)</InstallerPlatform>
+        <!-- perMachineOrUser (default), perUser, or perMachine. -->
+        <InstallerScope Condition="'$(InstallerScope)' == ''">perMachineOrUser</InstallerScope>
         <OutputName>$(ApplicationName)_$(RuntimeIdentifier)_v$(BuildVersion)</OutputName>
         <LicenseFile>$(MSBuildProjectDirectory)\Resources\License.rtf</LicenseFile>
         <InstallerDialogImage>$(MSBuildProjectDirectory)\Resources\InstallerDialogImage.png</InstallerDialogImage>
         <InstallerBannerImage>$(MSBuildProjectDirectory)\Resources\InstallerBannerImage.png</InstallerBannerImage>
+        <AuthenticodeTimestampUrl Condition="'$(AuthenticodeTimestampUrl)' == ''">http://timestamp.digicert.com</AuthenticodeTimestampUrl>
+        <SignToolPath Condition="'$(SignToolPath)' == ''">signtool.exe</SignToolPath>
+        <SignOutput Condition="'$(AuthenticodeCertificateThumbprint)' != ''">true</SignOutput>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(ArtifactsPath)' != ''">
@@ -29,12 +34,13 @@
     </PropertyGroup>
 
     <PropertyGroup>
-        <DefineConstants>$(DefineConstants);ApplicationName=$(ApplicationName);ApplicationExecutableName=$(ApplicationExecutableName);BuildVersion=$(BuildVersion);Company=$(Company);Copyright=$(Copyright);RepositoryUrl=$(RepositoryUrl);ApplicationIcon=$(ApplicationIcon);LicenseFile=$(LicenseFile);UpgradeCode=$(UpgradeCode)</DefineConstants>
+        <DefineConstants>$(DefineConstants);ApplicationName=$(ApplicationName);ApplicationExecutableName=$(ApplicationExecutableName);BuildVersion=$(BuildVersion);Company=$(Company);Copyright=$(Copyright);RepositoryUrl=$(RepositoryUrl);ApplicationIcon=$(ApplicationIcon);LicenseFile=$(LicenseFile);UpgradeCode=$(UpgradeCode);InstallerScope=$(InstallerScope)</DefineConstants>
     </PropertyGroup>
 
     <ItemGroup>
         <BindPath Include="$(PublishDirectory)" BindName="Publish"/>
         <PackageReference Include="WixToolset.UI.wixext" Version="7.0.0"/>
+        <PackageReference Include="WixToolset.Util.wixext" Version="7.0.0"/>
     </ItemGroup>
 
     <!-- Optional artwork; omit either property to retain that WixUI default image. -->
@@ -68,6 +74,8 @@
                Text="RuntimeIdentifier must be provided by the Fallout publish pipeline."/>
         <Error Condition="'$(Platform)' != 'x64' And '$(Platform)' != 'arm64'"
                Text="Platform must be x64 or arm64, but was '$(Platform)'."/>
+        <Error Condition="'$(InstallerScope)' != 'perMachineOrUser' And '$(InstallerScope)' != 'perUser' And '$(InstallerScope)' != 'perMachine'"
+               Text="InstallerScope must be perMachineOrUser, perUser, or perMachine, but was '$(InstallerScope)'."/>
         <Error Condition="!Exists('$(PublishDirectory)')"
                Text="PublishDirectory '$(PublishDirectory)' does not exist."/>
         <Error Condition="!Exists('$(PublishDirectory)\$(ApplicationExecutableName).exe')"
@@ -76,6 +84,15 @@
                Text="Application icon '$(ApplicationIcon)' does not exist."/>
         <Error Condition="!Exists('$(LicenseFile)')"
                Text="Installer license '$(LicenseFile)' does not exist."/>
+    </Target>
+
+    <Target Name="SignInstallerPayload" BeforeTargets="CoreCompile"
+            Condition="'$(SignOutput)' == 'true'">
+        <Exec Command="&quot;$(SignToolPath)&quot; sign /sha1 &quot;$(AuthenticodeCertificateThumbprint)&quot; /fd SHA256 /tr &quot;$(AuthenticodeTimestampUrl)&quot; /td SHA256 /d &quot;$(ApplicationName)&quot; /du &quot;$(RepositoryUrl)&quot; &quot;$(PublishDirectory)\$(ApplicationExecutableName).exe&quot;"/>
+    </Target>
+
+    <Target Name="SignMsi" Condition="'$(SignOutput)' == 'true'">
+        <Exec Command="&quot;$(SignToolPath)&quot; sign /sha1 &quot;$(AuthenticodeCertificateThumbprint)&quot; /fd SHA256 /tr &quot;$(AuthenticodeTimestampUrl)&quot; /td SHA256 /d &quot;$(ApplicationName)&quot; /du &quot;$(RepositoryUrl)&quot; &quot;%(SignMsi.FullPath)&quot;"/>
     </Target>
 
 </Project>

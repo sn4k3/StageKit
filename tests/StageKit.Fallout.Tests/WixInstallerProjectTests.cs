@@ -45,27 +45,60 @@ public sealed class WixInstallerProjectTests
             Assert.Contains("22222222-2222-2222-2222-222222222222", project, StringComparison.Ordinal);
             Assert.Contains("<OutputName>$(ApplicationName)_$(RuntimeIdentifier)_v$(BuildVersion)</OutputName>",
                 project, StringComparison.Ordinal);
+            Assert.Contains("<TargetFrameworks></TargetFrameworks>", project, StringComparison.Ordinal);
+            Assert.Contains("<InstallerScope Condition=\"'$(InstallerScope)' == ''\">perMachineOrUser</InstallerScope>",
+                project, StringComparison.Ordinal);
+            Assert.Contains("InstallerScope must be perMachineOrUser, perUser, or perMachine", project,
+                StringComparison.Ordinal);
             Assert.Contains(@"Resources\License.rtf", project, StringComparison.Ordinal);
             Assert.Contains("ValidateInstallerInputs", project, StringComparison.Ordinal);
+            Assert.Contains("WixToolset.Util.wixext", project, StringComparison.Ordinal);
+            Assert.Contains("SignInstallerPayload", project, StringComparison.Ordinal);
+            Assert.Contains("<Target Name=\"SignMsi\"", project, StringComparison.Ordinal);
 
             var package = File.ReadAllText(Path.Combine(directory, "Package.wxs"));
             Assert.Contains("!(bindpath.Publish)", package, StringComparison.Ordinal);
             Assert.Contains("WixUI_InstallDir", package, StringComparison.Ordinal);
             Assert.Contains("InstallOptionsDlg", package, StringComparison.Ordinal);
+            Assert.Contains("<?define PackageScope = \"perUserOrMachine\" ?>", package, StringComparison.Ordinal);
+            Assert.Contains("Scope=\"$(var.PackageScope)\"", package, StringComparison.Ordinal);
+            Assert.Contains("<?if $(var.InstallerScope) = \"perMachineOrUser\" ?>", package,
+                StringComparison.Ordinal);
+            Assert.Contains("This application will be installed only for the current user.", package,
+                StringComparison.Ordinal);
+            Assert.Contains("This application will be installed for all users", package, StringComparison.Ordinal);
+            Assert.DoesNotContain("Event=\"SetTargetPath\" Value=\"[INSTALLFOLDER]\"", package,
+                StringComparison.Ordinal);
+            Assert.Contains("<MajorUpgrade AllowDowngrades=\"yes\"/>", package, StringComparison.Ordinal);
+            Assert.Contains("<util:QueryNativeMachine/>", package, StringComparison.Ordinal);
+            Assert.Contains("Installed OR WIX_UPGRADE_DETECTED OR (\"$(sys.BUILDARCH)\" ~= \"x64\" IMP WIX_NATIVE_MACHINE = 34404)",
+                package, StringComparison.Ordinal);
+            Assert.Contains("<Publish Property=\"ALLUSERS\" Value=\"2\" Order=\"1\"", package,
+                StringComparison.Ordinal);
+            Assert.Contains("<Publish Property=\"MSIINSTALLPERUSER\" Value=\"1\" Order=\"2\"", package,
+                StringComparison.Ordinal);
+            Assert.Contains("<Publish Property=\"ALLUSERS\" Value=\"2\" Order=\"3\"", package,
+                StringComparison.Ordinal);
+            Assert.Contains("Value=\"[MACHINEPROGRAMFILESFOLDER]\\$(var.ApplicationName)\"", package,
+                StringComparison.Ordinal);
+            Assert.Contains("<RemoveRegistryValue Root=\"HKMU\"", package, StringComparison.Ordinal);
+            Assert.Contains("Name=\"ScopedInstallLocation\"/>", package, StringComparison.Ordinal);
+            Assert.Contains("Property=\"INSTALLSCOPE\"", package, StringComparison.Ordinal);
             Assert.Contains("Id=\"WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT\" Value=\"Start program after install\"",
                 package, StringComparison.Ordinal);
             Assert.Contains("WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1", package, StringComparison.Ordinal);
             Assert.DoesNotContain("Property=\"STARTAFTERINSTALL\"", package, StringComparison.Ordinal);
             Assert.Contains("<?define InstallerRegistryKey =", package, StringComparison.Ordinal);
-            Assert.Equal(7, package.Split("Key=\"$(var.InstallerRegistryKey)\"").Length - 1);
+            Assert.Equal(11, package.Split("Key=\"$(var.InstallerRegistryKey)\"").Length - 1);
             Assert.DoesNotContain("Key=\"Software\\$(var.Company)\\$(var.ApplicationName)\\Installer\"", package,
                 StringComparison.Ordinal);
-            Assert.Contains("SearchInstallLocation", package, StringComparison.Ordinal);
+            Assert.Contains("SearchMachineInstallLocation", package, StringComparison.Ordinal);
+            Assert.Contains("SearchUserInstallLocation", package, StringComparison.Ordinal);
             Assert.Contains("<Component Id=\"InstallLocationRegistryComponent\" Guid=\"\">", package,
                 StringComparison.Ordinal);
             Assert.Contains("<Component Id=\"InstalledStateRegistryComponent\" Guid=\"*\">", package,
                 StringComparison.Ordinal);
-            Assert.Contains("<RegistryKey Root=\"HKLM\" Key=\"$(var.InstallerRegistryKey)\">", package,
+            Assert.Contains("<RegistryKey Root=\"HKMU\" Key=\"$(var.InstallerRegistryKey)\">", package,
                 StringComparison.Ordinal);
             Assert.Contains("Name=\"InstallLocation\" Type=\"string\" Value=\"[INSTALLFOLDER]\"", package,
                 StringComparison.Ordinal);
@@ -78,8 +111,10 @@ public sealed class WixInstallerProjectTests
             Assert.Contains("Name=\"ExecutablePath\" Type=\"string\"", package, StringComparison.Ordinal);
             Assert.Contains("Value=\"[INSTALLFOLDER]$(var.ApplicationExecutableName).exe\"", package,
                 StringComparison.Ordinal);
-            Assert.Contains("SearchStartMenuShortcut", package, StringComparison.Ordinal);
-            Assert.Contains("SearchDesktopShortcut", package, StringComparison.Ordinal);
+            Assert.Contains("SearchUserStartMenuShortcut", package, StringComparison.Ordinal);
+            Assert.Contains("SearchMachineStartMenuShortcut", package, StringComparison.Ordinal);
+            Assert.Contains("SearchUserDesktopShortcut", package, StringComparison.Ordinal);
+            Assert.Contains("SearchMachineDesktopShortcut", package, StringComparison.Ordinal);
             Assert.Contains("Set_CREATESTARTMENUSHORTCUT_Unchecked", package, StringComparison.Ordinal);
             Assert.Contains("Set_CREATEDESKTOPSHORTCUT_Unchecked", package, StringComparison.Ordinal);
 

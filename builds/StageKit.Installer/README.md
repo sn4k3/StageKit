@@ -13,3 +13,16 @@ Each property is optional; omitting it retains the corresponding WiX default. A 
 Use artwork only, without the wizard text and controls shown in reference screenshots.
 
 See the [WiX artwork documentation](https://docs.firegiant.com/wix/tools/wixext/wixui/#replacing-the-default-bitmaps).
+
+## Installation scope
+
+`InstallerScope` defaults to `perMachineOrUser`, which lets the user choose the installation scope in the wizard and
+initially selects a non-elevated per-user installation. Set it to `perUser` or `perMachine` in the project or with
+`-p:InstallerScope=...` to enforce that scope and hide the selector. Unsupported values fail the build.
+
+## Authenticode signing
+
+Set `AuthenticodeCertificateThumbprint` to the SHA-1 thumbprint of a code-signing certificate in the current user's
+certificate store. The build signs the staged application executable and the final MSI with SHA-256 and an RFC 3161
+timestamp. Override `AuthenticodeTimestampUrl` or `SignToolPath` when required. Leaving the thumbprint blank disables
+signing.

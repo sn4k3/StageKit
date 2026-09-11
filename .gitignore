@@ -465,4 +465,5 @@ $RECYCLE.BIN/
 # AI
 .claude
 .serena
+.semgrep
 .github/tdd

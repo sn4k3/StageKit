@@ -239,10 +239,20 @@ creating packages.
 
 It writes `builds/<SoftwareName>.WixInstaller` with the project file, `Package.wxs`, `Strings.en-us.wxl`, a readme, a
 placeholder `Resources/License.rtf`, and placeholder `Resources/InstallerBannerImage.png` (493 × 58) and
-`Resources/InstallerDialogImage.png` (493 × 312) artwork. The generated wizard offers Start menu, desktop shortcut, and
-launch-after-install options, and upgrades same-version installations in place. Every product-specific value — publish
-payload, application name, executable name, version, platform, and asset name — is passed by the pipeline at build time,
-so the project builds without editing.
+`Resources/InstallerDialogImage.png` (493 × 312) artwork. The generated wizard lets the user choose a per-user or
+per-machine installation and offers Start menu, desktop shortcut, and launch-after-install options. It accepts older and
+same-version packages as major upgrades. Every product-specific value — publish payload, application name, executable
+name, version, platform, and asset name — is passed by the pipeline at build time, so the project builds without editing.
+
+The generated project defines `InstallerScope` as `perMachineOrUser`, allowing users to choose their scope while
+defaulting to a non-elevated per-user installation. Set the property to `perUser` or `perMachine` in the `.wixproj` to
+enforce one scope and hide the selector. The property can also be overridden when building the WiX project with
+`-p:InstallerScope=...`.
+
+Set `WindowsAuthenticodeCertificateThumbprint` to a SHA-1 certificate thumbprint to sign the staged application
+executable and final MSI. Fallout forwards `WindowsAuthenticodeTimestampUrl` (defaulting to DigiCert's RFC 3161 service)
+and `WindowsSignToolPath` (defaulting to `signtool.exe`) to the WiX build. The certificate must be available in the
+current user's certificate store; leaving the thumbprint blank disables signing.
 
 Two upgrade codes are generated, one per platform, and written into the project. **They must stay stable**: changing one
 makes Windows treat later installers as a different product instead of an upgrade. For that reason the target refuses to

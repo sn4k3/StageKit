@@ -730,6 +730,7 @@ public class PublishPipelineTests
             TestSoftwareName = "ProductName",
             TestSoftwareExecutableName = "PublishedExecutable"
         };
+        build.SetWindowsAuthenticodeSettings("ABC123", "https://timestamp.example", "tools/signtool.exe");
         var context = CreateContext(build, "win-x64");
 
         var settings = build.InvokeConfigureWindowsInstallerBuildSettings(
@@ -743,6 +744,12 @@ public class PublishPipelineTests
             Assert.IsType<JsonElement>(settings.Properties["ApplicationName"]).GetString());
         Assert.Equal("PublishedExecutable",
             Assert.IsType<JsonElement>(settings.Properties["ApplicationExecutableName"]).GetString());
+        Assert.Equal("ABC123",
+            Assert.IsType<JsonElement>(settings.Properties["AuthenticodeCertificateThumbprint"]).GetString());
+        Assert.Equal("https://timestamp.example",
+            Assert.IsType<JsonElement>(settings.Properties["AuthenticodeTimestampUrl"]).GetString());
+        Assert.Equal("tools/signtool.exe",
+            Assert.IsType<JsonElement>(settings.Properties["SignToolPath"]).GetString());
     }
 
     /// <summary>
@@ -3659,6 +3666,13 @@ public class PublishPipelineTests
         internal string TestSoftwareVersion { get; set; } = "1.2.3";
 
         internal bool UseDefaultPreparation { get; set; }
+
+        internal void SetWindowsAuthenticodeSettings(string thumbprint, string timestampUrl, string signToolPath)
+        {
+            WindowsAuthenticodeCertificateThumbprint = thumbprint;
+            WindowsAuthenticodeTimestampUrl = timestampUrl;
+            WindowsSignToolPath = signToolPath;
+        }
 
         internal bool UseDefaultSettings { get; set; }
 

@@ -69,6 +69,26 @@ public partial class StageKitBuild
     public bool UseSingleFileForInstaller { get; protected set; }
 
     /// <summary>
+    /// Gets the SHA-1 thumbprint of the current-user certificate used to Authenticode-sign Windows installer payloads
+    /// and MSI packages.
+    /// </summary>
+    /// <remarks>Leave blank to disable Windows installer signing.</remarks>
+    [Parameter("SHA-1 thumbprint of the current-user Authenticode certificate used to sign Windows installers.")]
+    public string? WindowsAuthenticodeCertificateThumbprint { get; protected set; }
+
+    /// <summary>
+    /// Gets the RFC 3161 timestamp service used when Authenticode-signing Windows installers.
+    /// </summary>
+    [Parameter("RFC 3161 timestamp URL used when signing Windows installers.")]
+    public string WindowsAuthenticodeTimestampUrl { get; protected set; } = "http://timestamp.digicert.com";
+
+    /// <summary>
+    /// Gets the path or command name of the Microsoft SignTool executable.
+    /// </summary>
+    [Parameter("Path or command name of signtool.exe used to sign Windows installers.")]
+    public string WindowsSignToolPath { get; protected set; } = "signtool.exe";
+
+    /// <summary>
     /// Gets the icon file used for macOS application bundles.
     /// </summary>
     public virtual AbsolutePath MacOSIconFile => MediaDirectory / $"{SoftwareName}.icns";
@@ -228,7 +248,7 @@ public partial class StageKitBuild
                 if (!filePath.FileExists())
                     throw new FileNotFoundException($"File '{filePath}' does not exist, cannot set {mode} permissions.",
                         filePath);
-                
+
                 UnixSystem.SetUnixPermissions(filePath, mode);
             }
         }
