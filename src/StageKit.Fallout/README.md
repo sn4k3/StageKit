@@ -125,16 +125,16 @@ Run a target:
 
 ## Targets
 
-| Target                  | Depends on            | Description                                                                                                            |
-|-------------------------|-----------------------|------------------------------------------------------------------------------------------------------------------------|
-| `Print`                 | —                     | Logs every public build variable, including resolved metadata and bundle options. Useful for diagnosing configuration. |
-| `Clean`                 | runs before `Restore` | `dotnet clean` plus deletion of `ArtifactsDirectory`.                                                                  |
-| `Restore`               | —                     | `dotnet restore` on `MainProject`.                                                                                     |
-| `Compile`               | `Restore`             | `dotnet build` on `MainProject`. Default target.                                                                       |
-| `Run`                   | `Compile`             | `dotnet run` on `MainProject` with `--no-build --no-restore`.                                                          |
-| `Publish`               | `Restore`             | Publishes every runtime identifier in `RIds` and creates the packaging formats selected by `PackagingTypes`.           |
-| `GenerateInstallScript` | —                     | Generates Bash and Windows PowerShell install/uninstall scripts for compatible GitHub release assets.                  |
-| `GenerateWindowsWixInstaller` | —               | Scaffolds `builds/<SoftwareName>.WixInstaller`, the WiX project `Publish` builds into an MSI. Fails when it exists.    |
+| Target                        | Depends on            | Description                                                                                                            |
+|-------------------------------|-----------------------|------------------------------------------------------------------------------------------------------------------------|
+| `Print`                       | —                     | Logs every public build variable, including resolved metadata and bundle options. Useful for diagnosing configuration. |
+| `Clean`                       | runs before `Restore` | `dotnet clean` plus deletion of `ArtifactsDirectory`.                                                                  |
+| `Restore`                     | —                     | `dotnet restore` on `MainProject`.                                                                                     |
+| `Compile`                     | `Restore`             | `dotnet build` on `MainProject`. Default target.                                                                       |
+| `Run`                         | `Compile`             | `dotnet run` on `MainProject` with `--no-build --no-restore`.                                                          |
+| `Publish`                     | `Restore`             | Publishes every runtime identifier in `RIds` and creates the packaging formats selected by `PackagingTypes`.           |
+| `GenerateInstallScript`       | —                     | Generates Bash and Windows PowerShell install/uninstall scripts for compatible GitHub release assets.                  |
+| `GenerateWindowsWixInstaller` | —                     | Scaffolds `builds/<SoftwareName>.WixInstaller`, the WiX project `Publish` builds into an MSI. Fails when it exists.    |
 
 `DependOnTargets` lets a derived build inject extra targets into `Compile`, `Run`, and `Publish`.
 
@@ -151,8 +151,8 @@ Declared with Fallout's `[Parameter]` attribute, so each can be supplied on the 
 | `PublishMultiArch`          | `false`                                                     | Create one macOS app bundle containing both x64 and arm64 executables. Requires both macOS RIDs. |
 | `DeletePublishDirectories`  | `false`                                                     | Delete raw publish directories after publishing.                                                 |
 | `UseSingleFileForInstaller` | `false`                                                     | Use the single-file executable as the Windows installer payload.                                 |
-| ReadyToRun                  | false                                                        | Publish ReadyToRun (R2R) compiled applications.                                                  |
-| PublishTrimmed              | false                                                        | Publish trimmed applications.                                                                    |
+| ReadyToRun                  | false                                                       | Publish ReadyToRun (R2R) compiled applications.                                                  |
+| PublishTrimmed              | false                                                       | Publish trimmed applications.                                                                    |
 | AppImageCompression         | null                                                        | Squashfs compression passed to appimagetool. Use 'default' for appimagetool default.             |
 
 ## Software metadata
@@ -237,17 +237,17 @@ creating packages.
 ./build.ps1 GenerateWindowsWixInstaller
 ```
 
-It writes `builds/<SoftwareName>.WixInstaller` with the project file, `Package.wxs`, `Strings.en-us.wxl`, a readme,
-a placeholder `Resources/License.rtf`, and placeholder `Resources/InstallerBannerImage.png` (493 × 58) and
-`Resources/InstallerDialogImage.png` (493 × 312) artwork. The generated wizard offers Start menu, desktop shortcut,
-and launch-after-install options, and upgrades same-version installations in place. Every product-specific value —
-publish payload, application name, executable name, version, platform, and asset name — is passed by the pipeline at
-build time, so the project builds without editing.
+It writes `builds/<SoftwareName>.WixInstaller` with the project file, `Package.wxs`, `Strings.en-us.wxl`, a readme, a
+placeholder `Resources/License.rtf`, and placeholder `Resources/InstallerBannerImage.png` (493 × 58) and
+`Resources/InstallerDialogImage.png` (493 × 312) artwork. The generated wizard offers Start menu, desktop shortcut, and
+launch-after-install options, and upgrades same-version installations in place. Every product-specific value — publish
+payload, application name, executable name, version, platform, and asset name — is passed by the pipeline at build time,
+so the project builds without editing.
 
-Two upgrade codes are generated, one per platform, and written into the project. **They must stay stable**: changing
-one makes Windows treat later installers as a different product instead of an upgrade. For that reason the target
-refuses to overwrite an existing project and fails when `builds/<SoftwareName>.WixInstaller` already exists and is not
-empty. Delete the directory to regenerate it, and add the project to the solution so `InstallerProjects` finds it.
+Two upgrade codes are generated, one per platform, and written into the project. **They must stay stable**: changing one
+makes Windows treat later installers as a different product instead of an upgrade. For that reason the target refuses to
+overwrite an existing project and fails when `builds/<SoftwareName>.WixInstaller` already exists and is not empty.
+Delete the directory to regenerate it, and add the project to the solution so `InstallerProjects` finds it.
 
 Override `WindowsWixInstallerProjectName`, `WindowsWixInstallerDirectory`, `WindowsWixInstallerProjectFile`,
 `CreateWindowsWixInstallerLicense()`, or `CreateWindowsWixInstallerUpgradeCode()` in a derived build to change the
@@ -370,6 +370,21 @@ scalable hicolor directory, while PNG icons are installed in `256x256/apps`. App
 `appimagetool` for the host architecture; when FUSE 2 is unavailable the tool is extracted before use.
 
 `PublishCleanupExtensions` (default `wixpdb`) removes leftover files from the publish directory after a successful run.
+
+### Unix file permissions
+
+Use `UnixFilePermissions` to apply `chmod` modes to files in every Unix-like runtime's published output. Keys must be
+nonblank relative paths that resolve beneath the runtime publish directory; absolute paths, traversal paths, missing
+files, and reparse-point escapes are rejected. Values use the mode syntax accepted by Unix `chmod`. Windows runtime
+publishes ignore this configuration, and permission changes are a no-op when cross-publishing from a Windows host.
+
+```csharp
+public Build()
+{
+    UnixFilePermissions["tools/helper"] = "755";
+    UnixFilePermissions["scripts/start.sh"] = "u+x";
+}
+```
 
 ### Build runtime manifest
 

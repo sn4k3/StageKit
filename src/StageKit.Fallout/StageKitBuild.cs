@@ -245,9 +245,21 @@ public abstract partial class StageKitBuild : FalloutBuild
     {
         get
         {
-            field ??= GetMainProjectProperty("SoftwareName") ??
-                      GetMainProjectProperty("RepositoryName")
-                      ?? SolutionName;
+            field ??= GetMainProjectProperty("SoftwareName")
+                      ?? GetMainProjectProperty("ProductName")
+                      ?? GetMainProjectProperty("RepositoryName")
+                      ?? GetMainProjectProperty("Product")
+                      ?? GetMainProjectProperty("AssemblyName")
+                      ?? GetMainProjectProperty("SolutionName")
+                      ?? Solution.Name;
+
+            if (string.IsNullOrEmpty(field))
+            {
+                field = MainProject.Name
+                    .Split(['.', '-'], StringSplitOptions.RemoveEmptyEntries)
+                    .FirstOrDefault();
+            }
+            
             ThrowIfMissingProperty(field);
             return field;
         }
@@ -488,6 +500,16 @@ public abstract partial class StageKitBuild : FalloutBuild
     /// Gets the root directory used for temporary publish staging payloads.
     /// </summary>
     protected virtual AbsolutePath PublishStagingDirectory => TemporaryDirectory / "publish-staging";
+
+    /// <summary>
+    /// Gets the Unix file permissions to apply to files in each runtime's published output directory.
+    /// </summary>
+    /// <remarks>
+    /// Each key is a nonblank relative path beneath the runtime's publish directory and each value is a mode accepted
+    /// by Unix <c>chmod</c>, such as <c>755</c> or <c>u+x</c>. Entries are applied after publishing on Unix-like
+    /// runtime identifiers and are ignored for Windows runtimes. Permission changes are a no-op on Windows hosts.
+    /// </remarks>
+    public Dictionary<string, string> UnixFilePermissions { get; } = [];
 
     /// <summary>
     /// Gets or sets the options used to create macOS application bundles.

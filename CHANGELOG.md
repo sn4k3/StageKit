@@ -1,3 +1,10 @@
+# v0.3.7 (11/09/2026)
+
+- Remove `<TargetFramework>net10.0</TargetFramework>` from WixInstaller template
+- Add `StageKitBuild.UnixFilePermissions` to apply configured `chmod` modes to validated files beneath each Unix-like
+  runtime's publish directory after publishing
+- Improve the `StageKitBuild.SoftwareName` property to guess from more properties
+
 # v0.3.6 (10/09/2026)
 
 - Add the `EntryApplication.CurrentProcess` cached property to expose the current process

@@ -310,6 +310,158 @@ public class PublishPipelineTests
     }
 
     /// <summary>
+    /// Verifies that configured Unix file permissions are applied to files in the published output.
+    /// </summary>
+    [Fact]
+    public void PreparePublishedOutput_UnixFilePermissions_AppliesConfiguredMode()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        var rootDirectory = Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}");
+        var publishDirectory = CreateRawOutput(rootDirectory, "linux-x64", "PublishedExecutable");
+        var configuredPath = Path.Combine(publishDirectory, "tools", "helper");
+        Directory.CreateDirectory(Path.GetDirectoryName(configuredPath)!);
+        File.WriteAllText(configuredPath, "helper");
+
+        try
+        {
+            var build = new TestBuild
+            {
+                TestSoftwareExecutableName = "PublishedExecutable",
+                UseDefaultPreparation = true
+            };
+            build.UnixFilePermissions[Path.Combine("tools", "helper")] = "600";
+
+            build.InvokePreparePublishedOutput(CreateContext(build, "linux-x64", publishDirectory));
+
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(configuredPath));
+        }
+        finally
+        {
+            Directory.Delete(rootDirectory, true);
+        }
+    }
+
+    /// <summary>
+    /// Verifies that a configured permission target must exist in the published output.
+    /// </summary>
+    [Fact]
+    public void PreparePublishedOutput_UnixFilePermissions_MissingFileThrows()
+    {
+        var rootDirectory = Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}");
+        var publishDirectory = CreateRawOutput(rootDirectory, "linux-x64", "PublishedExecutable");
+        var missingPath = Path.Combine(publishDirectory, "missing.txt");
+
+        try
+        {
+            var build = new TestBuild
+            {
+                TestSoftwareExecutableName = "PublishedExecutable",
+                UseDefaultPreparation = true
+            };
+            build.UnixFilePermissions["missing.txt"] = "600";
+
+            var exception = Assert.Throws<FileNotFoundException>(() => build.InvokePreparePublishedOutput(
+                CreateContext(build, "linux-x64", publishDirectory)));
+
+            Assert.Equal(missingPath, exception.FileName);
+        }
+        finally
+        {
+            Directory.Delete(rootDirectory, true);
+        }
+    }
+
+    /// <summary>
+    /// Verifies that traversal paths cannot escape the published output.
+    /// </summary>
+    [Fact]
+    public void PreparePublishedOutput_UnixFilePermissions_TraversalPathThrows()
+    {
+        var rootDirectory = Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}");
+        var publishDirectory = CreateRawOutput(rootDirectory, "linux-x64", "PublishedExecutable");
+
+        try
+        {
+            var build = new TestBuild
+            {
+                TestSoftwareExecutableName = "PublishedExecutable",
+                UseDefaultPreparation = true
+            };
+            build.UnixFilePermissions[Path.Combine("..", "outside.txt")] = "600";
+
+            var exception = Assert.Throws<ArgumentException>(() => build.InvokePreparePublishedOutput(
+                CreateContext(build, "linux-x64", publishDirectory)));
+
+            Assert.Contains("must resolve beneath", exception.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(rootDirectory, true);
+        }
+    }
+
+    /// <summary>
+    /// Verifies that absolute paths cannot be used for configured Unix file permissions.
+    /// </summary>
+    [Fact]
+    public void PreparePublishedOutput_UnixFilePermissions_AbsolutePathThrows()
+    {
+        var rootDirectory = Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}");
+        var publishDirectory = CreateRawOutput(rootDirectory, "linux-x64", "PublishedExecutable");
+        var absolutePath = Path.Combine(publishDirectory, "absolute.txt");
+        File.WriteAllText(absolutePath, "absolute");
+
+        try
+        {
+            var build = new TestBuild
+            {
+                TestSoftwareExecutableName = "PublishedExecutable",
+                UseDefaultPreparation = true
+            };
+            build.UnixFilePermissions[absolutePath] = "600";
+
+            var exception = Assert.Throws<ArgumentException>(() => build.InvokePreparePublishedOutput(
+                CreateContext(build, "linux-x64", publishDirectory)));
+
+            Assert.Contains("must be relative", exception.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(rootDirectory, true);
+        }
+    }
+
+    /// <summary>
+    /// Verifies that blank configured Unix file permission paths are rejected.
+    /// </summary>
+    [Fact]
+    public void PreparePublishedOutput_UnixFilePermissions_BlankPathThrows()
+    {
+        var rootDirectory = Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}");
+        var publishDirectory = CreateRawOutput(rootDirectory, "linux-x64", "PublishedExecutable");
+
+        try
+        {
+            var build = new TestBuild
+            {
+                TestSoftwareExecutableName = "PublishedExecutable",
+                UseDefaultPreparation = true
+            };
+            build.UnixFilePermissions[" "] = "600";
+
+            var exception = Assert.Throws<ArgumentException>(() => build.InvokePreparePublishedOutput(
+                CreateContext(build, "linux-x64", publishDirectory)));
+
+            Assert.Contains("must not be null, empty, or whitespace", exception.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(rootDirectory, true);
+        }
+    }
+
+    /// <summary>
     /// Verifies that preparing a published output writes an external runtime manifest even when single-file packaging is enabled.
     /// </summary>
     [Fact]

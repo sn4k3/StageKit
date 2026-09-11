@@ -1,5 +1,6 @@
 using Fallout.Common;
 using Fallout.Common.IO;
+using Fallout.Common.Tooling;
 using Fallout.Common.Tools.DotNet;
 using Fallout.Solutions;
 using Serilog;
@@ -205,6 +206,31 @@ public partial class StageKitBuild
                     executablePath);
 
             UnixSystem.SetUnix755Executable(executablePath);
+
+            foreach (var (path, mode) in UnixFilePermissions)
+            {
+                if (string.IsNullOrWhiteSpace(path))
+                    throw new ArgumentException(
+                        "Unix file permission paths must not be null, empty, or whitespace.",
+                        nameof(UnixFilePermissions));
+
+                if (Path.IsPathRooted(path))
+                    throw new ArgumentException(
+                        $"Unix file permission path '{path}' must be relative to the publish directory.",
+                        nameof(UnixFilePermissions));
+
+                var filePath = context.PublishPath / path;
+                if (!PathUtilities.IsSubPathOf(filePath.ToString(), context.PublishPath.ToString()))
+                    throw new ArgumentException(
+                        $"Unix file permission path '{path}' must resolve beneath the publish directory.",
+                        nameof(UnixFilePermissions));
+
+                if (!filePath.FileExists())
+                    throw new FileNotFoundException($"File '{filePath}' does not exist, cannot set {mode} permissions.",
+                        filePath);
+
+                filePath.SetUnixPermissions(mode);
+            }
         }
 
         PublishUtilities.WriteRuntimeManifest(context.PublishPath, BuildRuntimeManifestFileName,

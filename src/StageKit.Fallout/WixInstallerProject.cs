@@ -276,7 +276,6 @@ internal static class WixInstallerProject
         <Project Sdk="WixToolset.Sdk/7.0.0">
 
             <PropertyGroup>
-                <TargetFramework>net10.0</TargetFramework>
                 <OutputType>Package</OutputType>
                 <AcceptEula>wix7</AcceptEula>
                 <!-- Same-version replacement is intentional (MajorUpgrade.AllowSameVersionUpgrades). -->
