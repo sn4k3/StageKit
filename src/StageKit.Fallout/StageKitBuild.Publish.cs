@@ -228,8 +228,8 @@ public partial class StageKitBuild
                 if (!filePath.FileExists())
                     throw new FileNotFoundException($"File '{filePath}' does not exist, cannot set {mode} permissions.",
                         filePath);
-
-                filePath.SetUnixPermissions(mode);
+                
+                UnixSystem.SetUnixPermissions(filePath, mode);
             }
         }
 
