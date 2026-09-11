@@ -219,9 +219,9 @@ internal static class InstallScript
                                                 BEGIN {
                                                   split(current, current_parts, ".")
                                                   split(minimum, minimum_parts, ".")
-                                                  for (index = 1; index <= 3; index++) {
-                                                    current_part = current_parts[index] + 0
-                                                    minimum_part = minimum_parts[index] + 0
+                                                  for (part_index = 1; part_index <= 3; part_index++) {
+                                                    current_part = current_parts[part_index] + 0
+                                                    minimum_part = minimum_parts[part_index] + 0
                                                     if (current_part > minimum_part) exit 0
                                                     if (current_part < minimum_part) exit 1
                                                   }
