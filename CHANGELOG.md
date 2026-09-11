@@ -4,6 +4,7 @@
 - Emit current AppStream developer metadata, including a configurable developer ID, for Linux application bundles
 - Normalize AppStream summaries by removing trailing periods
 - Add option to stop configured running application instances before installation
+- Add the StageKit demo icon to its window and taskbar entry
 
 # v0.3.8 (11/09/2026)
 

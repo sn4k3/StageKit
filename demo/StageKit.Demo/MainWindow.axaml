@@ -3,6 +3,7 @@
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="{Binding WindowTitle}"
+    Icon="/Assets/StageKit.ico"
     Width="1180"
     Height="780"
     MinWidth="940"
@@ -127,7 +128,8 @@
                                     <Border Classes="card" Margin="0,0,12,12">
                                         <StackPanel Spacing="6">
                                             <SelectableTextBlock Classes="muted" Text="{Binding Label}" />
-                                            <SelectableTextBlock FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding Value}" />
+                                            <SelectableTextBlock FontWeight="SemiBold" TextWrapping="Wrap"
+                                                                 Text="{Binding Value}" />
                                         </StackPanel>
                                     </Border>
                                 </DataTemplate>
