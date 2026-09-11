@@ -77,6 +77,15 @@ public class InstallScriptTests
         Assert.Contains("list_changelogs", script, StringComparison.Ordinal);
         Assert.Contains("CHANGELOG_LIMIT='20'", script, StringComparison.Ordinal);
         Assert.Contains("MACOS_MINIMUM_VERSION='13.0'", script, StringComparison.Ordinal);
+        Assert.Contains("KILL_RUNNING_INSTANCES='true'", script, StringComparison.Ordinal);
+        Assert.Contains("kill_running_instances()", script, StringComparison.Ordinal);
+        Assert.Contains("pkill -TERM -x \"$EXECUTABLE_NAME\"", script, StringComparison.Ordinal);
+        const string installCall = "kill_running_instances\ninstall_selected_package";
+        var downloadIndex = script.IndexOf("download_file \"$SELECTED_ASSET_URL\" \"$ASSET_FILE\"",
+            StringComparison.Ordinal);
+        var installIndex = script.IndexOf(installCall, StringComparison.Ordinal);
+        Assert.True(downloadIndex >= 0);
+        Assert.True(installIndex > downloadIndex);
         Assert.Contains("check_macos_version()", script, StringComparison.Ordinal);
         Assert.Contains("macOS ${MACOS_MINIMUM_VERSION} or newer is required", script,
             StringComparison.Ordinal);
