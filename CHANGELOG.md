@@ -4,6 +4,10 @@
 - Emit current AppStream developer metadata, including a configurable developer ID, for Linux application bundles
 - Normalize AppStream summaries by removing trailing periods
 - Add option to stop configured running application instances before installation
+- Add `InstallerPathRegistration` modes for optional or enforced WiX PATH registration, with user/system scope handling,
+  upgrade preference restoration, uninstall cleanup, and checked or unchecked user defaults
+- Isolate WiX intermediate outputs by installer name to prevent incremental builds from reusing another version's MSI
+- Keep WiX shortcut registry state in the selected user or machine installation scope
 - Add the StageKit demo icon to its window and taskbar entry
 
 # v0.3.8 (11/09/2026)

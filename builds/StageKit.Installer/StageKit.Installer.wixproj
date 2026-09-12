@@ -4,13 +4,19 @@
         <TargetFrameworks></TargetFrameworks>
         <OutputType>Package</OutputType>
         <AcceptEula>wix7</AcceptEula>
-        <!-- ICE61 requires an upper version bound, which intentionally conflicts with allowed downgrades. -->
-        <SuppressIces>$(SuppressIces);ICE61</SuppressIces>
+        <!-- ICE57 cannot model HKMU and context-resolved shell folders in a dual-purpose package.
+             ICE61 requires an upper version bound, which intentionally conflicts with allowed downgrades. -->
+        <SuppressIces>$(SuppressIces);ICE57;ICE61</SuppressIces>
         <!-- Keep the MSI in the output root while resolving English UI strings. -->
         <Cultures>neutral,en-US</Cultures>
         <InstallerPlatform>$(Platform)</InstallerPlatform>
         <!-- perMachineOrUser (default), perUser, or perMachine. -->
         <InstallerScope Condition="'$(InstallerScope)' == ''">perMachineOrUser</InstallerScope>
+        <InstallerPathRegistration>UserDefaultYes</InstallerPathRegistration>
+        <!-- Register, UserDefaultNo, or UserDefaultYes; blank disables PATH registration. -->
+        <InstallerPathRegistrationMode Condition="'$(InstallerPathRegistration)' == 'Register'">Register</InstallerPathRegistrationMode>
+        <InstallerPathRegistrationMode Condition="'$(InstallerPathRegistration)' == 'UserDefaultNo'">UserDefaultNo</InstallerPathRegistrationMode>
+        <InstallerPathRegistrationMode Condition="'$(InstallerPathRegistration)' == 'UserDefaultYes'">UserDefaultYes</InstallerPathRegistrationMode>
         <OutputName>$(ApplicationName)_$(RuntimeIdentifier)_v$(BuildVersion)</OutputName>
         <LicenseFile>$(MSBuildProjectDirectory)\Resources\License.rtf</LicenseFile>
         <InstallerDialogImage>$(MSBuildProjectDirectory)\Resources\InstallerDialogImage.png</InstallerDialogImage>
@@ -22,7 +28,7 @@
 
     <PropertyGroup Condition="'$(ArtifactsPath)' != ''">
         <OutputPath>$(ArtifactsPath)\bin\$(MSBuildProjectName)\$(Configuration)\</OutputPath>
-        <IntermediateOutputPath>$(ArtifactsPath)\obj\$(MSBuildProjectName)\$(Configuration)\</IntermediateOutputPath>
+        <IntermediateOutputPath>$(ArtifactsPath)\obj\$(MSBuildProjectName)\$(Configuration)\$(OutputName)\</IntermediateOutputPath>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Platform)' == 'x64'">
@@ -35,6 +41,10 @@
 
     <PropertyGroup>
         <DefineConstants>$(DefineConstants);ApplicationName=$(ApplicationName);ApplicationExecutableName=$(ApplicationExecutableName);BuildVersion=$(BuildVersion);Company=$(Company);Copyright=$(Copyright);RepositoryUrl=$(RepositoryUrl);ApplicationIcon=$(ApplicationIcon);LicenseFile=$(LicenseFile);UpgradeCode=$(UpgradeCode);InstallerScope=$(InstallerScope)</DefineConstants>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(InstallerPathRegistrationMode)' != ''">
+        <DefineConstants>$(DefineConstants);InstallerPathRegistration=$(InstallerPathRegistrationMode)</DefineConstants>
     </PropertyGroup>
 
     <ItemGroup>
@@ -76,6 +86,8 @@
                Text="Platform must be x64 or arm64, but was '$(Platform)'."/>
         <Error Condition="'$(InstallerScope)' != 'perMachineOrUser' And '$(InstallerScope)' != 'perUser' And '$(InstallerScope)' != 'perMachine'"
                Text="InstallerScope must be perMachineOrUser, perUser, or perMachine, but was '$(InstallerScope)'."/>
+        <Error Condition="'$(InstallerPathRegistration)' != '' And '$(InstallerPathRegistrationMode)' == ''"
+               Text="InstallerPathRegistration must be Register, UserDefaultNo, or UserDefaultYes, but was '$(InstallerPathRegistration)'."/>
         <Error Condition="!Exists('$(PublishDirectory)')"
                Text="PublishDirectory '$(PublishDirectory)' does not exist."/>
         <Error Condition="!Exists('$(PublishDirectory)\$(ApplicationExecutableName).exe')"

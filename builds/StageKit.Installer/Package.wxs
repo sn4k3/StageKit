@@ -25,6 +25,8 @@
         <?else ?>
         <Property Id="INSTALLSCOPE" Value="perUser" Secure="yes"/>
         <?endif ?>
+        <Property Id="INSTALLSCOPE_UI_COMPLETE" Secure="yes"/>
+        <Property Id="INSTALLFOLDER" Secure="yes"/>
         <Property Id="CREATESTARTMENUSHORTCUT" Value="1" Secure="yes"/>
         <Property Id="CREATEDESKTOPSHORTCUT" Value="1" Secure="yes"/>
         <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Start program after install"/>
@@ -60,6 +62,60 @@
         <SetProperty Id="INSTALLSCOPE" Action="Set_INSTALLSCOPE_PerMachine" Value="perMachine"
                      After="Set_INSTALLSCOPE_PerUser" Sequence="ui"
                      Condition="MACHINEINSTALLFOLDER AND NOT USERINSTALLFOLDER"/>
+        <SetProperty Id="INSTALLSCOPE" Action="Set_INSTALLSCOPE_PerUser_Execute" Value="perUser"
+                     After="AppSearch" Sequence="execute"
+                     Condition="NOT INSTALLSCOPE_UI_COMPLETE AND USERINSTALLFOLDER AND NOT MACHINEINSTALLFOLDER"/>
+        <SetProperty Id="INSTALLSCOPE" Action="Set_INSTALLSCOPE_PerMachine_Execute" Value="perMachine"
+                     After="Set_INSTALLSCOPE_PerUser_Execute" Sequence="execute"
+                     Condition="NOT INSTALLSCOPE_UI_COMPLETE AND MACHINEINSTALLFOLDER AND NOT USERINSTALLFOLDER"/>
+        <?endif ?>
+        <SetProperty Id="INSTALLFOLDER" Action="Set_INSTALLFOLDER_User_Execute" Value="[USERINSTALLFOLDER]"
+                     Before="CostFinalize" Sequence="execute"
+                     Condition="INSTALLSCOPE = &quot;perUser&quot; AND USERINSTALLFOLDER"/>
+        <SetProperty Id="INSTALLFOLDER" Action="Set_INSTALLFOLDER_Machine_Execute" Value="[MACHINEINSTALLFOLDER]"
+                     Before="CostFinalize" Sequence="execute"
+                     Condition="INSTALLSCOPE = &quot;perMachine&quot; AND MACHINEINSTALLFOLDER"/>
+
+        <!-- Restore the PATH choice for upgrades and repairs. The two searches cover either install scope. -->
+        <?ifdef InstallerPathRegistration ?>
+        <?if $(var.InstallerPathRegistration) = "Register" ?>
+        <Property Id="PATHREGISTRATIONSTATE" Value="1" Secure="yes"/>
+        <?else ?>
+        <Property Id="PATHREGISTRATION_USER_REG" Secure="yes">
+            <RegistrySearch Id="SearchUserPathRegistration"
+                            Root="HKCU"
+                            Key="$(var.InstallerRegistryKey)"
+                            Name="PathRegistration"
+                            Type="raw"/>
+        </Property>
+        <Property Id="PATHREGISTRATION_MACHINE_REG" Secure="yes">
+            <RegistrySearch Id="SearchMachinePathRegistration"
+                            Root="HKLM"
+                            Key="$(var.InstallerRegistryKey)"
+                            Name="PathRegistration"
+                            Type="raw"/>
+        </Property>
+        <?if $(var.InstallerPathRegistration) = "UserDefaultYes" ?>
+        <Property Id="REGISTERINSTALLPATH" Value="1" Secure="yes"/>
+        <Property Id="PATHREGISTRATIONSTATE" Value="1" Secure="yes"/>
+        <?else ?>
+        <Property Id="REGISTERINSTALLPATH" Secure="yes"/>
+        <Property Id="PATHREGISTRATIONSTATE" Value="0" Secure="yes"/>
+        <?endif ?>
+        <SetProperty Id="REGISTERINSTALLPATH" Action="Set_REGISTERINSTALLPATH_Checked"
+                     Value="1" After="AppSearch" Sequence="ui"
+                     Condition="PATHREGISTRATION_USER_REG = &quot;#1&quot; OR PATHREGISTRATION_MACHINE_REG = &quot;#1&quot;"/>
+        <SetProperty Id="REGISTERINSTALLPATH" Action="Set_REGISTERINSTALLPATH_Unchecked"
+                     Value="{}" After="AppSearch" Sequence="ui"
+                     Condition="PATHREGISTRATION_USER_REG = &quot;#0&quot; OR PATHREGISTRATION_MACHINE_REG = &quot;#0&quot;"/>
+        <Property Id="PATHREGISTRATION_UI_COMPLETE" Secure="yes"/>
+        <SetProperty Id="PATHREGISTRATIONSTATE" Action="Set_PATHREGISTRATIONSTATE_Checked_Execute"
+                     Value="1" After="AppSearch" Sequence="execute"
+                     Condition="NOT PATHREGISTRATION_UI_COMPLETE AND (PATHREGISTRATION_USER_REG = &quot;#1&quot; OR PATHREGISTRATION_MACHINE_REG = &quot;#1&quot;)"/>
+        <SetProperty Id="PATHREGISTRATIONSTATE" Action="Set_PATHREGISTRATIONSTATE_Unchecked_Execute"
+                     Value="0" After="Set_PATHREGISTRATIONSTATE_Checked_Execute" Sequence="execute"
+                     Condition="NOT PATHREGISTRATION_UI_COMPLETE AND (PATHREGISTRATION_USER_REG = &quot;#0&quot; OR PATHREGISTRATION_MACHINE_REG = &quot;#0&quot;)"/>
+        <?endif ?>
         <?endif ?>
 
         <Property Id="STARTMENUSHORTCUT_USER_REG" Secure="yes">
@@ -122,43 +178,86 @@
 
                 <!-- Keep only the selected directory after uninstall so a later install can restore it. -->
                 <Component Id="InstallLocationRegistryComponent" Guid="">
+                    <RemoveRegistryValue Root="HKMU"
+                                         Key="$(var.InstallerRegistryKey)"
+                                         Name="ScopedInstallLocation"/>
                     <RegistryValue Root="HKMU"
                                    Key="$(var.InstallerRegistryKey)"
                                    Name="InstallLocation" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes"/>
                 </Component>
 
-                <!-- Installed-product metadata is MSI-managed and removed during a full uninstall. -->
+                <!--
+                    MSI component GUIDs are derived from their key paths. Keep a platform-specific
+                    marker as the key path so x64 and ARM64 packages never claim the same metadata
+                    or prevent each other from removing it during uninstall.
+                -->
                 <Component Id="InstalledStateRegistryComponent" Guid="*">
                     <RegistryKey Root="HKMU" Key="$(var.InstallerRegistryKey)">
-                        <RegistryValue Name="ProductCode" Type="string" Value="[ProductCode]" KeyPath="yes"/>
+                        <RegistryValue Name="ProductCode" Type="string" Value="[ProductCode]"/>
                         <RegistryValue Name="Version" Type="string" Value="$(var.BuildVersion)"/>
                         <RegistryValue Name="Architecture" Type="string" Value="$(var.Platform)"/>
                         <RegistryValue Name="ExecutablePath" Type="string"
                                        Value="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe"/>
+                        <RegistryValue Name="InstalledStateComponent-$(var.Platform)" Type="integer" Value="1"
+                                       KeyPath="yes"/>
                     </RegistryKey>
                 </Component>
 
-                <Component Id="StartMenuShortcutComponent" Guid="*" Condition="CREATESTARTMENUSHORTCUT = 1">
+                <?ifdef InstallerPathRegistration ?>
+                <!-- Persist the PATH checkbox independently from the PATH component so unchecked choices survive upgrades. -->
+                <Component Id="PathRegistrationStateComponent" Guid="*">
+                    <RegistryValue Root="HKMU" Key="$(var.InstallerRegistryKey)"
+                                   Name="PathRegistration" Type="integer" Value="[PATHREGISTRATIONSTATE]"
+                                   KeyPath="yes"/>
+                </Component>
+                <Component Id="UserPathEnvironmentComponent" Guid="*"
+                           Condition="INSTALLSCOPE = &quot;perUser&quot; AND PATHREGISTRATIONSTATE = 1"
+                           Transitive="yes">
+                    <Environment Id="AddUserInstallPath" Name="PATH" Action="set" Part="last"
+                                 System="no" Value="[INSTALLFOLDER]"/>
+                    <RegistryValue Root="HKMU" Key="$(var.InstallerRegistryKey)"
+                                   Name="UserPathEnvironment" Type="integer" Value="1" KeyPath="yes"/>
+                </Component>
+                <Component Id="MachinePathEnvironmentComponent" Guid="*"
+                           Condition="INSTALLSCOPE = &quot;perMachine&quot; AND PATHREGISTRATIONSTATE = 1"
+                           Transitive="yes">
+                    <Environment Id="AddMachineInstallPath" Name="PATH" Action="set" Part="last"
+                                 System="yes" Value="[INSTALLFOLDER]"/>
+                    <RegistryValue Root="HKMU" Key="$(var.InstallerRegistryKey)"
+                                   Name="MachinePathEnvironment" Type="integer" Value="1" KeyPath="yes"/>
+                </Component>
+                <?endif ?>
+
+                <!-- HKMU and the shell-folder properties resolve from the package's selected install context. -->
+                <Component Id="StartMenuShortcutComponent" Guid="*"
+                           Condition="CREATESTARTMENUSHORTCUT = 1">
                     <Shortcut Id="StartMenuShortcut" Directory="ApplicationProgramsFolder"
-                              Name="$(var.ApplicationName)" Target="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe"
-                              WorkingDirectory="INSTALLFOLDER"/>
+                               Name="$(var.ApplicationName)" Target="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe"
+                               WorkingDirectory="INSTALLFOLDER"/>
                     <Shortcut Id="StartMenuUninstallShortcut" Directory="ApplicationProgramsFolder"
-                              Name="Uninstall $(var.ApplicationName)" Target="[System64Folder]msiexec.exe"
-                              Description="Uninstalls $(var.ApplicationName) and all of its components"
-                              Arguments="/i [ProductCode]"/>
-                    <RegistryValue Root="HKCU" Key="$(var.InstallerRegistryKey)"
-                                   Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes"/>
+                               Name="Uninstall $(var.ApplicationName)" Target="[System64Folder]msiexec.exe"
+                               Description="Uninstalls $(var.ApplicationName) and all of its components"
+                               Arguments="/i [ProductCode]"/>
+                    <RegistryValue Root="HKMU" Key="$(var.InstallerRegistryKey)"
+                                   Name="StartMenuShortcut" Type="integer" Value="1"/>
+                    <RegistryValue Root="HKMU" Key="$(var.InstallerRegistryKey)"
+                                   Name="StartMenuShortcutComponent-$(var.Platform)" Type="integer" Value="1"
+                                   KeyPath="yes"/>
                     <RemoveFolder Id="RemoveApplicationProgramsFolder"
                                   Directory="ApplicationProgramsFolder"
                                   On="uninstall"/>
                 </Component>
 
-                <Component Id="DesktopShortcutComponent" Guid="*" Condition="CREATEDESKTOPSHORTCUT = 1">
+                <Component Id="DesktopShortcutComponent" Guid="*"
+                           Condition="CREATEDESKTOPSHORTCUT = 1">
                     <Shortcut Id="DesktopShortcut" Directory="DesktopFolder"
-                              Name="$(var.ApplicationName)" Target="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe"
-                              WorkingDirectory="INSTALLFOLDER"/>
-                    <RegistryValue Root="HKCU" Key="$(var.InstallerRegistryKey)"
-                                   Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes"/>
+                               Name="$(var.ApplicationName)" Target="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe"
+                               WorkingDirectory="INSTALLFOLDER"/>
+                    <RegistryValue Root="HKMU" Key="$(var.InstallerRegistryKey)"
+                                   Name="DesktopShortcut" Type="integer" Value="1"/>
+                    <RegistryValue Root="HKMU" Key="$(var.InstallerRegistryKey)"
+                                   Name="DesktopShortcutComponent-$(var.Platform)" Type="integer" Value="1"
+                                   KeyPath="yes"/>
                 </Component>
 
                 <Files Include="!(bindpath.Publish)\**">
@@ -207,6 +306,17 @@
                          Property="CREATESTARTMENUSHORTCUT" CheckBoxValue="1" Text="Create Start menu shortcut"/>
                 <Control Id="Desktop" Type="CheckBox" X="20" Y="155" Width="330" Height="18"
                          Property="CREATEDESKTOPSHORTCUT" CheckBoxValue="1" Text="Create Desktop shortcut"/>
+                <?ifdef InstallerPathRegistration ?>
+                <?if $(var.InstallerPathRegistration) = "UserDefaultNo" ?>
+                <Control Id="RegisterInstallPath" Type="CheckBox" X="20" Y="185" Width="330" Height="18"
+                         Property="REGISTERINSTALLPATH" CheckBoxValue="1"
+                         Text="Add installation directory to PATH"/>
+                <?elseif $(var.InstallerPathRegistration) = "UserDefaultYes" ?>
+                <Control Id="RegisterInstallPath" Type="CheckBox" X="20" Y="185" Width="330" Height="18"
+                         Property="REGISTERINSTALLPATH" CheckBoxValue="1"
+                         Text="Add installation directory to PATH"/>
+                <?endif ?>
+                <?endif ?>
                 <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0"/>
                 <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
                     <Publish Event="NewDialog" Value="LicenseAgreementDlg"/>
@@ -214,26 +324,42 @@
                 <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes"
                          Text="!(loc.WixUINext)">
                     <?if $(var.InstallerScope) = "perMachineOrUser" ?>
-                    <Publish Property="ALLUSERS" Value="2" Order="1"
+                    <Publish Property="INSTALLSCOPE_UI_COMPLETE" Value="1" Order="1"/>
+                    <Publish Property="ALLUSERS" Value="2" Order="2"
                              Condition="INSTALLSCOPE = &quot;perUser&quot;"/>
-                    <Publish Property="MSIINSTALLPERUSER" Value="1" Order="2"
+                    <Publish Property="MSIINSTALLPERUSER" Value="1" Order="3"
                              Condition="INSTALLSCOPE = &quot;perUser&quot;"/>
-                    <Publish Property="ALLUSERS" Value="2" Order="3"
+                    <Publish Property="ALLUSERS" Value="2" Order="4"
                              Condition="INSTALLSCOPE = &quot;perMachine&quot;"/>
-                    <Publish Property="MSIINSTALLPERUSER" Value="{}" Order="4"
+                    <Publish Property="MSIINSTALLPERUSER" Value="{}" Order="5"
                              Condition="INSTALLSCOPE = &quot;perMachine&quot;"/>
                     <?endif ?>
-                    <Publish Property="INSTALLFOLDER" Value="[USERINSTALLFOLDER]" Order="5"
+                    <Publish Property="INSTALLFOLDER" Value="[USERINSTALLFOLDER]" Order="6"
                              Condition="INSTALLSCOPE = &quot;perUser&quot; AND USERINSTALLFOLDER"/>
                     <Publish Property="INSTALLFOLDER" Value="[LocalAppDataFolder]Programs\$(var.ApplicationName)"
-                             Order="6"
+                             Order="7"
                              Condition="INSTALLSCOPE = &quot;perUser&quot; AND NOT USERINSTALLFOLDER"/>
-                    <Publish Property="INSTALLFOLDER" Value="[MACHINEINSTALLFOLDER]" Order="7"
+                    <Publish Property="INSTALLFOLDER" Value="[MACHINEINSTALLFOLDER]" Order="8"
                              Condition="INSTALLSCOPE = &quot;perMachine&quot; AND MACHINEINSTALLFOLDER"/>
                     <Publish Property="INSTALLFOLDER" Value="[MACHINEPROGRAMFILESFOLDER]\$(var.ApplicationName)"
-                             Order="8"
+                             Order="9"
                              Condition="INSTALLSCOPE = &quot;perMachine&quot; AND NOT MACHINEINSTALLFOLDER"/>
-                    <Publish Event="NewDialog" Value="InstallDirDlg" Order="9"/>
+                    <?ifdef InstallerPathRegistration ?>
+                    <?if $(var.InstallerPathRegistration) = "UserDefaultNo" ?>
+                    <Publish Property="PATHREGISTRATION_UI_COMPLETE" Value="1" Order="10"/>
+                    <Publish Property="PATHREGISTRATIONSTATE" Value="1" Order="11"
+                             Condition="REGISTERINSTALLPATH = 1"/>
+                    <Publish Property="PATHREGISTRATIONSTATE" Value="0" Order="12"
+                             Condition="NOT REGISTERINSTALLPATH"/>
+                    <?elseif $(var.InstallerPathRegistration) = "UserDefaultYes" ?>
+                    <Publish Property="PATHREGISTRATION_UI_COMPLETE" Value="1" Order="10"/>
+                    <Publish Property="PATHREGISTRATIONSTATE" Value="1" Order="11"
+                             Condition="REGISTERINSTALLPATH = 1"/>
+                    <Publish Property="PATHREGISTRATIONSTATE" Value="0" Order="12"
+                             Condition="NOT REGISTERINSTALLPATH"/>
+                    <?endif ?>
+                    <?endif ?>
+                    <Publish Event="NewDialog" Value="InstallDirDlg" Order="13"/>
                 </Control>
                 <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes"
                          Text="!(loc.WixUICancel)">

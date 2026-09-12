@@ -250,6 +250,11 @@ defaulting to a non-elevated per-user installation. Set the property to `perUser
 enforce one scope and hide the selector. The property can also be overridden when building the WiX project with
 `-p:InstallerScope=...`.
 
+Set the `InstallerPathRegistration` property to `Register` to always append the installation directory
+to PATH; `UserDefaultNo` to show an unchecked option; or `UserDefaultYes` to show a checked option. Leaving it blank
+disables PATH registration. Per-user installations update the current user's PATH, per-machine installations update the
+system PATH, and uninstall removes the installer-managed entry.
+
 Set `WindowsAuthenticodeCertificateThumbprint` to a SHA-1 certificate thumbprint to sign the staged application
 executable and final MSI. Fallout forwards `WindowsAuthenticodeTimestampUrl` (defaulting to DigiCert's RFC 3161 service)
 and `WindowsSignToolPath` (defaulting to `signtool.exe`) to the WiX build. The certificate must be available in the
