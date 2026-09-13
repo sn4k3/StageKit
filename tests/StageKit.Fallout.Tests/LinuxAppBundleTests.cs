@@ -6,7 +6,7 @@ namespace StageKit.Fallout.Tests;
 public class LinuxAppBundleTests
 {
     [Fact]
-    public void Options_AfterConstruction_CanBeModified()
+    public void Options_DefaultsAndCustomization_AreApplied()
     {
         var options = CreateOptions();
 
@@ -17,6 +17,10 @@ public class LinuxAppBundleTests
 
         Assert.Contains("Name=Modified", desktopEntry, StringComparison.Ordinal);
         Assert.Contains("Exec=\"Modified.Launcher\"", desktopEntry, StringComparison.Ordinal);
+        Assert.Empty(options.UrlSchemes);
+        Assert.Null(options.StartupWMClass);
+        Assert.Null(options.StartupNotify);
+        Assert.Null(options.PrefersNonDefaultGPU);
     }
 
     [Fact]
@@ -31,6 +35,11 @@ public class LinuxAppBundleTests
         options.Keywords = ["bundle", "cross platform"];
         options.Terminal = true;
         options.SingleMainWindow = true;
+        options.UrlSchemes.Add("stagekit");
+        options.UrlSchemes.Add("custom://");
+        options.StartupWMClass = "stagekit-main";
+        options.StartupNotify = true;
+        options.PrefersNonDefaultGPU = true;
 
         var desktopEntry = LinuxAppBundle.GetDesktopEntry(options);
 
@@ -39,9 +48,14 @@ public class LinuxAppBundleTests
         Assert.Contains("Categories=Utility;Development;", desktopEntry, StringComparison.Ordinal);
         Assert.Contains("Keywords=bundle;cross platform;", desktopEntry, StringComparison.Ordinal);
         Assert.Contains("Icon=example-icon", desktopEntry, StringComparison.Ordinal);
-        Assert.Contains("Exec=\"Example Tool\"", desktopEntry, StringComparison.Ordinal);
+        Assert.Contains("Exec=\"Example Tool\" %F", desktopEntry, StringComparison.Ordinal);
         Assert.Contains("Terminal=true", desktopEntry, StringComparison.Ordinal);
         Assert.Contains("SingleMainWindow=true", desktopEntry, StringComparison.Ordinal);
+        Assert.Contains("MimeType=x-scheme-handler/stagekit;x-scheme-handler/custom;", desktopEntry,
+            StringComparison.Ordinal);
+        Assert.Contains("StartupWMClass=stagekit-main", desktopEntry, StringComparison.Ordinal);
+        Assert.Contains("StartupNotify=true", desktopEntry, StringComparison.Ordinal);
+        Assert.Contains("PrefersNonDefaultGPU=true", desktopEntry, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -263,36 +277,6 @@ public class LinuxAppBundleTests
         Assert.Contains("MimeType=", desktopEntry, StringComparison.Ordinal);
         Assert.Contains("application/x-sl1;", desktopEntry, StringComparison.Ordinal);
         Assert.Contains("application/zip;", desktopEntry, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void GetDesktopEntry_WithUrlSchemes_RegistersSchemeHandlerMimeTypes()
-    {
-        var options = CreateOptions();
-        options.UrlSchemes.Add("stagekit");
-        options.UrlSchemes.Add("custom://");
-
-        var desktopEntry = LinuxAppBundle.GetDesktopEntry(options);
-
-        Assert.Contains("Exec=\"Example\" %F", desktopEntry, StringComparison.Ordinal);
-        Assert.Contains("MimeType=", desktopEntry, StringComparison.Ordinal);
-        Assert.Contains("x-scheme-handler/stagekit;", desktopEntry, StringComparison.Ordinal);
-        Assert.Contains("x-scheme-handler/custom;", desktopEntry, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void GetDesktopEntry_WithDesktopEnhancements_OutputsExpectedKeys()
-    {
-        var options = CreateOptions();
-        options.StartupWMClass = "stagekit-main";
-        options.StartupNotify = true;
-        options.PrefersNonDefaultGPU = true;
-
-        var desktopEntry = LinuxAppBundle.GetDesktopEntry(options);
-
-        Assert.Contains("StartupWMClass=stagekit-main", desktopEntry, StringComparison.Ordinal);
-        Assert.Contains("StartupNotify=true", desktopEntry, StringComparison.Ordinal);
-        Assert.Contains("PrefersNonDefaultGPU=true", desktopEntry, StringComparison.Ordinal);
     }
 
     [Fact]

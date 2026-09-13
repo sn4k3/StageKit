@@ -901,6 +901,14 @@ public class PublishPipelineTests
         build.WindowsInstallerOptions.ContextMenuOpenWithFileAssociations.Add(new FileAssociation(".sl1"));
         build.WindowsInstallerOptions.ContextMenuOpenWithFileAssociations.Add(new FileAssociation(".sl1s"));
         build.WindowsInstallerOptions.ContextMenuOpenWithFileAssociations.Add(new FileAssociation("*.zip"));
+        build.WindowsInstallerOptions.FileAssociations.Add(new FileAssociation(["*.sl1", "sl1s"], "StageKit Model"));
+        build.WindowsInstallerOptions.FileAssociations.Add(new FileAssociation(".zip", "Zip Archive"));
+        build.WindowsInstallerOptions.UrlSchemes.Add(" stagekit://");
+        build.WindowsInstallerOptions.UrlSchemes.Add("STAGEKIT");
+        build.WindowsInstallerOptions.LaunchApplicationArguments = "--open=%1, --mode=test";
+        build.WindowsInstallerOptions.DefaultDesktopShortcut = false;
+        build.WindowsInstallerOptions.ContextMenuTitle = "Open with StageKit";
+        build.WindowsInstallerOptions.ContextMenuCommandArguments = "--open \"%1\"";
         var context = CreateContext(build, "win-x64");
 
         var settings = build.InvokeConfigureWindowsInstallerBuildSettings(
@@ -912,6 +920,17 @@ public class PublishPipelineTests
 
         Assert.Equal(".sl1%3B.sl1s%3B*.zip",
             Assert.IsType<JsonElement>(settings.Properties["ContextMenuOpenWithFileAssociations"]).GetString());
+        Assert.Equal(".sl1%3B.sl1s%3B.zip",
+            Assert.IsType<JsonElement>(settings.Properties["FileAssociations"]).GetString());
+        Assert.Equal("stagekit",
+            Assert.IsType<JsonElement>(settings.Properties["UrlSchemes"]).GetString());
+        Assert.Equal("--open=%251%2C --mode=test",
+            Assert.IsType<JsonElement>(settings.Properties["LaunchApplicationArguments"]).GetString());
+        Assert.Equal("0", Assert.IsType<JsonElement>(settings.Properties["DefaultDesktopShortcut"]).GetString());
+        Assert.Equal("Open with StageKit",
+            Assert.IsType<JsonElement>(settings.Properties["ContextMenuOpenWithTitle"]).GetString());
+        Assert.Equal("--open \"%251\"",
+            Assert.IsType<JsonElement>(settings.Properties["ContextMenuOpenWithCommandArgs"]).GetString());
     }
 
     /// <summary>
@@ -937,6 +956,11 @@ public class PublishPipelineTests
         Assert.Null(options.IconFile);
         Assert.Empty(options.ContextMenuOpenWithFileAssociations);
         Assert.IsType<HashSet<FileAssociation>>(options.ContextMenuOpenWithFileAssociations);
+        Assert.Empty(options.UrlSchemes);
+        Assert.Null(options.LaunchApplicationArguments);
+        Assert.True(options.DefaultDesktopShortcut);
+        Assert.Null(options.ContextMenuTitle);
+        Assert.Null(options.ContextMenuCommandArguments);
     }
 
     /// <summary>
@@ -968,77 +992,6 @@ public class PublishPipelineTests
         Assert.Equal(2, build.WindowsInstallerOptions.FileAssociations.Count);
         Assert.Equal(2, build.MacAppBundleOptions.FileAssociations.Count);
         Assert.Equal(2, build.LinuxAppBundleOptions.FileAssociations.Count);
-    }
-
-    /// <summary>
-    /// Verifies that FileAssociations configured on WindowsInstallerOptions are passed as an MSBuild property for WiX registry capability.
-    /// </summary>
-    [Fact]
-    public void ConfigureWindowsInstallerBuildSettings_FileAssociations_PassesNormalizedProperty()
-    {
-        var build = new TestBuild
-        {
-            TestSoftwareName = "ProductName",
-            TestSoftwareExecutableName = "PublishedExecutable",
-            TestMainProjectProperties = new Dictionary<string, string?>
-            {
-                ["Company"] = "Example Company",
-                ["Copyright"] = "Copyright (c) 2026",
-                ["Description"] = "Product description",
-                ["RepositoryUrl"] = "https://github.com/example/product",
-                ["PackageTags"] = "tag1"
-            }
-        };
-        build.WindowsInstallerOptions.FileAssociations.Add(new FileAssociation(["*.sl1", "sl1s"], "StageKit Model"));
-        build.WindowsInstallerOptions.FileAssociations.Add(new FileAssociation(".zip", "Zip Archive"));
-
-        var context = CreateContext(build, "win-x64");
-        var settings = build.InvokeConfigureWindowsInstallerBuildSettings(
-            new DotNetBuildSettings(),
-            CreateProject("Installer.wixproj"),
-            context,
-            (AbsolutePath)Path.GetTempPath(),
-            "x64");
-
-        Assert.Equal(".sl1%3B.sl1s%3B.zip",
-            Assert.IsType<JsonElement>(settings.Properties["FileAssociations"]).GetString());
-    }
-
-    /// <summary>
-    /// Verifies that ContextMenuOpenWithFileAssociations on WindowsInstallerOptions are merged into ContextMenuOpenWithFileAssociations for WiX.
-    /// </summary>
-    [Fact]
-    public void ConfigureWindowsInstallerBuildSettings_ContextMenuOpenWithFileAssociations_PassesProperty()
-    {
-        var build = new TestBuild
-        {
-            TestSoftwareName = "ProductName",
-            TestSoftwareExecutableName = "PublishedExecutable",
-            TestMainProjectProperties = new Dictionary<string, string?>
-            {
-                ["Company"] = "Example Company",
-                ["Copyright"] = "Copyright (c) 2026",
-                ["Description"] = "Product description",
-                ["RepositoryUrl"] = "https://github.com/example/product",
-                ["PackageTags"] = "tag1"
-            }
-        };
-        build.WindowsInstallerOptions.ContextMenuOpenWithFileAssociations.Add(new FileAssociation([".sl1", "*.sl1s"]));
-        build.WindowsInstallerOptions.ContextMenuOpenWithFileAssociations.Add(new FileAssociation("*.zip"));
-
-        var context = CreateContext(build, "win-x64");
-        var settings = build.InvokeConfigureWindowsInstallerBuildSettings(
-            new DotNetBuildSettings(),
-            CreateProject("Installer.wixproj"),
-            context,
-            (AbsolutePath)Path.GetTempPath(),
-            "x64");
-
-        var contextMenuProp = Assert.IsType<JsonElement>(settings.Properties["ContextMenuOpenWithFileAssociations"]).GetString();
-        Assert.NotNull(contextMenuProp);
-        Assert.Contains(".sl1", contextMenuProp);
-        Assert.Contains("*.sl1s", contextMenuProp);
-        Assert.Contains("*.zip", contextMenuProp);
     }
 
     /// <summary>
