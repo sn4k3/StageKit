@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Numerics;
 using Fallout.Common.IO;
 
 namespace StageKit.Fallout;
@@ -6,7 +7,7 @@ namespace StageKit.Fallout;
 /// <summary>
 /// Defines an immutable file type association configured across supported packaging platforms (Windows, macOS, and Linux).
 /// </summary>
-public record FileAssociation
+public record FileAssociation : IEqualityOperators<FileAssociation, FileAssociation, bool>
 {
     private readonly ImmutableHashSet<string> _extensions =
         ImmutableHashSet<string>.Empty.WithComparer(StringComparer.OrdinalIgnoreCase);
@@ -66,7 +67,7 @@ public record FileAssociation
     public ImmutableHashSet<string> Extensions
     {
         get => _extensions;
-        init => _extensions = value.KeyComparer == StringComparer.OrdinalIgnoreCase
+        init => _extensions = Equals(value.KeyComparer, StringComparer.OrdinalIgnoreCase)
             ? value
             : ImmutableHashSet.CreateRange(StringComparer.OrdinalIgnoreCase, value);
     }
