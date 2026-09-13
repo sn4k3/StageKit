@@ -199,6 +199,44 @@ public class MacAppBundleTests
     }
 
     [Fact]
+    public void GetInfoPList_WithUIElementAndBackgroundOnly_ProducesPlistBooleans()
+    {
+        var options = CreateOptions();
+        options.UIElement = true;
+        options.BackgroundOnly = false;
+
+        var propertyList = MacAppBundle.GetInfoPList(options);
+        var document = XDocument.Parse(propertyList);
+
+        Assert.Equal("true", GetDictionaryValue(document, "LSUIElement"));
+        Assert.Equal("false", GetDictionaryValue(document, "LSBackgroundOnly"));
+    }
+
+    [Fact]
+    public void GetInfoPList_WithUrlSchemes_ProducesCFBundleURLTypes()
+    {
+        var options = CreateOptions();
+        options.UrlSchemes.Add("stagekit");
+        options.UrlSchemes.Add("stagekit-custom://");
+
+        var propertyList = MacAppBundle.GetInfoPList(options);
+        var document = XDocument.Parse(propertyList);
+
+        var urlTypesKey = document.Descendants("key").FirstOrDefault(e => e.Value == "CFBundleURLTypes");
+        Assert.NotNull(urlTypesKey);
+
+        var array = urlTypesKey.ElementsAfterSelf("array").FirstOrDefault();
+        Assert.NotNull(array);
+
+        var dict = array.Elements("dict").FirstOrDefault();
+        Assert.NotNull(dict);
+
+        Assert.Contains(dict.Descendants("string"), e => e.Value == "org.example.app");
+        Assert.Contains(dict.Descendants("string"), e => e.Value == "stagekit");
+        Assert.Contains(dict.Descendants("string"), e => e.Value == "stagekit-custom");
+    }
+
+    [Fact]
     public void GetInfoPList_WithFileAssociations_ProducesCFBundleDocumentTypes()
     {
         var options = CreateOptions();

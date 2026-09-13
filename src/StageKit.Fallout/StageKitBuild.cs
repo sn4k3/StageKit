@@ -18,7 +18,8 @@ public abstract partial class StageKitBuild : FalloutBuild
     private static readonly string[] MainProjectPropertyNames =
     [
         "ArtifactsPath", "SolutionName", "ProductName", "AssemblyName", "Company", "CompanyRDNS", "Authors", "Summary",
-        "Description", "Version", "Copyright", "PackageLicenseExpression", "RepositoryUrl", "PackageTags", "FileAssociations", "ContextMenuOpenWithFileAssociations",
+        "Description", "Version", "Copyright", "PackageLicenseExpression", "RepositoryUrl", "PackageTags",
+        "FileAssociations", "ContextMenuOpenWithFileAssociations", "UrlSchemes",
         nameof(BuildRuntimeManifestFileName)
     ];
 
@@ -259,7 +260,7 @@ public abstract partial class StageKitBuild : FalloutBuild
                     .Split(['.', '-'], StringSplitOptions.RemoveEmptyEntries)
                     .FirstOrDefault();
             }
-            
+
             ThrowIfMissingProperty(field);
             return field;
         }
@@ -564,6 +565,17 @@ public abstract partial class StageKitBuild : FalloutBuild
     }
 
     /// <summary>
+    /// Gets or sets the custom URL schemes (e.g. 'myapp') configured across packaging platforms.
+    /// </summary>
+    [field: AllowNull]
+    [field: MaybeNull]
+    public HashSet<string> UrlSchemes
+    {
+        get => field ??= CreateUrlSchemes();
+        set;
+    }
+
+    /// <summary>
     /// Gets the list of targets that this build depends on. These targets will be executed before the current build target.
     /// </summary>
     protected Target[] DependOnTargets { get; set; } = [];
@@ -636,6 +648,30 @@ public abstract partial class StageKitBuild : FalloutBuild
         return associations;
     }
 
+    /// <summary>
+    /// Creates the default URL schemes.
+    /// </summary>
+    /// <returns>The default URL schemes.</returns>
+    protected virtual HashSet<string> CreateUrlSchemes()
+    {
+        var schemes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var schemeSetting = GetMainProjectProperty("UrlSchemes");
+        if (!string.IsNullOrWhiteSpace(schemeSetting))
+        {
+            var tokens = schemeSetting.Split([';', ','], StringSplitOptions.RemoveEmptyEntries);
+            foreach (var token in tokens)
+            {
+                var trimmed = token.Trim().TrimEnd(':', '/');
+                if (!string.IsNullOrWhiteSpace(trimmed))
+                {
+                    schemes.Add(trimmed);
+                }
+            }
+        }
+
+        return schemes;
+    }
+
 
     /// <summary>
     /// Gets the public build variables written by the <see cref="Print"/> target.
@@ -705,7 +741,7 @@ public abstract partial class StageKitBuild : FalloutBuild
         if (value is global::StageKit.Fallout.MacAppBundleOptions or
             global::StageKit.Fallout.LinuxAppBundleOptions or
             global::StageKit.Fallout.WindowsInstallerOptions or
-            global::StageKit.Fallout.FileAssociation)
+            FileAssociation)
             return JsonSerializer.Serialize(value, value.GetType());
 
         if (value is Solution solution)

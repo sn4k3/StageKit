@@ -34,7 +34,11 @@
         <Property Id="SHORTCUTS_UI_COMPLETE" Secure="yes"/>
         <Property Id="INSTALLFOLDER" Secure="yes"/>
         <Property Id="CREATESTARTMENUSHORTCUT" Value="1" Secure="yes"/>
+        <?ifdef DefaultDesktopShortcut ?>
+        <Property Id="CREATEDESKTOPSHORTCUT" Value="$(var.DefaultDesktopShortcut)" Secure="yes"/>
+        <?else ?>
         <Property Id="CREATEDESKTOPSHORTCUT" Value="1" Secure="yes"/>
+        <?endif ?>
         <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Start program after install"/>
         <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1"/>
 
@@ -178,7 +182,10 @@
                      Value="{}" After="Set_CREATEDESKTOPSHORTCUT_Checked_Execute" Sequence="execute"
                      Condition="NOT SHORTCUTS_UI_COMPLETE AND (DESKTOPSHORTCUT_USER_REG = &quot;#0&quot; OR DESKTOPSHORTCUT_MACHINE_REG = &quot;#0&quot; OR ((WIX_UPGRADE_DETECTED OR Installed) AND NOT DESKTOPSHORTCUT_USER_REG AND NOT DESKTOPSHORTCUT_MACHINE_REG))"/>
 
-        <CustomAction Id="LaunchApplication" FileRef="MainExecutable" ExeCommand=""
+        <?ifndef LaunchApplicationArguments ?>
+        <?define LaunchApplicationArguments = "" ?>
+        <?endif ?>
+        <CustomAction Id="LaunchApplication" FileRef="MainExecutable" ExeCommand="$(var.LaunchApplicationArguments)"
                       Execute="immediate" Impersonate="yes" Return="asyncNoWait"/>
 
         <Icon Id="ProductIcon.ico" SourceFile="$(var.ApplicationIcon)"/>
@@ -238,13 +245,13 @@
                 <Component Id="StartMenuShortcutComponent" Guid="*"
                            Condition="CREATESTARTMENUSHORTCUT = 1" Transitive="yes">
                     <Shortcut Id="StartMenuShortcut" Directory="ApplicationProgramsFolder"
-                               Name="$(var.ApplicationName)" Target="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe"
-                               WorkingDirectory="INSTALLFOLDER"/>
+                              Name="$(var.ApplicationName)" Target="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe"
+                              WorkingDirectory="INSTALLFOLDER"/>
                     <Shortcut Id="StartMenuUninstallShortcut" Directory="ApplicationProgramsFolder"
-                               Name="Uninstall $(var.ApplicationName)" Target="[System64Folder]msiexec.exe"
-                               Description="Uninstalls $(var.ApplicationName) and all of its components"
-                               Arguments="/x [ProductCode]"
-                               Icon="ProductIcon.ico" IconIndex="0"/>
+                              Name="Uninstall $(var.ApplicationName)" Target="[System64Folder]msiexec.exe"
+                              Description="Uninstalls $(var.ApplicationName) and all of its components"
+                              Arguments="/x [ProductCode]"
+                              Icon="ProductIcon.ico" IconIndex="0"/>
                     <RegistryValue Root="HKMU" Key="$(var.InstallerRegistryKey)"
                                    Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes"/>
                     <RemoveFolder Id="RemoveApplicationProgramsFolder"
@@ -255,8 +262,8 @@
                 <Component Id="DesktopShortcutComponent" Guid="*"
                            Condition="CREATEDESKTOPSHORTCUT = 1" Transitive="yes">
                     <Shortcut Id="DesktopShortcut" Directory="DesktopFolder"
-                               Name="$(var.ApplicationName)" Target="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe"
-                               WorkingDirectory="INSTALLFOLDER"/>
+                              Name="$(var.ApplicationName)" Target="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe"
+                              WorkingDirectory="INSTALLFOLDER"/>
                     <RegistryValue Root="HKMU" Key="$(var.InstallerRegistryKey)"
                                    Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes"/>
                 </Component>
@@ -264,7 +271,8 @@
                 <?ifdef FileAssociations ?>
                 <Component Id="FileAssociationsCapabilityComponent" Guid="*">
                     <RegistryKey Root="HKMU" Key="Software\RegisteredApplications">
-                        <RegistryValue Name="$(var.ApplicationName)" Value="$(var.ApplicationCapabilitiesRegistryKey)" Type="string" KeyPath="yes"/>
+                        <RegistryValue Name="$(var.ApplicationName)" Value="$(var.ApplicationCapabilitiesRegistryKey)"
+                                       Type="string" KeyPath="yes"/>
                     </RegistryKey>
                     <RegistryKey Root="HKMU" Key="$(var.ApplicationCapabilitiesRegistryKey)">
                         <RegistryValue Name="ApplicationName" Value="$(var.ApplicationName)" Type="string"/>
@@ -276,12 +284,15 @@
                     </RegistryKey>
                     <RegistryKey Root="HKMU" Key="Software\Classes\$(var.ApplicationName)$(var.Ext)">
                         <RegistryValue Value="$(var.ApplicationName) $(var.Ext) File" Type="string"/>
-                        <RegistryValue Name="FriendlyTypeName" Value="$(var.ApplicationName) $(var.Ext) File" Type="string"/>
+                        <RegistryValue Name="FriendlyTypeName" Value="$(var.ApplicationName) $(var.Ext) File"
+                                       Type="string"/>
                         <RegistryKey Key="DefaultIcon">
                             <RegistryValue Value="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe,0" Type="string"/>
                         </RegistryKey>
                         <RegistryKey Key="shell\open\command">
-                            <RegistryValue Value="&quot;[INSTALLFOLDER]$(var.ApplicationExecutableName).exe&quot; &quot;%1&quot;" Type="string"/>
+                            <RegistryValue
+                                    Value="&quot;[INSTALLFOLDER]$(var.ApplicationExecutableName).exe&quot; &quot;%1&quot;"
+                                    Type="string"/>
                         </RegistryKey>
                     </RegistryKey>
                     <RegistryKey Root="HKMU" Key="Software\Classes\$(var.Ext)\OpenWithProgids">
@@ -291,18 +302,71 @@
                 </Component>
                 <?endif ?>
 
+                <?ifdef UrlSchemes ?>
+                <Component Id="UrlSchemesCapabilityComponent" Guid="*">
+                    <RegistryKey Root="HKMU" Key="Software\RegisteredApplications">
+                        <RegistryValue Name="$(var.ApplicationName) Protocols"
+                                       Value="$(var.ApplicationCapabilitiesRegistryKey)" Type="string" KeyPath="yes"/>
+                    </RegistryKey>
+                    <RegistryKey Root="HKMU" Key="$(var.ApplicationCapabilitiesRegistryKey)\URLAssociations">
+                        <?foreach Scheme in $(var.UrlSchemes) ?>
+                        <RegistryValue Name="$(var.Scheme)" Value="$(var.ApplicationName).$(var.Scheme)" Type="string"/>
+                        <?endforeach ?>
+                    </RegistryKey>
+                    <?foreach Scheme in $(var.UrlSchemes) ?>
+                    <RegistryKey Root="HKMU" Key="Software\Classes\$(var.ApplicationName).$(var.Scheme)">
+                        <RegistryValue Value="URL:$(var.ApplicationName) Protocol" Type="string"/>
+                        <RegistryValue Name="URL Protocol" Value="" Type="string"/>
+                        <RegistryKey Key="DefaultIcon">
+                            <RegistryValue Value="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe,0" Type="string"/>
+                        </RegistryKey>
+                        <RegistryKey Key="shell\open\command">
+                            <RegistryValue
+                                    Value="&quot;[INSTALLFOLDER]$(var.ApplicationExecutableName).exe&quot; &quot;%1&quot;"
+                                    Type="string"/>
+                        </RegistryKey>
+                    </RegistryKey>
+                    <RegistryKey Root="HKMU" Key="Software\Classes\$(var.Scheme)">
+                        <RegistryValue Value="URL:$(var.ApplicationName) Protocol" Type="string"/>
+                        <RegistryValue Name="URL Protocol" Value="" Type="string"/>
+                        <RegistryKey Key="DefaultIcon">
+                            <RegistryValue Value="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe,0" Type="string"/>
+                        </RegistryKey>
+                        <RegistryKey Key="shell\open\command">
+                            <RegistryValue
+                                    Value="&quot;[INSTALLFOLDER]$(var.ApplicationExecutableName).exe&quot; &quot;%1&quot;"
+                                    Type="string"/>
+                        </RegistryKey>
+                    </RegistryKey>
+                    <?endforeach ?>
+                </Component>
+                <?endif ?>
+
                 <?ifdef ContextMenuOpenWith ?>
                 <Component Id="ContextMenuOpenWithComponent" Guid="*">
                     <RegistryKey Root="HKMU" Key="Software\Classes\*\shell\$(var.ApplicationName)"
                                  ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+                        <?ifdef ContextMenuOpenWithTitle ?>
+                        <RegistryValue Value="$(var.ContextMenuOpenWithTitle)" Type="string" KeyPath="yes"/>
+                        <?else ?>
                         <RegistryValue Value="Open with $(var.ApplicationName)" Type="string" KeyPath="yes"/>
-                        <RegistryValue Name="Icon" Value="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe" Type="string"/>
+                        <?endif ?>
+                        <RegistryValue Name="Icon" Value="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe"
+                                       Type="string"/>
                         <RegistryValue Name="Position" Value="Top" Type="string"/>
                         <?ifdef ContextMenuOpenWithAppliesTo ?>
                         <RegistryValue Name="AppliesTo" Value="$(var.ContextMenuOpenWithAppliesTo)" Type="string"/>
                         <?endif ?>
                         <RegistryKey Key="command" ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
-                            <RegistryValue Value="&quot;[INSTALLFOLDER]$(var.ApplicationExecutableName).exe&quot; &quot;%1&quot;" Type="string"/>
+                            <?ifdef ContextMenuOpenWithCommandArgs ?>
+                            <RegistryValue
+                                    Value="&quot;[INSTALLFOLDER]$(var.ApplicationExecutableName).exe&quot; $(var.ContextMenuOpenWithCommandArgs)"
+                                    Type="string"/>
+                            <?else ?>
+                            <RegistryValue
+                                    Value="&quot;[INSTALLFOLDER]$(var.ApplicationExecutableName).exe&quot; &quot;%1&quot;"
+                                    Type="string"/>
+                            <?endif ?>
                         </RegistryKey>
                     </RegistryKey>
                     <RegistryValue Root="HKMU" Key="$(var.InstallerRegistryKey)"
@@ -339,7 +403,8 @@
                 <?if $(var.InstallerScope) = "perMachineOrUser" ?>
                 <Control Id="InstallScope" Type="RadioButtonGroup" X="20" Y="60" Width="330" Height="45"
                          Property="INSTALLSCOPE"
-                         DisableCondition="WIX_UPGRADE_DETECTED OR Installed" EnableCondition="NOT WIX_UPGRADE_DETECTED AND NOT Installed">
+                         DisableCondition="WIX_UPGRADE_DETECTED OR Installed"
+                         EnableCondition="NOT WIX_UPGRADE_DETECTED AND NOT Installed">
                     <RadioButtonGroup Property="INSTALLSCOPE">
                         <RadioButton Value="perMachine" X="0" Y="0" Width="310" Height="16"
                                      Text="Install for all users (requires administrator privileges)"/>

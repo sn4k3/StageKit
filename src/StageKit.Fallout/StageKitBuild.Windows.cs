@@ -194,6 +194,45 @@ public partial class StageKitBuild
             }
         }
 
+        if (options.UrlSchemes.Count > 0)
+        {
+            var schemes = options.UrlSchemes
+                .Select(s => s.Trim().TrimEnd(':', '/'))
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(s => s, StringComparer.OrdinalIgnoreCase);
+
+            var urlSchemesString = string.Join(";", schemes);
+            if (!string.IsNullOrWhiteSpace(urlSchemesString))
+            {
+                settings = settings.SetProperty("UrlSchemes",
+                    PublishUtilities.EscapeMSBuildPropertyValue(urlSchemesString));
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.LaunchApplicationArguments))
+        {
+            settings = settings.SetProperty("LaunchApplicationArguments",
+                PublishUtilities.EscapeMSBuildPropertyValue(options.LaunchApplicationArguments));
+        }
+
+        if (!options.DefaultDesktopShortcut)
+        {
+            settings = settings.SetProperty("DefaultDesktopShortcut", "0");
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.ContextMenuTitle))
+        {
+            settings = settings.SetProperty("ContextMenuOpenWithTitle",
+                PublishUtilities.EscapeMSBuildPropertyValue(options.ContextMenuTitle));
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.ContextMenuCommandArguments))
+        {
+            settings = settings.SetProperty("ContextMenuOpenWithCommandArgs",
+                PublishUtilities.EscapeMSBuildPropertyValue(options.ContextMenuCommandArguments));
+        }
+
         return settings;
     }
 

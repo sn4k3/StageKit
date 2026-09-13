@@ -22,13 +22,15 @@ public partial class StageKitBuild
     /// Gets the code signing identity used to sign macOS applications and packages (e.g. 'Developer ID Application: Company (TEAMID)').
     /// If omitted and notarization is not configured, ad-hoc signing ('-') is used.
     /// </summary>
-    [Parameter("macOS code signing identity (e.g. 'Developer ID Application: Company (TEAMID)'). Defaults to '-' (ad-hoc signing) if notarization is not configured.")]
+    [Parameter(
+        "macOS code signing identity (e.g. 'Developer ID Application: Company (TEAMID)'). Defaults to '-' (ad-hoc signing) if notarization is not configured.")]
     public string? MacSigningIdentity { get; protected set; }
 
     /// <summary>
     /// Gets a value indicating whether macOS notarization should be performed.
     /// </summary>
-    [Parameter("Enable macOS notarization for application bundles and packages. Defaults to true when notarization credentials are provided; otherwise false.")]
+    [Parameter(
+        "Enable macOS notarization for application bundles and packages. Defaults to true when notarization credentials are provided; otherwise false.")]
     public bool MacNotarize { get; protected set; }
 
     /// <summary>
@@ -244,6 +246,14 @@ public partial class StageKitBuild
 
         var iconFileName = options.IconFileName!;
         MacOSIconFile.Copy(resourcesPath / iconFileName, ExistsPolicy.FileOverwrite);
+        foreach (var association in options.FileAssociations)
+        {
+            if (association.IconFile is not null && association.IconFile.FileExists())
+            {
+                association.IconFile.Copy(resourcesPath / association.IconFile.Name, ExistsPolicy.FileOverwrite);
+            }
+        }
+
         (contentsPath / "Info.plist").WriteAllText(
             MacAppBundle.GetInfoPList(options).ReplaceLineEndings("\n"));
         (contentsPath / $"{SoftwareName}.entitlements").WriteAllText(
@@ -260,7 +270,7 @@ public partial class StageKitBuild
     {
         var stagingPath = PublishStagingDirectory / Guid.NewGuid().ToString("N");
         var archivePath = (AbsolutePath)$"{context.BundleOutputPath}.zip";
-        
+
         Log.Information("Creating and compressing {fileName} macOS application bundle for {Rid}",
             archivePath.Name, context.RuntimeIdentifier);
 
@@ -292,7 +302,7 @@ public partial class StageKitBuild
             "Creating and compressing {fileName} multi-architecture macOS application bundle for {X64Rid} and {Arm64Rid}",
             archivePath.Name, x64Context.RuntimeIdentifier, arm64Context.RuntimeIdentifier);
 
-        
+
         try
         {
             stagingPath.DeleteDirectory();
@@ -355,6 +365,7 @@ public partial class StageKitBuild
             {
                 NotarizeMacOSPackage(temporaryOutputPath);
             }
+
             MoveMacOSPackageOutput(temporaryOutputPath, outputPath, extension);
         }
         finally
@@ -381,6 +392,7 @@ public partial class StageKitBuild
             {
                 NotarizeMacOSPackage(temporaryOutputPath);
             }
+
             MoveMacOSPackageOutput(temporaryOutputPath, outputPath, extension);
         }
         finally
@@ -567,7 +579,8 @@ public partial class StageKitBuild
             ? $"--entitlements {entitlementsPath.ToString().QuoteProcessArgument()} "
             : string.Empty;
 
-        ExecuteCodeSign($"--force --deep --timestamp --options runtime {entitlementsArg}--sign {identity.QuoteProcessArgument()} {appPath.ToString().QuoteProcessArgument()}");
+        ExecuteCodeSign(
+            $"--force --deep --timestamp --options runtime {entitlementsArg}--sign {identity.QuoteProcessArgument()} {appPath.ToString().QuoteProcessArgument()}");
 
         if (ShouldNotarizeMacOS)
         {

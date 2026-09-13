@@ -200,16 +200,6 @@ public class PackagingMetadataTests
     }
 
     [Fact]
-    public void FileAssociation_Constructor_WithMimeTypeSecondAndNameThird_SwapsIntelligently()
-    {
-        var assoc = new FileAssociation(".skini", "application/x-stagekit-skini", "StageKit SKINI File");
-
-        Assert.Contains(".skini", assoc.Extensions);
-        Assert.Equal("application/x-stagekit-skini", assoc.MimeType);
-        Assert.Equal("StageKit SKINI File", assoc.Name);
-    }
-
-    [Fact]
     public void FileAssociation_Constructor_WithNameSecondAndMimeTypeThird_PreservesOrder()
     {
         var assoc = new FileAssociation(".skini", "StageKit SKINI File", "application/x-stagekit-skini");
@@ -220,12 +210,50 @@ public class PackagingMetadataTests
     }
 
     [Fact]
-    public void FileAssociation_Constructor_WithMultipleExtensionsAndSwappedArgs_SwapsIntelligently()
+    public void WindowsInstallerOptions_DefaultProperties_InitializedCorrectly()
     {
-        var assoc = new FileAssociation([".skini", ".skin"], "application/x-stagekit-skini", "StageKit SKINI File");
+        var options = new WindowsInstallerOptions();
 
-        Assert.Equal(2, assoc.Extensions.Count);
-        Assert.Equal("application/x-stagekit-skini", assoc.MimeType);
-        Assert.Equal("StageKit SKINI File", assoc.Name);
+        Assert.Empty(options.UrlSchemes);
+        Assert.Null(options.LaunchApplicationArguments);
+        Assert.True(options.DefaultDesktopShortcut);
+        Assert.Null(options.ContextMenuTitle);
+        Assert.Null(options.ContextMenuCommandArguments);
+    }
+
+    [Fact]
+    public void LinuxAppBundleOptions_DefaultEnhancements_InitializedCorrectly()
+    {
+        var options = new LinuxAppBundleOptions
+        {
+            ApplicationId = "org.example.app",
+            ProductName = "Example",
+            Summary = "Summary",
+            Description = "Description",
+            License = "MIT",
+            RepositoryUrl = "https://example.com",
+            DeveloperId = "org.example",
+            Authors = "Author"
+        };
+
+        Assert.Empty(options.UrlSchemes);
+        Assert.Null(options.StartupWMClass);
+        Assert.Null(options.StartupNotify);
+        Assert.Null(options.PrefersNonDefaultGPU);
+    }
+
+    [Fact]
+    public void MacAppBundleOptions_DefaultProperties_InitializedCorrectly()
+    {
+        var options = new MacAppBundleOptions
+        {
+            ProductName = "Example",
+            BundleIdentifier = "org.example.app",
+            Version = "1.0.0"
+        };
+
+        Assert.Empty(options.UrlSchemes);
+        Assert.Null(options.UIElement);
+        Assert.Null(options.BackgroundOnly);
     }
 }

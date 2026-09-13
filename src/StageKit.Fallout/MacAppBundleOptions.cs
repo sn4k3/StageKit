@@ -23,6 +23,7 @@ public class MacAppBundleOptions
     public MacAppBundleOptions(StageKitBuild build)
     {
         FileAssociations.UnionWith(build.FileAssociations);
+        UrlSchemes.UnionWith(build.UrlSchemes);
         ProductName = build.SoftwareName;
         BundleIdentifier = build.SoftwareRDNS;
         Version = build.SoftwareVersion;
@@ -91,6 +92,22 @@ public class MacAppBundleOptions
     /// Gets or sets the file associations configured for the macOS application bundle.
     /// </summary>
     public HashSet<FileAssociation> FileAssociations { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the custom URL schemes (e.g. 'myapp') handled by the macOS application bundle.
+    /// Emitted into <c>Info.plist</c> under <c>CFBundleURLTypes</c>.
+    /// </summary>
+    public HashSet<string> UrlSchemes { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets a value indicating whether this is an agent or menu bar accessory application without a Dock icon (<c>LSUIElement</c>).
+    /// </summary>
+    public bool? UIElement { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the application runs exclusively in the background without UI (<c>LSBackgroundOnly</c>).
+    /// </summary>
+    public bool? BackgroundOnly { get; set; }
 
     /// <summary>
     /// Gets additional key/value entries inserted into the generated <c>Info.plist</c> dictionary.

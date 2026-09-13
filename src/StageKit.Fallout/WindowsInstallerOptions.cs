@@ -27,6 +27,7 @@ public class WindowsInstallerOptions
         IconFile = build.WindowsIconFile;
 
         FileAssociations.UnionWith(build.FileAssociations);
+        UrlSchemes.UnionWith(build.UrlSchemes);
 
         var contextMenuSetting = build.GetMainProjectProperty("ContextMenuOpenWithFileAssociations");
         if (!string.IsNullOrWhiteSpace(contextMenuSetting))
@@ -47,6 +48,31 @@ public class WindowsInstallerOptions
     /// Gets or sets the file associations configured for the Windows installer to register their capabilities in the registry.
     /// </summary>
     public HashSet<FileAssociation> FileAssociations { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the custom URL schemes (e.g. 'myapp') configured for the Windows installer to register their capabilities in the registry.
+    /// </summary>
+    public HashSet<string> UrlSchemes { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the command-line arguments to pass when launching the application on installer exit.
+    /// </summary>
+    public string? LaunchApplicationArguments { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the "Create Desktop shortcut" option is checked by default in the installer dialog. The default is <see langword="true"/>.
+    /// </summary>
+    public bool DefaultDesktopShortcut { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the display text for the Explorer context menu entry. Defaults to "Open with {ApplicationName}".
+    /// </summary>
+    public string? ContextMenuTitle { get; set; }
+
+    /// <summary>
+    /// Gets or sets the command-line arguments passed when opening from the context menu. Defaults to ""%1"".
+    /// </summary>
+    public string? ContextMenuCommandArguments { get; set; }
 
     /// <summary>
     /// Gets or sets the file associations registered in the Windows Explorer "Open with" context menu.

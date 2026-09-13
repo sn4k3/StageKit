@@ -266,6 +266,36 @@ public class LinuxAppBundleTests
     }
 
     [Fact]
+    public void GetDesktopEntry_WithUrlSchemes_RegistersSchemeHandlerMimeTypes()
+    {
+        var options = CreateOptions();
+        options.UrlSchemes.Add("stagekit");
+        options.UrlSchemes.Add("custom://");
+
+        var desktopEntry = LinuxAppBundle.GetDesktopEntry(options);
+
+        Assert.Contains("Exec=\"Example\" %F", desktopEntry, StringComparison.Ordinal);
+        Assert.Contains("MimeType=", desktopEntry, StringComparison.Ordinal);
+        Assert.Contains("x-scheme-handler/stagekit;", desktopEntry, StringComparison.Ordinal);
+        Assert.Contains("x-scheme-handler/custom;", desktopEntry, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GetDesktopEntry_WithDesktopEnhancements_OutputsExpectedKeys()
+    {
+        var options = CreateOptions();
+        options.StartupWMClass = "stagekit-main";
+        options.StartupNotify = true;
+        options.PrefersNonDefaultGPU = true;
+
+        var desktopEntry = LinuxAppBundle.GetDesktopEntry(options);
+
+        Assert.Contains("StartupWMClass=stagekit-main", desktopEntry, StringComparison.Ordinal);
+        Assert.Contains("StartupNotify=true", desktopEntry, StringComparison.Ordinal);
+        Assert.Contains("PrefersNonDefaultGPU=true", desktopEntry, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void GetAppStreamMetadata_WithFileAssociations_ProducesMediaTypeElements()
     {
         var options = CreateOptions();

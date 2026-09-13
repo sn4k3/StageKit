@@ -18,6 +18,19 @@ public static partial class HostSystem
     }
 
     /// <summary>
+    /// Opens an absolute URL with the host's default application.
+    /// </summary>
+    /// <param name="url">The absolute, non-file URL to open.</param>
+    /// <returns>
+    /// <see langword="true"/> if the open request was started; otherwise, <see langword="false"/>.
+    /// </returns>
+    public static bool OpenUrl(Uri url)
+    {
+        ArgumentNullException.ThrowIfNull(url);
+        return Start(CreateUrlStartInfo(url));
+    }
+
+    /// <summary>
     /// Asynchronously opens an absolute URL with the host's default application.
     /// </summary>
     /// <param name="url">The absolute URL to open.</param>
@@ -29,6 +42,58 @@ public static partial class HostSystem
     public static Task<bool> OpenUrlAsync(string url, CancellationToken cancellationToken = default)
     {
         return StartAsync(CreateUrlStartInfo(url), cancellationToken);
+    }
+
+    /// <summary>
+    /// Asynchronously opens an absolute URL with the host's default application.
+    /// </summary>
+    /// <param name="url">The absolute, non-file URL to open.</param>
+    /// <param name="cancellationToken">The token used to cancel the open request before it starts.</param>
+    /// <returns>
+    /// A task containing <see langword="true"/> if the open request was started; otherwise,
+    /// <see langword="false"/>.
+    /// </returns>
+    public static Task<bool> OpenUrlAsync(Uri url, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(url);
+        return StartAsync(CreateUrlStartInfo(url), cancellationToken);
+    }
+
+    /// <summary>
+    /// Opens a directory, file, URL, or other host-recognized target with its default application.
+    /// </summary>
+    /// <param name="target">The directory, file, URL, or raw host target to open.</param>
+    /// <returns>
+    /// <see langword="true"/> if the open request was started; otherwise, <see langword="false"/>.
+    /// </returns>
+    public static bool Open(string target)
+    {
+        if (string.IsNullOrWhiteSpace(target))
+            return false;
+
+        return Start(CreateClassifiedOpenStartInfo(target)) || Start(CreateRawShellExecuteStartInfo(target));
+    }
+
+    /// <summary>
+    /// Asynchronously opens a directory, file, URL, or other host-recognized target with its default application.
+    /// </summary>
+    /// <param name="target">The directory, file, URL, or raw host target to open.</param>
+    /// <param name="cancellationToken">The token used to cancel the open request before it starts.</param>
+    /// <returns>
+    /// A task containing <see langword="true"/> if the open request was started; otherwise,
+    /// <see langword="false"/>.
+    /// </returns>
+    public static async Task<bool> OpenAsync(string target, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (string.IsNullOrWhiteSpace(target))
+            return false;
+
+        if (await StartAsync(CreateClassifiedOpenStartInfo(target), cancellationToken).ConfigureAwait(false))
+            return true;
+
+        return await StartAsync(CreateRawShellExecuteStartInfo(target), cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -135,6 +200,14 @@ public static partial class HostSystem
         return OperatingSystem.IsLinux()
             ? CreateLauncherStartInfo("xdg-open", target)
             : null;
+    }
+
+    internal static ProcessStartInfo CreateRawShellExecuteStartInfo(string target)
+    {
+        return new ProcessStartInfo(target)
+        {
+            UseShellExecute = true
+        };
     }
 
     internal static ProcessStartInfo? CreateShowFileInFileManagerStartInfo(string filePath)
@@ -347,9 +420,52 @@ public static partial class HostSystem
 
     private static ProcessStartInfo? CreateUrlStartInfo(string url)
     {
-        return Uri.TryCreate(url, UriKind.Absolute, out var uri) && !uri.IsFile
+        return Uri.TryCreate(url, UriKind.Absolute, out var uri) ? CreateUrlStartInfo(uri) : null;
+    }
+
+    private static ProcessStartInfo? CreateUrlStartInfo(Uri uri)
+    {
+        return uri.IsAbsoluteUri && !uri.IsFile
             ? CreateOpenTargetStartInfo(uri.AbsoluteUri)
             : null;
+    }
+
+    internal static ProcessStartInfo? CreateClassifiedOpenStartInfo(string target)
+    {
+        if (string.IsNullOrWhiteSpace(target))
+            return null;
+
+        if (Directory.Exists(target))
+            return CreateExistingPathStartInfo(target, true);
+
+        if (File.Exists(target))
+            return CreateExistingPathStartInfo(target, false);
+
+        if (!Uri.TryCreate(target, UriKind.Absolute, out var uri))
+            return null;
+
+        if (uri.IsFile)
+        {
+            try
+            {
+                var localPath = uri.LocalPath;
+                return Directory.Exists(localPath)
+                    ? CreateExistingPathStartInfo(localPath, true)
+                    : File.Exists(localPath)
+                        ? CreateExistingPathStartInfo(localPath, false)
+                        : null;
+            }
+            catch (Exception exception) when (exception is ArgumentException or
+                                                  IOException or
+                                                  UnauthorizedAccessException or
+                                                  NotSupportedException)
+            {
+                Debug.WriteLine(exception);
+                return null;
+            }
+        }
+
+        return CreateUrlStartInfo(uri);
     }
 
     private static ProcessStartInfo? CreateExistingPathStartInfo(string path, bool isDirectory)

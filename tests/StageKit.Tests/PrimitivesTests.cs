@@ -100,6 +100,44 @@ public sealed class PrimitivesTests
         Assert.False(await HostSystem.OpenUrlAsync(url, TestContext.Current.CancellationToken));
     }
 
+    [Fact]
+    public async Task HostSystem_OpenUrl_UriOverloadValidatesUri()
+    {
+        Assert.Throws<ArgumentNullException>(() => HostSystem.OpenUrl((Uri)null!));
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
+            HostSystem.OpenUrlAsync((Uri)null!, TestContext.Current.CancellationToken));
+
+        Assert.False(HostSystem.OpenUrl(new Uri("file:///tmp/stagekit.txt")));
+        Assert.False(await HostSystem.OpenUrlAsync(new Uri("relative", UriKind.Relative),
+            TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public void HostSystem_Open_ClassifiesPathsAndUrisAndBuildsRawFallbackStartInfo()
+    {
+        var directoryPath = CreateTempDirectory();
+        var filePath = Path.Combine(directoryPath, "stagekit-open.txt");
+        File.WriteAllText(filePath, string.Empty);
+
+        try
+        {
+            Assert.NotNull(HostSystem.CreateClassifiedOpenStartInfo(directoryPath));
+            Assert.NotNull(HostSystem.CreateClassifiedOpenStartInfo(filePath));
+            Assert.NotNull(HostSystem.CreateClassifiedOpenStartInfo(new Uri(filePath).AbsoluteUri));
+            Assert.NotNull(HostSystem.CreateClassifiedOpenStartInfo("https://example.com"));
+            Assert.Null(HostSystem.CreateClassifiedOpenStartInfo("stagekit-unknown-target"));
+
+            var raw = HostSystem.CreateRawShellExecuteStartInfo("stagekit-unknown-target");
+            Assert.Equal("stagekit-unknown-target", raw.FileName);
+            Assert.True(raw.UseShellExecute);
+            Assert.Empty(raw.ArgumentList);
+        }
+        finally
+        {
+            Directory.Delete(directoryPath, recursive: true);
+        }
+    }
+
     [Theory]
     [InlineData(800, 150, 800, 150)]
     [InlineData(20, 150, 37, 150)] // Console.Beep throws below 37 Hz.

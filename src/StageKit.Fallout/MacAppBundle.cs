@@ -68,12 +68,31 @@ public static class MacAppBundle
             StringEntry("NSHumanReadableCopyright", options.Copyright)
         }.ToList();
 
+        if (options.UIElement.HasValue)
+        {
+            entries.Add(BooleanEntry("LSUIElement", options.UIElement.Value));
+        }
+
+        if (options.BackgroundOnly.HasValue)
+        {
+            entries.Add(BooleanEntry("LSBackgroundOnly", options.BackgroundOnly.Value));
+        }
+
         if (options.FileAssociations.Count > 0)
         {
             var documentTypes = CreateDocumentTypesElement(options);
             if (documentTypes is not null)
             {
                 entries.Add(documentTypes);
+            }
+        }
+
+        if (options.UrlSchemes.Count > 0)
+        {
+            var urlTypes = CreateUrlTypesElement(options);
+            if (urlTypes is not null)
+            {
+                entries.Add(urlTypes);
             }
         }
 
@@ -339,7 +358,8 @@ public static class MacAppBundle
             if (association.ContentTypes.Count > 0)
             {
                 dictEntries.Add(new XElement("key", "LSItemContentTypes"));
-                dictEntries.Add(new XElement("array", association.ContentTypes.Select(type => new XElement("string", type))));
+                dictEntries.Add(new XElement("array",
+                    association.ContentTypes.Select(type => new XElement("string", type))));
             }
 
             if (association.IconFile is not null)
@@ -359,5 +379,28 @@ public static class MacAppBundle
         return new XElement("entry",
             new XElement("key", "CFBundleDocumentTypes"),
             new XElement("array", dicts));
+    }
+
+    private static XElement? CreateUrlTypesElement(MacAppBundleOptions options)
+    {
+        var schemes = options.UrlSchemes
+            .Select(s => s.Trim().TrimEnd(':', '/'))
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (schemes.Count == 0)
+        {
+            return null;
+        }
+
+        return new XElement("entry",
+            new XElement("key", "CFBundleURLTypes"),
+            new XElement("array",
+                new XElement("dict",
+                    new XElement("key", "CFBundleURLName"),
+                    new XElement("string", options.BundleIdentifier),
+                    new XElement("key", "CFBundleURLSchemes"),
+                    new XElement("array", schemes.Select(s => new XElement("string", s))))));
     }
 }

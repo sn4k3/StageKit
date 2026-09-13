@@ -35,8 +35,6 @@ internal class Build : StageKitBuild
             new FileAssociation(".skini", "StageKit SKINI File", "application/x-stagekit-skini"),
             new FileAssociation(".skjson", "StageKit SKJSON File", "application/x-stagekit-skjson"),
         ]);
-        
-        WindowsInstallerOptions.SyncContextMenuOpenWithFileAssociations();
     }
 
     /// <summary>
@@ -44,44 +42,27 @@ internal class Build : StageKitBuild
     /// </summary>
     public override string SoftwareName => SolutionName;
 
-    public override Project MainProject => Solution.AllProjects.First(project => project.Name == "StageKit.Demo");
+    protected override WindowsInstallerOptions CreateWindowsInstallerOptions()
+    {
+        var options = base.CreateWindowsInstallerOptions();
+        options.SyncContextMenuOpenWithFileAssociations();
+        return options;
+    }
 
     /// <inheritdoc />
     protected override LinuxAppBundleOptions CreateLinuxAppBundleOptions()
     {
         var options = base.CreateLinuxAppBundleOptions();
         options.SnapStagePackages.Add("libfontconfig1");
-        options.AppRunScriptBeforeExec = $$"""
-                                           function help() {
-                                              echo '   _____ __                   __ __ _ __' 
-                                              echo '  / ___// /_____ _____ ____  / //_/(_) /_'\n                                              echo '  \__ \/ __/ __ `/ __ `/ _ \/ ,<  / / __/'
-                                              echo ' ___/ / /_/ /_/ / /_/ /  __/ /| |/ / /_'
-                                              echo '/____/\__/\__,_/\__, /\___/_/ |_/_/\__/' 
-                                              echo '               /____/'
-                                                    
-                                               echo "
-                                            --------------------------------------------------------------------------
-                                               All the great {{SoftwareName}} functionality inside an AppImage package.
-                                            --------------------------------------------------------------------------
-                                            (This package uses the AppImage software packaging technology for Linux
-                                             ['One App == One File'] for easy availability of the newest {{SoftwareName}}
-                                             releases across all major Linux distributions.)
-                                            Usage:  --help, -h
-                                            ------     # This message
-                                                    --appimage-extract
-                                                       # Unpack this AppImage into a local sub-directory [currently named 'squashfs-root']
-                                                    --appimage-help
-                                                       # Show available AppImage options
-                                           "
-                                           }
+        return options;
+    }
 
-                                           if [ "$1" == "--help" -o "$1" == "-h" ]; then
-                                               help
-                                               exit $?
-                                           fi
-
-                                           """;
-        
+    /// <inheritdoc />
+    protected override MacAppBundleOptions CreateMacAppBundleOptions()
+    {
+        var options = base.CreateMacAppBundleOptions();
+        options.MinimumSystemVersion = "12.0";
+        options.ApplicationCategory = "public.app-category.developer-tools";
         return options;
     }
 

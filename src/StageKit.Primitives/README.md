@@ -28,6 +28,15 @@ All public helpers are exposed from the `StageKit.Primitives` namespace. IO-rela
 - `SafeHandle` wrapper for pinned `GCHandle` scenarios through `GCSafeHandle`
 - `MemoryManager<T>` wrapper for externally owned unmanaged buffers through `UnmanagedMemoryManager<T>`
 
+Open a directory, file, URL, or another host target with the default application. `Open` classifies existing paths and
+absolute URIs first, then falls back to a raw shell-execute request when the host-specific launcher cannot start:
+
+```csharp
+HostSystem.Open("https://example.com");
+await HostSystem.OpenAsync(settingsDirectory, cancellationToken);
+await HostSystem.OpenUrlAsync(new Uri("https://example.com"), cancellationToken);
+```
+
 ## Install
 
 ```bash

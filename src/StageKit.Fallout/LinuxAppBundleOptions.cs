@@ -22,6 +22,7 @@ public class LinuxAppBundleOptions
     public LinuxAppBundleOptions(StageKitBuild build)
     {
         FileAssociations.UnionWith(build.FileAssociations);
+        UrlSchemes.UnionWith(build.UrlSchemes);
         ApplicationId = build.SoftwareRDNS;
         ProductName = build.SoftwareName;
         ExecutableName = build.SoftwareExecutableFileNameWithoutExtension;
@@ -32,7 +33,7 @@ public class LinuxAppBundleOptions
         DeveloperId = build.SoftwareCompanyRdns;
         Authors = build.SoftwareAuthors;
         DebPackageMaintainer = build.SoftwarePackageMaintainersRFC822;
-        Keywords = [..build.SoftwarePackageTagsList];
+        Keywords = [.. build.SoftwarePackageTagsList];
     }
 
     /// <summary>
@@ -114,6 +115,27 @@ public class LinuxAppBundleOptions
     /// Gets or sets the file associations configured for the Linux desktop entry and AppStream metadata.
     /// </summary>
     public HashSet<FileAssociation> FileAssociations { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the custom URL schemes (e.g. 'myapp') configured for the Linux desktop entry.
+    /// Emitted as MIME type associations: <c>x-scheme-handler/{scheme}</c>.
+    /// </summary>
+    public HashSet<string> UrlSchemes { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the window class name used by Wayland and X11 compositors to map running windows to this desktop launcher.
+    /// </summary>
+    public string? StartupWMClass { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether desktop environments should display a startup notification cursor while launching.
+    /// </summary>
+    public bool? StartupNotify { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the application prefers running on the discrete/non-default GPU.
+    /// </summary>
+    public bool? PrefersNonDefaultGPU { get; set; }
 
     /// <summary>
     /// Gets additional lines appended to the generated desktop entry.

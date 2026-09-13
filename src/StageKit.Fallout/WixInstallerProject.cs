@@ -133,9 +133,9 @@ internal static class WixInstallerProject
     {
         amount = Math.Clamp(amount, 0, 1);
         return (
-            (byte)Math.Round(from.R + ((to.R - from.R) * amount)),
-            (byte)Math.Round(from.G + ((to.G - from.G) * amount)),
-            (byte)Math.Round(from.B + ((to.B - from.B) * amount)));
+            (byte)Math.Round(from.R + (to.R - from.R) * amount),
+            (byte)Math.Round(from.G + (to.G - from.G) * amount),
+            (byte)Math.Round(from.B + (to.B - from.B) * amount));
     }
 
     /// <summary>
@@ -147,11 +147,11 @@ internal static class WixInstallerProject
     /// <returns>The encoded PNG bytes.</returns>
     private static byte[] CreatePng(int width, int height, Func<int, int, (byte R, byte G, byte B)> shader)
     {
-        var stride = 1 + (width * 3);
+        var stride = 1 + width * 3;
         var raw = new byte[height * stride];
         for (var y = 0; y < height; y++)
         {
-            var offset = (y * stride) + 1; // Leave the leading per-scanline filter byte at zero (no filter).
+            var offset = y * stride + 1; // Leave the leading per-scanline filter byte at zero (no filter).
             for (var x = 0; x < width; x++)
             {
                 var (r, g, b) = shader(x, y);
@@ -162,7 +162,7 @@ internal static class WixInstallerProject
         }
 
         using var deflated = new MemoryStream();
-        using (var compressor = new ZLibStream(deflated, CompressionLevel.SmallestSize, leaveOpen: true))
+        using (var compressor = new ZLibStream(deflated, CompressionLevel.SmallestSize, true))
         {
             compressor.Write(raw, 0, raw.Length);
         }
@@ -297,6 +297,12 @@ internal static class WixInstallerProject
                 <FileAssociations Condition="'$(FileAssociations)' == ''"></FileAssociations>
                 <!-- Optional file patterns or extensions for the Windows Explorer context menu; blank disables. -->
                 <ContextMenuOpenWithFileAssociations Condition="'$(ContextMenuOpenWithFileAssociations)' == ''"></ContextMenuOpenWithFileAssociations>
+                <!-- Optional URL schemes registered for the application; blank disables. -->
+                <UrlSchemes Condition="'$(UrlSchemes)' == ''"></UrlSchemes>
+                <LaunchApplicationArguments Condition="'$(LaunchApplicationArguments)' == ''"></LaunchApplicationArguments>
+                <DefaultDesktopShortcut Condition="'$(DefaultDesktopShortcut)' == ''"></DefaultDesktopShortcut>
+                <ContextMenuOpenWithTitle Condition="'$(ContextMenuOpenWithTitle)' == ''"></ContextMenuOpenWithTitle>
+                <ContextMenuOpenWithCommandArgs Condition="'$(ContextMenuOpenWithCommandArgs)' == ''"></ContextMenuOpenWithCommandArgs>
                 <OutputName>$(ApplicationName)_$(RuntimeIdentifier)_v$(BuildVersion)</OutputName>
                 <LicenseFile>$(MSBuildProjectDirectory)\Resources\License.rtf</LicenseFile>
                 <InstallerDialogImage>$(MSBuildProjectDirectory)\Resources\InstallerDialogImage.png</InstallerDialogImage>
@@ -387,6 +393,29 @@ internal static class WixInstallerProject
                     <ContextMenuOpenWithAppliesTo Condition="$([System.String]::Copy('$(ContextMenuOpenWithFileAssociations)').Contains('System.FileName:'))">$(ContextMenuOpenWithFileAssociations)</ContextMenuOpenWithAppliesTo>
                     <DefineConstants>$(DefineConstants);ContextMenuOpenWith=true</DefineConstants>
                     <DefineConstants Condition="'$(ContextMenuOpenWithFileAssociations)' != '*' and '$(ContextMenuOpenWithAppliesTo)' != ''">$(DefineConstants);ContextMenuOpenWithAppliesTo=$(ContextMenuOpenWithAppliesTo)</DefineConstants>
+                    <DefineConstants Condition="'$(ContextMenuOpenWithTitle)' != ''">$(DefineConstants);ContextMenuOpenWithTitle=$(ContextMenuOpenWithTitle)</DefineConstants>
+                    <DefineConstants Condition="'$(ContextMenuOpenWithCommandArgs)' != ''">$(DefineConstants);ContextMenuOpenWithCommandArgs=$(ContextMenuOpenWithCommandArgs)</DefineConstants>
+                </PropertyGroup>
+            </Target>
+
+            <Target Name="ConfigureUrlSchemes" BeforeTargets="BeforeBuild;CoreCompile" Condition="'$(UrlSchemes)' != ''">
+                <PropertyGroup>
+                    <_RawUrlSchemes>$([System.String]::Copy('$(UrlSchemes)').Replace(',', ';').Replace('%2C', ';').Replace('%3B', ';'))</_RawUrlSchemes>
+                </PropertyGroup>
+                <ItemGroup>
+                    <_UrlSchemeSplitItems Include="$(_RawUrlSchemes.Split(';', System.StringSplitOptions.RemoveEmptyEntries))" />
+                    <_UrlSchemeTrimmedItems Include="@(_UrlSchemeSplitItems->Trim())" Condition="'%(Identity)' != ''" />
+                </ItemGroup>
+                <PropertyGroup>
+                    <_CleanedUrlSchemes Condition="'@(_UrlSchemeTrimmedItems)' != ''">@(_UrlSchemeTrimmedItems, '%3B')</_CleanedUrlSchemes>
+                    <DefineConstants Condition="'$(_CleanedUrlSchemes)' != ''">$(DefineConstants);UrlSchemes=$(_CleanedUrlSchemes)</DefineConstants>
+                </PropertyGroup>
+            </Target>
+
+            <Target Name="ConfigureInstallerCustomizations" BeforeTargets="BeforeBuild;CoreCompile">
+                <PropertyGroup>
+                    <DefineConstants Condition="'$(LaunchApplicationArguments)' != ''">$(DefineConstants);LaunchApplicationArguments=$(LaunchApplicationArguments)</DefineConstants>
+                    <DefineConstants Condition="'$(DefaultDesktopShortcut)' != ''">$(DefineConstants);DefaultDesktopShortcut=$(DefaultDesktopShortcut)</DefineConstants>
                 </PropertyGroup>
             </Target>
 
@@ -479,7 +508,11 @@ internal static class WixInstallerProject
                 <Property Id="SHORTCUTS_UI_COMPLETE" Secure="yes"/>
                 <Property Id="INSTALLFOLDER" Secure="yes"/>
                 <Property Id="CREATESTARTMENUSHORTCUT" Value="1" Secure="yes"/>
+                <?ifdef DefaultDesktopShortcut ?>
+                <Property Id="CREATEDESKTOPSHORTCUT" Value="$(var.DefaultDesktopShortcut)" Secure="yes"/>
+                <?else ?>
                 <Property Id="CREATEDESKTOPSHORTCUT" Value="1" Secure="yes"/>
+                <?endif ?>
                 <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Start program after install"/>
                 <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1"/>
 
@@ -622,7 +655,10 @@ internal static class WixInstallerProject
                              Value="{}" After="Set_CREATEDESKTOPSHORTCUT_Checked_Execute" Sequence="execute"
                              Condition="NOT SHORTCUTS_UI_COMPLETE AND (DESKTOPSHORTCUT_USER_REG = &quot;#0&quot; OR DESKTOPSHORTCUT_MACHINE_REG = &quot;#0&quot; OR ((WIX_UPGRADE_DETECTED OR Installed) AND NOT DESKTOPSHORTCUT_USER_REG AND NOT DESKTOPSHORTCUT_MACHINE_REG))"/>
 
-                <CustomAction Id="LaunchApplication" FileRef="MainExecutable" ExeCommand=""
+                <?ifndef LaunchApplicationArguments ?>
+                <?define LaunchApplicationArguments = "" ?>
+                <?endif ?>
+                <CustomAction Id="LaunchApplication" FileRef="MainExecutable" ExeCommand="$(var.LaunchApplicationArguments)"
                               Execute="immediate" Impersonate="yes" Return="asyncNoWait"/>
 
                 <Icon Id="ProductIcon.ico" SourceFile="$(var.ApplicationIcon)"/>
@@ -734,18 +770,61 @@ internal static class WixInstallerProject
                         </Component>
                         <?endif ?>
 
+                        <?ifdef UrlSchemes ?>
+                        <Component Id="UrlSchemesCapabilityComponent" Guid="*">
+                            <RegistryKey Root="HKMU" Key="Software\RegisteredApplications">
+                                <RegistryValue Name="$(var.ApplicationName) Protocols" Value="$(var.ApplicationCapabilitiesRegistryKey)" Type="string" KeyPath="yes"/>
+                            </RegistryKey>
+                            <RegistryKey Root="HKMU" Key="$(var.ApplicationCapabilitiesRegistryKey)\URLAssociations">
+                                <?foreach Scheme in $(var.UrlSchemes) ?>
+                                <RegistryValue Name="$(var.Scheme)" Value="$(var.ApplicationName).$(var.Scheme)" Type="string"/>
+                                <?endforeach ?>
+                            </RegistryKey>
+                            <?foreach Scheme in $(var.UrlSchemes) ?>
+                            <RegistryKey Root="HKMU" Key="Software\Classes\$(var.ApplicationName).$(var.Scheme)">
+                                <RegistryValue Value="URL:$(var.ApplicationName) Protocol" Type="string"/>
+                                <RegistryValue Name="URL Protocol" Value="" Type="string"/>
+                                <RegistryKey Key="DefaultIcon">
+                                    <RegistryValue Value="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe,0" Type="string"/>
+                                </RegistryKey>
+                                <RegistryKey Key="shell\open\command">
+                                    <RegistryValue Value="&quot;[INSTALLFOLDER]$(var.ApplicationExecutableName).exe&quot; &quot;%1&quot;" Type="string"/>
+                                </RegistryKey>
+                            </RegistryKey>
+                            <RegistryKey Root="HKMU" Key="Software\Classes\$(var.Scheme)">
+                                <RegistryValue Value="URL:$(var.ApplicationName) Protocol" Type="string"/>
+                                <RegistryValue Name="URL Protocol" Value="" Type="string"/>
+                                <RegistryKey Key="DefaultIcon">
+                                    <RegistryValue Value="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe,0" Type="string"/>
+                                </RegistryKey>
+                                <RegistryKey Key="shell\open\command">
+                                    <RegistryValue Value="&quot;[INSTALLFOLDER]$(var.ApplicationExecutableName).exe&quot; &quot;%1&quot;" Type="string"/>
+                                </RegistryKey>
+                            </RegistryKey>
+                            <?endforeach ?>
+                        </Component>
+                        <?endif ?>
+
                         <?ifdef ContextMenuOpenWith ?>
                         <Component Id="ContextMenuOpenWithComponent" Guid="*">
                             <RegistryKey Root="HKMU" Key="Software\Classes\*\shell\$(var.ApplicationName)"
                                          ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+                                <?ifdef ContextMenuOpenWithTitle ?>
+                                <RegistryValue Value="$(var.ContextMenuOpenWithTitle)" Type="string" KeyPath="yes"/>
+                                <?else ?>
                                 <RegistryValue Value="Open with $(var.ApplicationName)" Type="string" KeyPath="yes"/>
+                                <?endif ?>
                                 <RegistryValue Name="Icon" Value="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe" Type="string"/>
                                 <RegistryValue Name="Position" Value="Top" Type="string"/>
                                 <?ifdef ContextMenuOpenWithAppliesTo ?>
                                 <RegistryValue Name="AppliesTo" Value="$(var.ContextMenuOpenWithAppliesTo)" Type="string"/>
                                 <?endif ?>
                                 <RegistryKey Key="command" ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+                                    <?ifdef ContextMenuOpenWithCommandArgs ?>
+                                    <RegistryValue Value="&quot;[INSTALLFOLDER]$(var.ApplicationExecutableName).exe&quot; $(var.ContextMenuOpenWithCommandArgs)" Type="string"/>
+                                    <?else ?>
                                     <RegistryValue Value="&quot;[INSTALLFOLDER]$(var.ApplicationExecutableName).exe&quot; &quot;%1&quot;" Type="string"/>
+                                    <?endif ?>
                                 </RegistryKey>
                             </RegistryKey>
                             <RegistryValue Root="HKMU" Key="$(var.InstallerRegistryKey)"

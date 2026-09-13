@@ -45,6 +45,16 @@ public static partial class LinuxAppBundle
             ? $"\nMimeType={FormatDesktopList(mimeTypes, nameof(options.FileAssociations))}"
             : string.Empty;
 
+        var startupWMClassLine = !string.IsNullOrWhiteSpace(options.StartupWMClass)
+            ? $"\nStartupWMClass={EscapeDesktopValue(options.StartupWMClass)}"
+            : string.Empty;
+        var startupNotifyLine = options.StartupNotify.HasValue
+            ? $"\nStartupNotify={options.StartupNotify.Value.ToString().ToLowerInvariant()}"
+            : string.Empty;
+        var prefersNonDefaultGpuLine = options.PrefersNonDefaultGPU.HasValue
+            ? $"\nPrefersNonDefaultGPU={options.PrefersNonDefaultGPU.Value.ToString().ToLowerInvariant()}"
+            : string.Empty;
+
         var desktopEntry = $$"""
                              [Desktop Entry]
                              Type=Application
@@ -55,7 +65,7 @@ public static partial class LinuxAppBundle
                              Icon={{EscapeDesktopValue(iconName)}}
                              Exec="{{EscapeDesktopExecDoubleQuoted(executableName)}}"{{execArgs}}{{mimeTypeLine}}
                              Terminal={{options.Terminal.ToString().ToLowerInvariant()}}
-                             SingleMainWindow={{options.SingleMainWindow.ToString().ToLowerInvariant()}}
+                             SingleMainWindow={{options.SingleMainWindow.ToString().ToLowerInvariant()}}{{startupWMClassLine}}{{startupNotifyLine}}{{prefersNonDefaultGpuLine}}
                              """;
 
         return AppendCustomBlock(desktopEntry, options.ExtraDesktopEntry).ReplaceLineEndings("\n");
@@ -247,6 +257,15 @@ public static partial class LinuxAppBundle
     internal static List<string> ResolveMimeTypes(LinuxAppBundleOptions options)
     {
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var scheme in options.UrlSchemes)
+        {
+            var cleanScheme = scheme.Trim().TrimEnd(':', '/').ToLowerInvariant();
+            if (!string.IsNullOrWhiteSpace(cleanScheme))
+            {
+                set.Add($"x-scheme-handler/{cleanScheme}");
+            }
+        }
 
         foreach (var association in options.FileAssociations)
         {

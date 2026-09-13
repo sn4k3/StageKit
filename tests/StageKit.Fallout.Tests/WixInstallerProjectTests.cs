@@ -56,10 +56,17 @@ public sealed class WixInstallerProjectTests
             Assert.Contains("InstallerScope must be perMachineOrUser, perUser, or perMachine", project,
                 StringComparison.Ordinal);
             Assert.Contains("InstallerPathRegistrationMode", project, StringComparison.Ordinal);
-            Assert.Contains("<ContextMenuOpenWithFileAssociations Condition=\"'$(ContextMenuOpenWithFileAssociations)' == ''\"></ContextMenuOpenWithFileAssociations>", project, StringComparison.Ordinal);
+            Assert.Contains(
+                "<ContextMenuOpenWithFileAssociations Condition=\"'$(ContextMenuOpenWithFileAssociations)' == ''\"></ContextMenuOpenWithFileAssociations>",
+                project, StringComparison.Ordinal);
+            Assert.Contains("<UrlSchemes Condition=\"'$(UrlSchemes)' == ''\"></UrlSchemes>", project,
+                StringComparison.Ordinal);
             Assert.Contains("Target Name=\"ConfigureContextMenuOpenWith\"", project, StringComparison.Ordinal);
             Assert.Contains("Target Name=\"ConfigureFileAssociations\"", project, StringComparison.Ordinal);
+            Assert.Contains("Target Name=\"ConfigureUrlSchemes\"", project, StringComparison.Ordinal);
+            Assert.Contains("Target Name=\"ConfigureInstallerCustomizations\"", project, StringComparison.Ordinal);
             Assert.Contains("@(_FileAssocDotted, '%3B')", project, StringComparison.Ordinal);
+            Assert.Contains("@(_UrlSchemeTrimmedItems, '%3B')", project, StringComparison.Ordinal);
             Assert.Contains("InstallerPathRegistration must be Register, UserDefaultNo, or UserDefaultYes, but was",
                 project, StringComparison.Ordinal);
             Assert.Contains(@"Resources\License.rtf", project, StringComparison.Ordinal);
@@ -112,7 +119,8 @@ public sealed class WixInstallerProjectTests
             // A remembered directory must never override an explicit wizard or command-line choice.
             var userDefault = package[package.IndexOf(
                 "Action=\"Set_INSTALLFOLDER_User_Default_Execute\"", StringComparison.Ordinal)..];
-            Assert.Contains("Condition=\"NOT Installed AND NOT INSTALLFOLDER AND NOT ALLUSERS AND NOT USERINSTALLFOLDER\"",
+            Assert.Contains(
+                "Condition=\"NOT Installed AND NOT INSTALLFOLDER AND NOT ALLUSERS AND NOT USERINSTALLFOLDER\"",
                 userDefault[..400], StringComparison.Ordinal);
 
             var userRestore = package[package.IndexOf(
@@ -151,6 +159,9 @@ public sealed class WixInstallerProjectTests
                 StringComparison.Ordinal);
             Assert.Contains("SearchMachineInstallLocation", package, StringComparison.Ordinal);
             Assert.Contains("SearchUserInstallLocation", package, StringComparison.Ordinal);
+            Assert.Contains("Component Id=\"UrlSchemesCapabilityComponent\"", package, StringComparison.Ordinal);
+            Assert.Contains("$(var.LaunchApplicationArguments)", package, StringComparison.Ordinal);
+            Assert.Contains("$(var.DefaultDesktopShortcut)", package, StringComparison.Ordinal);
             Assert.Contains("<Component Id=\"InstalledStateRegistryComponent\" Guid=\"*\">", package,
                 StringComparison.Ordinal);
             // A full uninstall has to leave nothing behind, so the key is force-deleted and no component
@@ -244,15 +255,21 @@ public sealed class WixInstallerProjectTests
                 StringComparison.Ordinal);
 
             var contextMenuComponent = GetComponent(package, "ContextMenuOpenWithComponent");
-            Assert.Contains(@"Software\Classes\*\shell\$(var.ApplicationName)", contextMenuComponent, StringComparison.Ordinal);
+            Assert.Contains(@"Software\Classes\*\shell\$(var.ApplicationName)", contextMenuComponent,
+                StringComparison.Ordinal);
             Assert.Contains(@"Root=""HKMU""", contextMenuComponent, StringComparison.Ordinal);
-            Assert.Contains(@"Value=""Open with $(var.ApplicationName)""", contextMenuComponent, StringComparison.Ordinal);
-            Assert.Contains(@"Name=""Icon"" Value=""[INSTALLFOLDER]$(var.ApplicationExecutableName).exe""", contextMenuComponent, StringComparison.Ordinal);
+            Assert.Contains(@"Value=""Open with $(var.ApplicationName)""", contextMenuComponent,
+                StringComparison.Ordinal);
+            Assert.Contains(@"Name=""Icon"" Value=""[INSTALLFOLDER]$(var.ApplicationExecutableName).exe""",
+                contextMenuComponent, StringComparison.Ordinal);
             Assert.Contains(@"Name=""Position"" Value=""Top""", contextMenuComponent, StringComparison.Ordinal);
             Assert.Contains("<?ifdef ContextMenuOpenWithAppliesTo ?>", contextMenuComponent, StringComparison.Ordinal);
-            Assert.Contains(@"<RegistryValue Name=""AppliesTo"" Value=""$(var.ContextMenuOpenWithAppliesTo)""", contextMenuComponent, StringComparison.Ordinal);
+            Assert.Contains(@"<RegistryValue Name=""AppliesTo"" Value=""$(var.ContextMenuOpenWithAppliesTo)""",
+                contextMenuComponent, StringComparison.Ordinal);
             Assert.Contains(@"<RegistryKey Key=""command""", contextMenuComponent, StringComparison.Ordinal);
-            Assert.Contains(@"<RegistryValue Value=""&quot;[INSTALLFOLDER]$(var.ApplicationExecutableName).exe&quot; &quot;%1&quot;""", contextMenuComponent, StringComparison.Ordinal);
+            Assert.Contains(
+                @"<RegistryValue Value=""&quot;[INSTALLFOLDER]$(var.ApplicationExecutableName).exe&quot; &quot;%1&quot;""",
+                contextMenuComponent, StringComparison.Ordinal);
 
             var desktopComponent = GetComponent(package, "DesktopShortcutComponent");
             Assert.Contains("Directory=\"DesktopFolder\"", desktopComponent, StringComparison.Ordinal);
@@ -276,7 +293,9 @@ public sealed class WixInstallerProjectTests
             Assert.Contains("| `Description` | `SoftwareDescription` |", readme, StringComparison.Ordinal);
             Assert.Contains("| `Keywords` | `SoftwareKeywords` |", readme, StringComparison.Ordinal);
             Assert.Contains("## Context menu (\"Open with\")", readme, StringComparison.Ordinal);
-            Assert.Contains("<ContextMenuOpenWithFileAssociations>.sl1;.sl1s;*.zip;*.photon</ContextMenuOpenWithFileAssociations>", readme, StringComparison.Ordinal);
+            Assert.Contains(
+                "<ContextMenuOpenWithFileAssociations>.sl1;.sl1s;*.zip;*.photon</ContextMenuOpenWithFileAssociations>",
+                readme, StringComparison.Ordinal);
         }
         finally
         {
@@ -396,13 +415,13 @@ public sealed class WixInstallerProjectTests
         var banner = ReadPng(WixInstallerProject.CreateBannerImage());
         Assert.Equal(WixInstallerProject.ImageWidth, banner.Width);
         Assert.Equal(WixInstallerProject.BannerImageHeight, banner.Height);
-        Assert.Equal(banner.Height * (1 + (banner.Width * 3)), banner.RawLength);
+        Assert.Equal(banner.Height * (1 + banner.Width * 3), banner.RawLength);
 
         var dialog = ReadPng(WixInstallerProject.CreateDialogImage());
         Assert.Equal(WixInstallerProject.ImageWidth, dialog.Width);
         Assert.Equal(WixInstallerProject.DialogImageHeight, dialog.Height);
 
-        Assert.Equal(dialog.Height * (1 + (dialog.Width * 3)), dialog.RawLength);
+        Assert.Equal(dialog.Height * (1 + dialog.Width * 3), dialog.RawLength);
     }
 
     /// <summary>

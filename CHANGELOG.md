@@ -1,7 +1,14 @@
 # v0.3.9 (/09/2026)
 
-- Add cross-platform unified file associations via `FileAssociation` and `FileAssociations` on `StageKitBuild`, automatically configuring Windows Explorer context menu / Open With registration in WiX installers, `CFBundleDocumentTypes` in macOS `Info.plist`, and `MimeType` associations, `Exec` file arguments (`%F`), and AppStream mediatype metadata in Linux desktop application bundles
-- Add `WindowsInstallerOptions` to Fallout to configure Windows installer options (including `ContextMenuOpenWithFileAssociations` as a `HashSet<FileAssociation>`, `SignToolPath`, Authenticode signing, and single-file payload) alongside WiX installer context menu registration
+- Add `HostSystem.OpenUrl` URI overloads and generic synchronous/asynchronous and `Open` helpers for directories, files,
+  URLs, and raw shell-execute fallback targets
+- Add cross-platform unified file associations via `FileAssociation` and `FileAssociations` on `StageKitBuild`,
+  automatically configuring Windows Explorer context menu / Open With registration in WiX installers,
+  `CFBundleDocumentTypes` in macOS `Info.plist`, and `MimeType` associations, `Exec` file arguments (`%F`), and
+  AppStream mediatype metadata in Linux desktop application bundles
+- Add `WindowsInstallerOptions` to Fallout to configure Windows installer options (including
+  `ContextMenuOpenWithFileAssociations` as a `HashSet<FileAssociation>`, `SignToolPath`, Authenticode signing, and
+  single-file payload) alongside WiX installer context menu registration
 - Enforce a configurable macOS minimum runtime version in the generated installation script, defaulting to macOS 13.0
 - Emit current AppStream developer metadata, including a configurable developer ID, for Linux application bundles
 - Normalize AppStream summaries by removing trailing periods
@@ -12,11 +19,11 @@
 - Keep WiX shortcut registry state in the selected user or machine installation scope
 - Stop the WiX installer from overriding a chosen installation directory with the remembered one, which silently
   redirected wizard and `INSTALLFOLDER=` command-line choices back to the previous directory
-- Restore the WiX shortcut preferences on silent and basic-UI installations, which never run the wizard and so
-  recreated shortcuts the user had removed
-- Scope the WiX PATH entry and remembered directory by the installation context Windows Installer resolved
-  (`ALLUSERS`) rather than by the wizard's `INSTALLSCOPE`, so a per-user installation writes the user PATH instead of
-  failing with an access denied error while trying to write the system PATH
+- Restore the WiX shortcut preferences on silent and basic-UI installations, which never run the wizard and so recreated
+  shortcuts the user had removed
+- Scope the WiX PATH entry and remembered directory by the installation context Windows Installer resolved (`ALLUSERS`)
+  rather than by the wizard's `INSTALLSCOPE`, so a per-user installation writes the user PATH instead of failing with an
+  access denied error while trying to write the system PATH
 - Delete the WiX installer registry key on uninstall so nothing is left behind
 - Keep the WiX "Start program after install" checkbox working after a major upgrade instead of showing it inert, and
   check it by default
@@ -39,9 +46,9 @@
 - Add macOS Developer ID code signing and notarization support for application bundles (`.app`) and packages (`.dmg`,
   `.pkg`) via `xcrun notarytool` and `stapler`, supporting keychain profiles (`--mac-keychain-profile`), Apple ID
   credentials (`--mac-apple-id`, `--mac-password`, `--mac-team-id`), App Store Connect API keys (`--mac-api-key-path`,
-  `--mac-api-key-id`, `--mac-api-issuer-id`), signing identities (`--mac-signing-identity`), and programmatic options
-  on `MacAppBundleOptions`, while retaining ad-hoc code signing (`codesign --sign -`) as the fallback when notarization
-  or identity is not configured
+  `--mac-api-key-id`, `--mac-api-issuer-id`), signing identities (`--mac-signing-identity`), and programmatic options on
+  `MacAppBundleOptions`, while retaining ad-hoc code signing (`codesign --sign -`) as the fallback when notarization or
+  identity is not configured
 
 # v0.3.8 (11/09/2026)
 
