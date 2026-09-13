@@ -27,6 +27,7 @@ public partial class StageKitBuild
             .SetSelfContained(!FrameworkDependent)
             .SetPublishReadyToRun(PublishReadyToRun)
             .SetPublishTrimmed(PublishTrimmed)
+            .SetProperty("PublishAot", PublishAot)
             .SetPublishSingleFile(true)
             .SetProperty("DebugType", "embedded")
             .SetProperty("PublishDocumentationFiles", false)

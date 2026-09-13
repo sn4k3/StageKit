@@ -301,6 +301,12 @@ internal static class WixInstallerProject
                 <SignToolPath Condition="'$(SignToolPath)' == ''">signtool.exe</SignToolPath>
                 <SignOutput Condition="'$(AuthenticodeCertificateThumbprint)' != ''">true</SignOutput>
             </PropertyGroup>
+            
+            <ItemGroup>
+                <BindPath Include="$(PublishDirectory)" BindName="Publish"/>
+                <PackageReference Include="WixToolset.UI.wixext" Version="7.0.0"/>
+                <PackageReference Include="WixToolset.Util.wixext" Version="7.0.0"/>
+            </ItemGroup>
 
             <PropertyGroup Condition="'$(ArtifactsPath)' != ''">
                 <OutputPath>$(ArtifactsPath)\bin\$(MSBuildProjectName)\$(Configuration)\</OutputPath>
@@ -323,12 +329,6 @@ internal static class WixInstallerProject
             <PropertyGroup Condition="'$(InstallerPathRegistrationMode)' != ''">
                 <DefineConstants>$(DefineConstants);InstallerPathRegistration=$(InstallerPathRegistrationMode)</DefineConstants>
             </PropertyGroup>
-
-            <ItemGroup>
-                <BindPath Include="$(PublishDirectory)" BindName="Publish"/>
-                <PackageReference Include="WixToolset.UI.wixext" Version="7.0.0"/>
-                <PackageReference Include="WixToolset.Util.wixext" Version="7.0.0"/>
-            </ItemGroup>
 
             <!-- Optional artwork; omit either property to retain that WixUI default image. -->
             <PropertyGroup Condition="'$(InstallerDialogImage)' != ''">

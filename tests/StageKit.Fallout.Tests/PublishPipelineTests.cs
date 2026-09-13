@@ -46,6 +46,9 @@ public class PublishPipelineTests
         var publishTrimmed = buildType.GetProperty(nameof(StageKitBuild.PublishTrimmed));
         Assert.NotNull(publishTrimmed);
         Assert.NotNull(publishTrimmed.GetCustomAttribute<ParameterAttribute>());
+        var publishAot = buildType.GetProperty(nameof(StageKitBuild.PublishAot));
+        Assert.NotNull(publishAot);
+        Assert.NotNull(publishAot.GetCustomAttribute<ParameterAttribute>());
         Assert.NotNull(buildType.GetProperty(nameof(StageKitBuild.PublishTrimmed)));
         Assert.NotNull(buildType.GetProperty(nameof(StageKitBuild.PublishReadyToRun)));
         Assert.Null(buildType.GetProperty("PublishBundles"));
@@ -515,6 +518,7 @@ public class PublishPipelineTests
         Assert.True(settings.NoRestore);
         Assert.False(Assert.IsType<JsonElement>(settings.Properties["PublishReadyToRun"]).GetBoolean());
         Assert.False(Assert.IsType<JsonElement>(settings.Properties["PublishTrimmed"]).GetBoolean());
+        Assert.False(Assert.IsType<JsonElement>(settings.Properties["PublishAot"]).GetBoolean());
         Assert.True(Assert.IsType<JsonElement>(settings.Properties["PublishSingleFile"]).GetBoolean());
         Assert.Equal("embedded", Assert.IsType<JsonElement>(settings.Properties["DebugType"]).GetString());
         Assert.False(Assert.IsType<JsonElement>(settings.Properties["PublishDocumentationFiles"]).GetBoolean());
@@ -563,6 +567,7 @@ public class PublishPipelineTests
         Assert.False(settings.SelfContained);
         Assert.False(Assert.IsType<JsonElement>(settings.Properties["PublishReadyToRun"]).GetBoolean());
         Assert.False(Assert.IsType<JsonElement>(settings.Properties["PublishTrimmed"]).GetBoolean());
+        Assert.False(Assert.IsType<JsonElement>(settings.Properties["PublishAot"]).GetBoolean());
     }
 
     /// <summary>
@@ -604,6 +609,47 @@ public class PublishPipelineTests
         var settings = build.InvokeCreateSingleFilePublishSettings(context, outputPath);
 
         Assert.True(Assert.IsType<JsonElement>(settings.Properties["PublishTrimmed"]).GetBoolean());
+    }
+
+    /// <summary>
+    /// Verifies that enabling PublishAot sets PublishAot in publish settings.
+    /// </summary>
+    [Fact]
+    public void CreatePublishSettings_PublishAotEnabled_EnablesPublishAot()
+    {
+        var build = new TestBuild
+        {
+            UseDefaultSettings = true,
+            TestMainProject = CreateProject("Example.csproj")
+        };
+        Assert.False(build.PublishAot);
+        build.SetPublishAot(true);
+        var context = CreateContext(build);
+
+        var settings = build.InvokeCreatePublishSettings(context);
+
+        Assert.True(Assert.IsType<JsonElement>(settings.Properties["PublishAot"]).GetBoolean());
+    }
+
+    /// <summary>
+    /// Verifies that enabling PublishAot sets PublishAot in single-file publish settings.
+    /// </summary>
+    [Fact]
+    public void CreateSingleFilePublishSettings_PublishAotEnabled_EnablesPublishAot()
+    {
+        var build = new TestBuild
+        {
+            UseDefaultSettings = true,
+            TestMainProject = CreateProject("Example.csproj")
+        };
+        build.SetPackagingTypes(ApplicationPackagingType.DotNetSingleFile);
+        build.SetPublishAot(true);
+        var context = CreateContext(build);
+        var outputPath = (AbsolutePath)Path.Combine(Path.GetTempPath(), $"sf-{Guid.NewGuid():N}");
+
+        var settings = build.InvokeCreateSingleFilePublishSettings(context, outputPath);
+
+        Assert.True(Assert.IsType<JsonElement>(settings.Properties["PublishAot"]).GetBoolean());
     }
 
     /// <summary>
@@ -4078,6 +4124,11 @@ public class PublishPipelineTests
         internal void SetPublishTrimmed(bool publishTrimmed)
         {
             PublishTrimmed = publishTrimmed;
+        }
+
+        internal void SetPublishAot(bool publishAot)
+        {
+            PublishAot = publishAot;
         }
 
         internal void SetPublishCleanupExtensions(params string[] extensions)

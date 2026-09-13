@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using Fallout.Common.IO;
 
 namespace StageKit.Fallout;
 
@@ -97,6 +98,54 @@ public class MacAppBundleOptions
     /// </summary>
     /// <value>The custom entitlements, or <see langword="null"/> to use <see cref="MacAppBundle.DefaultEntitlements"/>.</value>
     public Dictionary<string, bool>? Entitlements { get; set; }
+
+    /// <summary>
+    /// Gets or sets the code-signing identity used to sign the macOS application bundle.
+    /// </summary>
+    /// <value>The code-signing identity, or <see langword="null"/> to use <see cref="StageKitBuild.MacSigningIdentity"/>.</value>
+    public string? SigningIdentity { get; set; }
+
+    /// <summary>
+    /// Gets or sets the keychain profile name used for macOS notarization.
+    /// </summary>
+    /// <value>The keychain profile name, or <see langword="null"/> to use <see cref="StageKitBuild.MacKeychainProfile"/>.</value>
+    public string? KeychainProfile { get; set; }
+
+    /// <summary>
+    /// Gets or sets the Apple ID email used for macOS notarization.
+    /// </summary>
+    /// <value>The Apple ID email, or <see langword="null"/> to use <see cref="StageKitBuild.MacAppleId"/>.</value>
+    public string? AppleId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the App Store Connect app-specific password used for macOS notarization.
+    /// </summary>
+    /// <value>The app-specific password, or <see langword="null"/> to use <see cref="StageKitBuild.MacPassword"/>.</value>
+    public string? Password { get; set; }
+
+    /// <summary>
+    /// Gets or sets the Apple Developer Team ID used for macOS notarization.
+    /// </summary>
+    /// <value>The Team ID, or <see langword="null"/> to use <see cref="StageKitBuild.MacTeamId"/>.</value>
+    public string? TeamId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the path to the App Store Connect API private key file (.p8) used for macOS notarization.
+    /// </summary>
+    /// <value>The API key path, or <see langword="null"/> to use <see cref="StageKitBuild.MacApiKeyPath"/>.</value>
+    public AbsolutePath? ApiKeyPath { get; set; }
+
+    /// <summary>
+    /// Gets or sets the App Store Connect API key identifier used for macOS notarization.
+    /// </summary>
+    /// <value>The API key identifier, or <see langword="null"/> to use <see cref="StageKitBuild.MacApiKeyId"/>.</value>
+    public string? ApiKeyId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the App Store Connect API issuer UUID used for macOS notarization.
+    /// </summary>
+    /// <value>The API issuer UUID, or <see langword="null"/> to use <see cref="StageKitBuild.MacApiIssuerId"/>.</value>
+    public string? ApiIssuerId { get; set; }
 
     /// <summary>
     /// Gets the runtime directory selected on Apple Silicon systems.

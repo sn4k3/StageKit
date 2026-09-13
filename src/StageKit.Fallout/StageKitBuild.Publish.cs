@@ -57,6 +57,12 @@ public partial class StageKitBuild
     public bool PublishTrimmed { get; protected set; }
 
     /// <summary>
+    /// Gets a value indicating whether applications are published with Native AOT ahead-of-time compilation.
+    /// </summary>
+    [Parameter("Publish Native AOT compiled applications. Defaults to false.")]
+    public bool PublishAot { get; protected set; }
+
+    /// <summary>
     /// Gets the file extensions removed directly from the publication directory after successful publishing.
     /// Specify extension names without a leading period.
     /// </summary>
@@ -189,6 +195,7 @@ public partial class StageKitBuild
             .SetSelfContained(!FrameworkDependent)
             .SetPublishReadyToRun(PublishReadyToRun)
             .SetPublishTrimmed(PublishTrimmed)
+            .SetProperty("PublishAot", PublishAot)
             .SetPublishSingleFile(false)
             .EnableNoRestore();
     }
@@ -213,7 +220,8 @@ public partial class StageKitBuild
             .SetProjectFile(MainProject)
             .SetRuntime(runtimeIdentifier)
             .SetPublishReadyToRun(PublishReadyToRun)
-            .SetPublishTrimmed(PublishTrimmed));
+            .SetPublishTrimmed(PublishTrimmed)
+            .SetProperty("PublishAot", PublishAot));
     }
 
     /// <summary>

@@ -32,6 +32,14 @@
   `InstallerPayloadToSign` item that can be redefined to narrow the set
 - Honour a preset `InstallerPathRegistration` in the WiX installer project instead of always overwriting it
 - Add the StageKit demo icon to its window and taskbar entry
+- Add the `PublishAot` build parameter (`--publish-aot`), defaulting to `false`, to support Native AOT ahead-of-time
+  compilation across publishing, single-file packaging, and runtime restore operations in Fallout
+- Add macOS Developer ID code signing and notarization support for application bundles (`.app`) and packages (`.dmg`,
+  `.pkg`) via `xcrun notarytool` and `stapler`, supporting keychain profiles (`--mac-keychain-profile`), Apple ID
+  credentials (`--mac-apple-id`, `--mac-password`, `--mac-team-id`), App Store Connect API keys (`--mac-api-key-path`,
+  `--mac-api-key-id`, `--mac-api-issuer-id`), signing identities (`--mac-signing-identity`), and programmatic options
+  on `MacAppBundleOptions`, while retaining ad-hoc code signing (`codesign --sign -`) as the fallback when notarization
+  or identity is not configured
 
 # v0.3.8 (11/09/2026)
 

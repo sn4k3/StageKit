@@ -1,4 +1,5 @@
-﻿using Fallout.Common.IO;
+using Fallout.Common;
+using Fallout.Common.IO;
 using Fallout.Common.Tooling;
 using Serilog;
 using StageKit.Primitives;
@@ -16,6 +17,102 @@ public partial class StageKitBuild
     /// The synthetic runtime identifier reported for multi-architecture macOS artifacts.
     /// </summary>
     public const string MultiArchMacOSRuntimeIdentifier = "osx-multiarch";
+
+    /// <summary>
+    /// Gets the code signing identity used to sign macOS applications and packages (e.g. 'Developer ID Application: Company (TEAMID)').
+    /// If omitted and notarization is not configured, ad-hoc signing ('-') is used.
+    /// </summary>
+    [Parameter("macOS code signing identity (e.g. 'Developer ID Application: Company (TEAMID)'). Defaults to '-' (ad-hoc signing) if notarization is not configured.")]
+    public string? MacSigningIdentity { get; protected set; }
+
+    /// <summary>
+    /// Gets a value indicating whether macOS notarization should be performed.
+    /// </summary>
+    [Parameter("Enable macOS notarization for application bundles and packages. Defaults to true when notarization credentials are provided; otherwise false.")]
+    public bool MacNotarize { get; protected set; }
+
+    /// <summary>
+    /// Gets the keychain profile name configured with 'xcrun notarytool store-credentials' for macOS notarization.
+    /// </summary>
+    [Parameter("Keychain profile name configured with 'xcrun notarytool store-credentials' for macOS notarization.")]
+    public string? MacKeychainProfile { get; protected set; }
+
+    /// <summary>
+    /// Gets the Apple ID email used for macOS notarization with notarytool.
+    /// </summary>
+    [Parameter("Apple ID email used for macOS notarization with notarytool.")]
+    public string? MacAppleId { get; protected set; }
+
+    /// <summary>
+    /// Gets the App Store Connect app-specific password used for macOS notarization with notarytool.
+    /// </summary>
+    [Parameter("App-specific password used for macOS notarization with notarytool.")]
+    public string? MacPassword { get; protected set; }
+
+    /// <summary>
+    /// Gets the 10-character Apple Developer Team ID used for macOS notarization with notarytool.
+    /// </summary>
+    [Parameter("Apple Developer Team ID (10-character identifier) used for macOS notarization with notarytool.")]
+    public string? MacTeamId { get; protected set; }
+
+    /// <summary>
+    /// Gets the path to the App Store Connect API private key (.p8) file used for macOS notarization.
+    /// </summary>
+    [Parameter("Path to the App Store Connect API private key file (.p8) used for macOS notarization.")]
+    public AbsolutePath? MacApiKeyPath { get; protected set; }
+
+    /// <summary>
+    /// Gets the App Store Connect API key identifier used for macOS notarization.
+    /// </summary>
+    [Parameter("App Store Connect API key identifier used for macOS notarization.")]
+    public string? MacApiKeyId { get; protected set; }
+
+    /// <summary>
+    /// Gets the App Store Connect API issuer UUID used for macOS notarization.
+    /// </summary>
+    [Parameter("App Store Connect API issuer UUID used for macOS notarization.")]
+    public string? MacApiIssuerId { get; protected set; }
+
+    /// <summary>
+    /// Gets a value indicating whether macOS notarization credentials are provided.
+    /// </summary>
+    protected virtual bool HasMacNotarizationCredentials =>
+        !string.IsNullOrWhiteSpace(ResolvedMacKeychainProfile) ||
+        (!string.IsNullOrWhiteSpace(ResolvedMacAppleId) &&
+         !string.IsNullOrWhiteSpace(ResolvedMacPassword) &&
+         !string.IsNullOrWhiteSpace(ResolvedMacTeamId)) ||
+        (ResolvedMacApiKeyPath != null &&
+         !string.IsNullOrWhiteSpace(ResolvedMacApiKeyId) &&
+         !string.IsNullOrWhiteSpace(ResolvedMacApiIssuerId));
+
+    /// <summary>
+    /// Gets a value indicating whether real macOS notarization should be performed.
+    /// </summary>
+    protected virtual bool ShouldNotarizeMacOS => MacNotarize || HasMacNotarizationCredentials;
+
+    private string? ResolvedMacKeychainProfile =>
+        !string.IsNullOrWhiteSpace(MacKeychainProfile) ? MacKeychainProfile : MacAppBundleOptions.KeychainProfile;
+
+    private string? ResolvedMacAppleId =>
+        !string.IsNullOrWhiteSpace(MacAppleId) ? MacAppleId : MacAppBundleOptions.AppleId;
+
+    private string? ResolvedMacPassword =>
+        !string.IsNullOrWhiteSpace(MacPassword) ? MacPassword : MacAppBundleOptions.Password;
+
+    private string? ResolvedMacTeamId =>
+        !string.IsNullOrWhiteSpace(MacTeamId) ? MacTeamId : MacAppBundleOptions.TeamId;
+
+    private AbsolutePath? ResolvedMacApiKeyPath =>
+        MacApiKeyPath ?? MacAppBundleOptions.ApiKeyPath;
+
+    private string? ResolvedMacApiKeyId =>
+        !string.IsNullOrWhiteSpace(MacApiKeyId) ? MacApiKeyId : MacAppBundleOptions.ApiKeyId;
+
+    private string? ResolvedMacApiIssuerId =>
+        !string.IsNullOrWhiteSpace(MacApiIssuerId) ? MacApiIssuerId : MacAppBundleOptions.ApiIssuerId;
+
+    private string? ResolvedMacSigningIdentity =>
+        !string.IsNullOrWhiteSpace(MacSigningIdentity) ? MacSigningIdentity : MacAppBundleOptions.SigningIdentity;
 
     /// <summary>
     /// Selects and creates the configured macOS application bundles.
@@ -254,6 +351,10 @@ public partial class StageKitBuild
             var appPath = StageMacOSApp(context, stagingPath, packagingType);
             ExecuteMacOSPackageCommand(createCommand(appPath, temporaryOutputPath), stagingPath,
                 temporaryOutputPath, packagingType);
+            if (IsMacOSHost && ShouldNotarizeMacOS)
+            {
+                NotarizeMacOSPackage(temporaryOutputPath);
+            }
             MoveMacOSPackageOutput(temporaryOutputPath, outputPath, extension);
         }
         finally
@@ -276,6 +377,10 @@ public partial class StageKitBuild
             var appPath = StageMultiArchMacOSApp(x64Context, arm64Context, stagingPath, packagingType);
             ExecuteMacOSPackageCommand(createCommand(appPath, temporaryOutputPath), stagingPath,
                 temporaryOutputPath, packagingType);
+            if (IsMacOSHost && ShouldNotarizeMacOS)
+            {
+                NotarizeMacOSPackage(temporaryOutputPath);
+            }
             MoveMacOSPackageOutput(temporaryOutputPath, outputPath, extension);
         }
         finally
@@ -441,13 +546,176 @@ public partial class StageKitBuild
     }
 
     /// <summary>
-    /// Ad-hoc signs a completed macOS application bundle.
+    /// Signs a completed macOS application bundle, applying real Developer ID signing and notarization when configured
+    /// or falling back to ad-hoc signing.
     /// </summary>
     /// <param name="appPath">The application bundle path.</param>
     protected virtual void SignMacOSApp(AbsolutePath appPath)
     {
-        using var process = ProcessTasks.StartProcess("codesign",
-            $"--force --deep --sign - {appPath.ToString().QuoteProcessArgument()}");
+        if (!ShouldNotarizeMacOS && string.IsNullOrWhiteSpace(ResolvedMacSigningIdentity))
+        {
+            ExecuteCodeSign($"--force --deep --sign - {appPath.ToString().QuoteProcessArgument()}");
+            return;
+        }
+
+        var identity = !string.IsNullOrWhiteSpace(ResolvedMacSigningIdentity)
+            ? ResolvedMacSigningIdentity
+            : "Developer ID Application";
+
+        var entitlementsPath = appPath / "Contents" / $"{SoftwareName}.entitlements";
+        var entitlementsArg = entitlementsPath.FileExists()
+            ? $"--entitlements {entitlementsPath.ToString().QuoteProcessArgument()} "
+            : string.Empty;
+
+        ExecuteCodeSign($"--force --deep --timestamp --options runtime {entitlementsArg}--sign {identity.QuoteProcessArgument()} {appPath.ToString().QuoteProcessArgument()}");
+
+        if (ShouldNotarizeMacOS)
+        {
+            NotarizeMacOSApp(appPath);
+        }
+    }
+
+    /// <summary>
+    /// Executes the macOS codesign command with the specified argument string.
+    /// </summary>
+    /// <param name="arguments">The codesign command-line arguments.</param>
+    protected virtual void ExecuteCodeSign(string arguments)
+    {
+        using var process = ProcessTasks.StartProcess("codesign", arguments);
         process.AssertWaitForExit().AssertZeroExitCode();
+    }
+
+    /// <summary>
+    /// Notarizes a signed macOS application bundle using xcrun notarytool and staples the ticket.
+    /// </summary>
+    /// <param name="appPath">The application bundle path.</param>
+    protected virtual void NotarizeMacOSApp(AbsolutePath appPath)
+    {
+        var tempZip = PublishStagingDirectory / $"{Guid.NewGuid():N}.zip";
+        try
+        {
+            ExecuteDittoZip(appPath, tempZip);
+            NotarizeAndStapleArtifact(tempZip, appPath);
+        }
+        finally
+        {
+            tempZip.DeleteFile();
+        }
+    }
+
+    /// <summary>
+    /// Notarizes a macOS package (.dmg or .pkg) using xcrun notarytool and staples the ticket.
+    /// </summary>
+    /// <param name="packagePath">The package file path.</param>
+    protected virtual void NotarizeMacOSPackage(AbsolutePath packagePath)
+    {
+        NotarizeAndStapleArtifact(packagePath, packagePath);
+    }
+
+    /// <summary>
+    /// Submits an artifact to xcrun notarytool for notarization and staples the ticket to the target.
+    /// </summary>
+    /// <param name="submissionPath">The archive or package submitted to notarytool (.zip, .dmg, or .pkg).</param>
+    /// <param name="stapleTarget">The target file or directory to which the ticket is stapled.</param>
+    protected virtual void NotarizeAndStapleArtifact(AbsolutePath submissionPath, AbsolutePath stapleTarget)
+    {
+        var authArgs = GetNotaryToolAuthenticationArguments();
+        Log.Information("Submitting {Artifact} for macOS notarization...", submissionPath.Name);
+        ExecuteNotaryToolSubmit(submissionPath, authArgs);
+
+        Log.Information("Stapling macOS notarization ticket to {Target}...", stapleTarget.Name);
+        ExecuteStapler(stapleTarget);
+    }
+
+    /// <summary>
+    /// Creates a zip archive using macOS ditto preserving resource forks and parent directory.
+    /// </summary>
+    /// <param name="source">The source bundle directory.</param>
+    /// <param name="destinationZip">The destination zip archive path.</param>
+    protected virtual void ExecuteDittoZip(AbsolutePath source, AbsolutePath destinationZip)
+    {
+        using var process = ProcessTasks.StartProcess("ditto",
+            $"-c -k --keepParent {source.ToString().QuoteProcessArgument()} {destinationZip.ToString().QuoteProcessArgument()}");
+        process.AssertWaitForExit().AssertZeroExitCode();
+    }
+
+    /// <summary>
+    /// Submits an artifact to Apple's notarization service via xcrun notarytool.
+    /// </summary>
+    /// <param name="submissionPath">The archive or package submitted to notarytool.</param>
+    /// <param name="authenticationArguments">The authentication argument fragment.</param>
+    protected virtual void ExecuteNotaryToolSubmit(AbsolutePath submissionPath, string authenticationArguments)
+    {
+        using var process = ProcessTasks.StartProcess("xcrun",
+            $"notarytool submit {submissionPath.ToString().QuoteProcessArgument()} {authenticationArguments} --wait");
+        process.AssertWaitForExit().AssertZeroExitCode();
+    }
+
+    /// <summary>
+    /// Staples a notarization ticket to a target application bundle or package via xcrun stapler.
+    /// </summary>
+    /// <param name="targetPath">The target application bundle or package.</param>
+    protected virtual void ExecuteStapler(AbsolutePath targetPath)
+    {
+        using var process = ProcessTasks.StartProcess("xcrun",
+            $"stapler staple {targetPath.ToString().QuoteProcessArgument()}");
+        process.AssertWaitForExit().AssertZeroExitCode();
+    }
+
+    /// <summary>
+    /// Gets the command-line argument fragment for authenticating with xcrun notarytool.
+    /// </summary>
+    protected virtual string GetNotaryToolAuthenticationArguments()
+    {
+        var keychainProfile = ResolvedMacKeychainProfile;
+        if (!string.IsNullOrWhiteSpace(keychainProfile))
+        {
+            return $"--keychain-profile {keychainProfile.QuoteProcessArgument()}";
+        }
+
+        var appleId = ResolvedMacAppleId;
+        var password = ResolvedMacPassword;
+        var teamId = ResolvedMacTeamId;
+
+        if (!string.IsNullOrWhiteSpace(appleId) ||
+            !string.IsNullOrWhiteSpace(password) ||
+            !string.IsNullOrWhiteSpace(teamId))
+        {
+            if (string.IsNullOrWhiteSpace(appleId) ||
+                string.IsNullOrWhiteSpace(password) ||
+                string.IsNullOrWhiteSpace(teamId))
+            {
+                throw new InvalidOperationException(
+                    "macOS notarization using Apple ID requires MacAppleId, MacPassword, and MacTeamId to all be specified.");
+            }
+
+            return $"--apple-id {appleId.QuoteProcessArgument()} " +
+                   $"--password {password.QuoteProcessArgument()} " +
+                   $"--team-id {teamId.QuoteProcessArgument()}";
+        }
+
+        var apiKeyPath = ResolvedMacApiKeyPath;
+        var apiKeyId = ResolvedMacApiKeyId;
+        var apiIssuerId = ResolvedMacApiIssuerId;
+
+        if (apiKeyPath != null ||
+            !string.IsNullOrWhiteSpace(apiKeyId) ||
+            !string.IsNullOrWhiteSpace(apiIssuerId))
+        {
+            if (apiKeyPath == null ||
+                string.IsNullOrWhiteSpace(apiKeyId) ||
+                string.IsNullOrWhiteSpace(apiIssuerId))
+            {
+                throw new InvalidOperationException(
+                    "macOS notarization using API key requires MacApiKeyPath, MacApiKeyId, and MacApiIssuerId to all be specified.");
+            }
+
+            return $"--key {apiKeyPath.ToString().QuoteProcessArgument()} " +
+                   $"--key-id {apiKeyId.QuoteProcessArgument()} " +
+                   $"--issuer {apiIssuerId.QuoteProcessArgument()}";
+        }
+
+        throw new InvalidOperationException(
+            "macOS notarization was requested, but notarization credentials were not configured. Specify MacKeychainProfile, or MacAppleId + MacPassword + MacTeamId, or MacApiKeyPath + MacApiKeyId + MacApiIssuerId.");
     }
 }
