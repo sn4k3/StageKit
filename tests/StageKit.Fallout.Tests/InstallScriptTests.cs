@@ -9,6 +9,8 @@ namespace StageKit.Fallout.Tests;
 /// </summary>
 public class InstallScriptTests
 {
+    private const string DefaultMacOsMinimumVersion = "13.0";
+
     /// <summary>
     /// Verifies that native packages precede generic bundles and Portable remains the final fallback.
     /// </summary>
@@ -19,6 +21,7 @@ public class InstallScriptTests
             "https://github.com/example/sample",
             "Sample App",
             "sample",
+            DefaultMacOsMinimumVersion,
             [
                 ApplicationPackagingType.Portable,
                 ApplicationPackagingType.DotNetSingleFile,
@@ -63,6 +66,7 @@ public class InstallScriptTests
             "https://github.com/example/sample",
             "Sample",
             "sample",
+            DefaultMacOsMinimumVersion,
             [ApplicationPackagingType.LinuxDeb]);
 
         Assert.Contains("show_header()", script, StringComparison.Ordinal);
@@ -112,6 +116,23 @@ public class InstallScriptTests
     }
 
     /// <summary>
+    /// Verifies that the configured minimum macOS version is embedded in the generated script.
+    /// </summary>
+    [Fact]
+    public void Create_CustomMacOsMinimumVersion_EmbedsConfiguredValue()
+    {
+        var script = InstallScript.Create(
+            "https://github.com/example/sample",
+            "Sample",
+            "sample",
+            "14.2",
+            [ApplicationPackagingType.MacOSAppBundle]);
+
+        Assert.Contains("MACOS_MINIMUM_VERSION='14.2'", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("MACOS_MINIMUM_VERSION='13.0'", script, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// Verifies that Portable extraction forces the ZIP package and uses an application-named destination.
     /// </summary>
     [Fact]
@@ -121,6 +142,7 @@ public class InstallScriptTests
             "https://github.com/example/sample",
             "Sample App",
             "sample",
+            DefaultMacOsMinimumVersion,
             [ApplicationPackagingType.LinuxDeb, ApplicationPackagingType.Portable]);
 
         Assert.Contains("--portable) FORCE_PORTABLE='true'; PORTABLE_PARENT=\"$PWD\"", script,
@@ -172,6 +194,7 @@ public class InstallScriptTests
             "https://github.com/example/sample",
             "Sample",
             "sample",
+            DefaultMacOsMinimumVersion,
             [ApplicationPackagingType.LinuxDeb]);
 
         AssertInOrder(script,
@@ -197,6 +220,7 @@ public class InstallScriptTests
             "git@github.com:example/sample.git",
             "Sam'ple App",
             "sample-app",
+            DefaultMacOsMinimumVersion,
             [ApplicationPackagingType.LinuxFlatpak]);
 
         Assert.Contains("REPOSITORY='example/sample'", script, StringComparison.Ordinal);
@@ -230,6 +254,7 @@ public class InstallScriptTests
             "https://github.com/example/sample",
             "Sample",
             "sample",
+            DefaultMacOsMinimumVersion,
             [ApplicationPackagingType.None, ApplicationPackagingType.WindowsInstaller]));
     }
 

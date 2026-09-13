@@ -59,6 +59,7 @@ public partial class StageKitBuild
             SoftwareRepositoryUrl,
             SoftwareName,
             SoftwareExecutableFileNameWithoutExtension,
+            MacAppBundleOptions.MinimumSystemVersion,
             PackagingTypes);
     }
 
