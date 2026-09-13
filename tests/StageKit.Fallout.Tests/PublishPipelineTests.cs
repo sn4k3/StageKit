@@ -907,6 +907,9 @@ public class PublishPipelineTests
         build.WindowsInstallerOptions.UrlSchemes.Add("STAGEKIT");
         build.WindowsInstallerOptions.LaunchApplicationArguments = "--open=%1, --mode=test";
         build.WindowsInstallerOptions.DefaultDesktopShortcut = false;
+        build.WindowsInstallerOptions.DefaultStartMenuShortcut = false;
+        build.WindowsInstallerOptions.InstallerScope = InstallerScope.PerMachine;
+        build.WindowsInstallerOptions.PathRegistration = PathRegistration.Register;
         build.WindowsInstallerOptions.ContextMenuTitle = "Open with StageKit";
         build.WindowsInstallerOptions.ContextMenuCommandArguments = "--open \"%1\"";
         var context = CreateContext(build, "win-x64");
@@ -927,15 +930,112 @@ public class PublishPipelineTests
         Assert.Equal("--open=%251%2C --mode=test",
             Assert.IsType<JsonElement>(settings.Properties["LaunchApplicationArguments"]).GetString());
         Assert.Equal("0", Assert.IsType<JsonElement>(settings.Properties["DefaultDesktopShortcut"]).GetString());
+        Assert.Equal("0", Assert.IsType<JsonElement>(settings.Properties["DefaultStartMenuShortcut"]).GetString());
+        Assert.Equal("perMachine", Assert.IsType<JsonElement>(settings.Properties["InstallerScope"]).GetString());
+        Assert.Equal("Register", Assert.IsType<JsonElement>(settings.Properties["InstallerPathRegistration"]).GetString());
         Assert.Equal("Open with StageKit",
             Assert.IsType<JsonElement>(settings.Properties["ContextMenuOpenWithTitle"]).GetString());
         Assert.Equal("--open \"%251\"",
             Assert.IsType<JsonElement>(settings.Properties["ContextMenuOpenWithCommandArgs"]).GetString());
     }
 
+    private static TestBuild CreateWindowsInstallerTestBuild() => new()
+    {
+        TestSoftwareName = "ProductName",
+        TestSoftwareExecutableName = "PublishedExecutable",
+        TestMainProjectProperties = new Dictionary<string, string?>
+        {
+            ["Company"] = "Example Company",
+            ["CompanyRDNS"] = "com.example",
+            ["Authors"] = "Example Authors",
+            ["PackageLicenseExpression"] = "MIT",
+            ["Copyright"] = "Copyright (c) 2026",
+            ["Description"] = "Product description",
+            ["RepositoryUrl"] = "https://github.com/example/product",
+            ["PackageTags"] = "tag1"
+        }
+    };
+
     /// <summary>
-    /// Verifies that WindowsInstallerOptions exposes expected properties and defaults.
+    /// Verifies that InstallerScope and PathRegistration enum values configure MSBuild properties correctly.
     /// </summary>
+    [Theory]
+    [InlineData(InstallerScope.PerMachineOrUser, "perMachineOrUser")]
+    [InlineData(InstallerScope.PerUser, "perUser")]
+    [InlineData(InstallerScope.PerMachine, "perMachine")]
+    public void ConfigureWindowsInstallerBuildSettings_InstallerScope_SetsExpectedProperty(
+        InstallerScope scope,
+        string expectedValue)
+    {
+        var build = CreateWindowsInstallerTestBuild();
+        build.WindowsInstallerOptions.InstallerScope = scope;
+        var context = CreateContext(build, "win-x64");
+
+        var settings = build.InvokeConfigureWindowsInstallerBuildSettings(
+            new DotNetBuildSettings(),
+            CreateProject("Installer.wixproj"),
+            context,
+            (AbsolutePath)Path.GetTempPath(),
+            "x64");
+
+        Assert.Equal(expectedValue, Assert.IsType<JsonElement>(settings.Properties["InstallerScope"]).GetString());
+    }
+
+    /// <summary>
+    /// Verifies that PathRegistration enum values configure MSBuild properties correctly, and None/null omit the property.
+    /// </summary>
+    [Theory]
+    [InlineData(PathRegistration.Register, "Register")]
+    [InlineData(PathRegistration.UserDefaultNo, "UserDefaultNo")]
+    [InlineData(PathRegistration.UserDefaultYes, "UserDefaultYes")]
+    public void ConfigureWindowsInstallerBuildSettings_PathRegistration_SetsExpectedProperty(
+        PathRegistration mode,
+        string expectedValue)
+    {
+        var build = CreateWindowsInstallerTestBuild();
+        build.WindowsInstallerOptions.PathRegistration = mode;
+        var context = CreateContext(build, "win-x64");
+
+        var settings = build.InvokeConfigureWindowsInstallerBuildSettings(
+            new DotNetBuildSettings(),
+            CreateProject("Installer.wixproj"),
+            context,
+            (AbsolutePath)Path.GetTempPath(),
+            "x64");
+
+        Assert.Equal(expectedValue, Assert.IsType<JsonElement>(settings.Properties["InstallerPathRegistration"]).GetString());
+    }
+
+    /// <summary>
+    /// Verifies that when PathRegistration is None or null, InstallerPathRegistration property is omitted.
+    /// </summary>
+    [Fact]
+    public void ConfigureWindowsInstallerBuildSettings_PathRegistrationNoneOrNull_Omitted()
+    {
+        var build = CreateWindowsInstallerTestBuild();
+        build.WindowsInstallerOptions.PathRegistration = PathRegistration.None;
+        var context = CreateContext(build, "win-x64");
+
+        var settingsNone = build.InvokeConfigureWindowsInstallerBuildSettings(
+            new DotNetBuildSettings(),
+            CreateProject("Installer.wixproj"),
+            context,
+            (AbsolutePath)Path.GetTempPath(),
+            "x64");
+
+        Assert.False(settingsNone.Properties.ContainsKey("InstallerPathRegistration"));
+
+        build.WindowsInstallerOptions.PathRegistration = null;
+        var settingsNull = build.InvokeConfigureWindowsInstallerBuildSettings(
+            new DotNetBuildSettings(),
+            CreateProject("Installer.wixproj"),
+            context,
+            (AbsolutePath)Path.GetTempPath(),
+            "x64");
+
+        Assert.False(settingsNull.Properties.ContainsKey("InstallerPathRegistration"));
+    }
+
     [Fact]
     public void WindowsInstallerOptions_DefaultsAndCustomization_ConfiguredCorrectly()
     {
@@ -959,6 +1059,9 @@ public class PublishPipelineTests
         Assert.Empty(options.UrlSchemes);
         Assert.Null(options.LaunchApplicationArguments);
         Assert.True(options.DefaultDesktopShortcut);
+        Assert.True(options.DefaultStartMenuShortcut);
+        Assert.Null(options.InstallerScope);
+        Assert.Null(options.PathRegistration);
         Assert.Null(options.ContextMenuTitle);
         Assert.Null(options.ContextMenuCommandArguments);
     }

@@ -33,7 +33,11 @@
         <?endif ?>
         <Property Id="SHORTCUTS_UI_COMPLETE" Secure="yes"/>
         <Property Id="INSTALLFOLDER" Secure="yes"/>
+        <?ifdef DefaultStartMenuShortcut ?>
+        <Property Id="CREATESTARTMENUSHORTCUT" Value="$(var.DefaultStartMenuShortcut)" Secure="yes"/>
+        <?else ?>
         <Property Id="CREATESTARTMENUSHORTCUT" Value="1" Secure="yes"/>
+        <?endif ?>
         <?ifdef DefaultDesktopShortcut ?>
         <Property Id="CREATEDESKTOPSHORTCUT" Value="$(var.DefaultDesktopShortcut)" Secure="yes"/>
         <?else ?>
@@ -446,12 +450,12 @@
                     <Publish Property="MSIINSTALLPERUSER" Value="{}" Order="5"
                              Condition="INSTALLSCOPE = &quot;perMachine&quot;"/>
                     <?endif ?>
-                    <Publish Property="INSTALLFOLDER" Value="[USERINSTALLFOLDER]" Order="6"
+                    <Publish Property="INSTALLFOLDER" Value="[USERINSTALLFOLDER]\" Order="6"
                              Condition="INSTALLSCOPE = &quot;perUser&quot; AND USERINSTALLFOLDER"/>
                     <Publish Property="INSTALLFOLDER" Value="[LocalAppDataFolder]Programs\$(var.ApplicationName)"
                              Order="7"
                              Condition="INSTALLSCOPE = &quot;perUser&quot; AND NOT USERINSTALLFOLDER"/>
-                    <Publish Property="INSTALLFOLDER" Value="[MACHINEINSTALLFOLDER]" Order="8"
+                    <Publish Property="INSTALLFOLDER" Value="[MACHINEINSTALLFOLDER]\" Order="8"
                              Condition="INSTALLSCOPE = &quot;perMachine&quot; AND MACHINEINSTALLFOLDER"/>
                     <Publish Property="INSTALLFOLDER" Value="[MACHINEPROGRAMFILESFOLDER]\$(var.ApplicationName)"
                              Order="9"

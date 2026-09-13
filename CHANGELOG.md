@@ -1,4 +1,4 @@
-# v0.3.9 (/09/2026)
+# v0.3.9 (13/09/2026)
 
 - Add `HostSystem.OpenUrl` URI overloads and generic synchronous/asynchronous and `Open` helpers for directories, files,
   URLs, and raw shell-execute fallback targets
@@ -7,7 +7,8 @@
   `CFBundleDocumentTypes` in macOS `Info.plist`, and `MimeType` associations, `Exec` file arguments (`%F`), and
   AppStream mediatype metadata in Linux desktop application bundles
 - Add `WindowsInstallerOptions` to Fallout to configure Windows installer options (including
-  `ContextMenuOpenWithFileAssociations` as a `HashSet<FileAssociation>`, `SignToolPath`, Authenticode signing, and
+  `ContextMenuOpenWithFileAssociations` as a `HashSet<FileAssociation>`, `SignToolPath`, Authenticode signing,
+  `InstallerScope` and `PathRegistration` enums, shortcut toggles `DefaultDesktopShortcut` and `DefaultStartMenuShortcut`, and
   single-file payload) alongside WiX installer context menu registration
 - Enforce a configurable macOS minimum runtime version in the generated installation script, defaulting to macOS 13.0
 - Emit current AppStream developer metadata, including a configurable developer ID, for Linux application bundles

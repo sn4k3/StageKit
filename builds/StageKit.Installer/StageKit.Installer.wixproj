@@ -23,6 +23,7 @@
         <UrlSchemes Condition="'$(UrlSchemes)' == ''"></UrlSchemes>
         <LaunchApplicationArguments Condition="'$(LaunchApplicationArguments)' == ''"></LaunchApplicationArguments>
         <DefaultDesktopShortcut Condition="'$(DefaultDesktopShortcut)' == ''"></DefaultDesktopShortcut>
+        <DefaultStartMenuShortcut Condition="'$(DefaultStartMenuShortcut)' == ''"></DefaultStartMenuShortcut>
         <ContextMenuOpenWithTitle Condition="'$(ContextMenuOpenWithTitle)' == ''"></ContextMenuOpenWithTitle>
         <ContextMenuOpenWithCommandArgs Condition="'$(ContextMenuOpenWithCommandArgs)' == ''"></ContextMenuOpenWithCommandArgs>
         <OutputName>$(ApplicationName)_$(RuntimeIdentifier)_v$(BuildVersion)</OutputName>
@@ -137,6 +138,7 @@
         <PropertyGroup>
             <DefineConstants Condition="'$(LaunchApplicationArguments)' != ''">$(DefineConstants);LaunchApplicationArguments=$(LaunchApplicationArguments)</DefineConstants>
             <DefineConstants Condition="'$(DefaultDesktopShortcut)' != ''">$(DefineConstants);DefaultDesktopShortcut=$(DefaultDesktopShortcut)</DefineConstants>
+            <DefineConstants Condition="'$(DefaultStartMenuShortcut)' != ''">$(DefineConstants);DefaultStartMenuShortcut=$(DefaultStartMenuShortcut)</DefineConstants>
         </PropertyGroup>
     </Target>
 

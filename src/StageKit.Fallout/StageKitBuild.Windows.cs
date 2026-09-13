@@ -156,6 +156,30 @@ public partial class StageKitBuild
             .SetProperty("SignToolPath", options.SignToolPath)
             .SetProperty("OutputName", context.BundleOutputPath.Name);
 
+        if (options.InstallerScope is { } installerScope)
+        {
+            var scopeValue = installerScope switch
+            {
+                InstallerScope.PerMachineOrUser => "perMachineOrUser",
+                InstallerScope.PerUser => "perUser",
+                InstallerScope.PerMachine => "perMachine",
+                _ => throw new ArgumentOutOfRangeException(nameof(options.InstallerScope), installerScope, "Unsupported installer scope.")
+            };
+            settings = settings.SetProperty("InstallerScope", scopeValue);
+        }
+
+        if (options.PathRegistration is { } pathRegistration and not PathRegistration.None)
+        {
+            var pathRegistrationValue = pathRegistration switch
+            {
+                PathRegistration.Register => "Register",
+                PathRegistration.UserDefaultNo => "UserDefaultNo",
+                PathRegistration.UserDefaultYes => "UserDefaultYes",
+                _ => throw new ArgumentOutOfRangeException(nameof(options.PathRegistration), pathRegistration, "Unsupported PATH registration mode.")
+            };
+            settings = settings.SetProperty("InstallerPathRegistration", pathRegistrationValue);
+        }
+
         var contextMenuFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var association in options.ContextMenuOpenWithFileAssociations)
         {
@@ -219,6 +243,11 @@ public partial class StageKitBuild
         if (!options.DefaultDesktopShortcut)
         {
             settings = settings.SetProperty("DefaultDesktopShortcut", "0");
+        }
+
+        if (!options.DefaultStartMenuShortcut)
+        {
+            settings = settings.SetProperty("DefaultStartMenuShortcut", "0");
         }
 
         if (!string.IsNullOrWhiteSpace(options.ContextMenuTitle))

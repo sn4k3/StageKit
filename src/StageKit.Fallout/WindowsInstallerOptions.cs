@@ -60,6 +60,22 @@ public class WindowsInstallerOptions
     public string? LaunchApplicationArguments { get; set; }
 
     /// <summary>
+    /// Gets or sets the installation scope for the Windows installer (<see cref="Fallout.InstallerScope.PerMachineOrUser"/>, <see cref="Fallout.InstallerScope.PerUser"/>, or <see cref="Fallout.InstallerScope.PerMachine"/>).
+    /// Defaults to <see langword="null"/> to use the installer project setting (typically <see cref="Fallout.InstallerScope.PerMachineOrUser"/>).
+    /// </summary>
+    public InstallerScope? InstallerScope { get; set; }
+
+    /// <summary>
+    /// Gets or sets the PATH environment variable registration mode (<see cref="Fallout.PathRegistration.Register"/>, <see cref="Fallout.PathRegistration.UserDefaultNo"/>, or <see cref="Fallout.PathRegistration.UserDefaultYes"/>), or <see langword="null"/> (or <see cref="Fallout.PathRegistration.None"/>) to disable PATH registration.
+    /// </summary>
+    public PathRegistration? PathRegistration { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the "Create Start menu shortcut" option is checked by default in the installer dialog. The default is <see langword="true"/>.
+    /// </summary>
+    public bool DefaultStartMenuShortcut { get; set; } = true;
+
+    /// <summary>
     /// Gets or sets a value indicating whether the "Create Desktop shortcut" option is checked by default in the installer dialog. The default is <see langword="true"/>.
     /// </summary>
     public bool DefaultDesktopShortcut { get; set; } = true;
@@ -70,7 +86,7 @@ public class WindowsInstallerOptions
     public string? ContextMenuTitle { get; set; }
 
     /// <summary>
-    /// Gets or sets the command-line arguments passed when opening from the context menu. Defaults to ""%1"".
+    /// Gets or sets the command-line arguments passed when opening from the context menu. Defaults to "\"%1\"".
     /// </summary>
     public string? ContextMenuCommandArguments { get; set; }
 

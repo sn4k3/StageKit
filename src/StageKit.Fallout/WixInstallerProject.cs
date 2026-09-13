@@ -300,6 +300,7 @@ internal static class WixInstallerProject
                 <!-- Optional URL schemes registered for the application; blank disables. -->
                 <UrlSchemes Condition="'$(UrlSchemes)' == ''"></UrlSchemes>
                 <LaunchApplicationArguments Condition="'$(LaunchApplicationArguments)' == ''"></LaunchApplicationArguments>
+                <DefaultStartMenuShortcut Condition="'$(DefaultStartMenuShortcut)' == ''"></DefaultStartMenuShortcut>
                 <DefaultDesktopShortcut Condition="'$(DefaultDesktopShortcut)' == ''"></DefaultDesktopShortcut>
                 <ContextMenuOpenWithTitle Condition="'$(ContextMenuOpenWithTitle)' == ''"></ContextMenuOpenWithTitle>
                 <ContextMenuOpenWithCommandArgs Condition="'$(ContextMenuOpenWithCommandArgs)' == ''"></ContextMenuOpenWithCommandArgs>
@@ -415,6 +416,7 @@ internal static class WixInstallerProject
             <Target Name="ConfigureInstallerCustomizations" BeforeTargets="BeforeBuild;CoreCompile">
                 <PropertyGroup>
                     <DefineConstants Condition="'$(LaunchApplicationArguments)' != ''">$(DefineConstants);LaunchApplicationArguments=$(LaunchApplicationArguments)</DefineConstants>
+                    <DefineConstants Condition="'$(DefaultStartMenuShortcut)' != ''">$(DefineConstants);DefaultStartMenuShortcut=$(DefaultStartMenuShortcut)</DefineConstants>
                     <DefineConstants Condition="'$(DefaultDesktopShortcut)' != ''">$(DefineConstants);DefaultDesktopShortcut=$(DefaultDesktopShortcut)</DefineConstants>
                 </PropertyGroup>
             </Target>
@@ -507,7 +509,11 @@ internal static class WixInstallerProject
                 <?endif ?>
                 <Property Id="SHORTCUTS_UI_COMPLETE" Secure="yes"/>
                 <Property Id="INSTALLFOLDER" Secure="yes"/>
+                <?ifdef DefaultStartMenuShortcut ?>
+                <Property Id="CREATESTARTMENUSHORTCUT" Value="$(var.DefaultStartMenuShortcut)" Secure="yes"/>
+                <?else ?>
                 <Property Id="CREATESTARTMENUSHORTCUT" Value="1" Secure="yes"/>
+                <?endif ?>
                 <?ifdef DefaultDesktopShortcut ?>
                 <Property Id="CREATEDESKTOPSHORTCUT" Value="$(var.DefaultDesktopShortcut)" Secure="yes"/>
                 <?else ?>

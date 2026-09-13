@@ -36,12 +36,7 @@ internal class Build : StageKitBuild
             new FileAssociation(".skjson", "StageKit SKJSON File", "application/x-stagekit-skjson"),
         ]);
     }
-
-    /// <summary>
-    /// Gets the product name, which differs from the solution name.
-    /// </summary>
-    public override string SoftwareName => SolutionName;
-
+    
     protected override WindowsInstallerOptions CreateWindowsInstallerOptions()
     {
         var options = base.CreateWindowsInstallerOptions();

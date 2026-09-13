@@ -162,6 +162,7 @@ public sealed class WixInstallerProjectTests
             Assert.Contains("Component Id=\"UrlSchemesCapabilityComponent\"", package, StringComparison.Ordinal);
             Assert.Contains("$(var.LaunchApplicationArguments)", package, StringComparison.Ordinal);
             Assert.Contains("$(var.DefaultDesktopShortcut)", package, StringComparison.Ordinal);
+            Assert.Contains("$(var.DefaultStartMenuShortcut)", package, StringComparison.Ordinal);
             Assert.Contains("<Component Id=\"InstalledStateRegistryComponent\" Guid=\"*\">", package,
                 StringComparison.Ordinal);
             // A full uninstall has to leave nothing behind, so the key is force-deleted and no component
