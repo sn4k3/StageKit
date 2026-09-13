@@ -90,4 +90,21 @@ internal static class PublishUtilities
         Directory.CreateDirectory(manifestPath.Parent);
         File.WriteAllText(manifestPath, JsonSerializer.Serialize(runtime, RuntimeManifestJsonOptions));
     }
+
+    /// <summary>
+    /// Escapes characters with syntactic meaning in MSBuild command-line property values (<c>%</c>, <c>;</c>, <c>,</c>)
+    /// using standard MSBuild URL percent-encoding, so MSBuild unescapes them during property evaluation.
+    /// </summary>
+    /// <param name="value">The raw property value to escape.</param>
+    /// <returns>The MSBuild-escaped property value.</returns>
+    internal static string EscapeMSBuildPropertyValue(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return string.Empty;
+
+        return value
+            .Replace("%", "%25", StringComparison.Ordinal)
+            .Replace(";", "%3B", StringComparison.Ordinal)
+            .Replace(",", "%2C", StringComparison.Ordinal);
+    }
 }

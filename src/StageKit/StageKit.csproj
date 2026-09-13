@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <Description>Lightweight .NET application infrastructure for JSON settings, autosave, schema migration, atomic persistence, backups, support bundles, retention, onboarding state, single-instance guards, crash reports, and unhandled exception handling.</Description>

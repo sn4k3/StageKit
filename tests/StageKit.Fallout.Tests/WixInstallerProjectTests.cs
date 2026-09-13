@@ -61,6 +61,8 @@ public sealed class WixInstallerProjectTests
             Assert.Contains(@"Resources\License.rtf", project, StringComparison.Ordinal);
             Assert.Contains("ValidateInstallerInputs", project, StringComparison.Ordinal);
             Assert.Contains("WixToolset.Util.wixext", project, StringComparison.Ordinal);
+            Assert.Contains("Description=$(Description)", project, StringComparison.Ordinal);
+            Assert.Contains("Keywords=$(Keywords)", project, StringComparison.Ordinal);
             Assert.Contains("SignInstallerPayload", project, StringComparison.Ordinal);
             Assert.Contains("<Target Name=\"SignMsi\"", project, StringComparison.Ordinal);
             // Every binary in the payload is signed, through an item the consumer can redefine.
@@ -134,7 +136,10 @@ public sealed class WixInstallerProjectTests
                 "Condition=\"WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed\"", package,
                 StringComparison.Ordinal);
             Assert.DoesNotContain("Property=\"STARTAFTERINSTALL\"", package, StringComparison.Ordinal);
-            Assert.Contains("<SummaryInformation Comments=\"$(var.Copyright)\"/>", package,
+            Assert.Contains("<SummaryInformation Description=\"$(var.Description)\"", package,
+                StringComparison.Ordinal);
+            Assert.Contains("Keywords=\"$(var.Keywords)\"", package, StringComparison.Ordinal);
+            Assert.Contains("Comments=\"$(var.Copyright)\"/>", package,
                 StringComparison.Ordinal);
             Assert.Contains("<?define InstallerRegistryKey =", package, StringComparison.Ordinal);
             Assert.Equal(15, package.Split("Key=\"$(var.InstallerRegistryKey)\"").Length - 1);
@@ -251,6 +256,10 @@ public sealed class WixInstallerProjectTests
             var dialog = ReadPng(File.ReadAllBytes(Path.Combine(resourcesDirectory, "InstallerDialogImage.png")));
             Assert.Equal(WixInstallerProject.ImageWidth, dialog.Width);
             Assert.Equal(WixInstallerProject.DialogImageHeight, dialog.Height);
+
+            var readme = File.ReadAllText(Path.Combine(directory, "README.md"));
+            Assert.Contains("| `Description` | `SoftwareDescription` |", readme, StringComparison.Ordinal);
+            Assert.Contains("| `Keywords` | `SoftwareKeywords` |", readme, StringComparison.Ordinal);
         }
         finally
         {
@@ -375,6 +384,7 @@ public sealed class WixInstallerProjectTests
         var dialog = ReadPng(WixInstallerProject.CreateDialogImage());
         Assert.Equal(WixInstallerProject.ImageWidth, dialog.Width);
         Assert.Equal(WixInstallerProject.DialogImageHeight, dialog.Height);
+
         Assert.Equal(dialog.Height * (1 + (dialog.Width * 3)), dialog.RawLength);
     }
 

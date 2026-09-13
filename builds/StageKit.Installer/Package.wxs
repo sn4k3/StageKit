@@ -18,7 +18,9 @@
              RemoveExistingProducts before InstallInitialize, so the previous version is removed
              outside this installation's rollback transaction. -->
         <MajorUpgrade AllowDowngrades="yes"/>
-        <SummaryInformation Comments="$(var.Copyright)"/>
+        <SummaryInformation Description="$(var.Description)"
+                            Keywords="$(var.Keywords)"
+                            Comments="$(var.Copyright)"/>
         <MediaTemplate EmbedCab="yes"/>
         <util:QueryNativeMachine/>
         <Launch Condition='Installed OR WIX_UPGRADE_DETECTED OR ("$(sys.BUILDARCH)" ~= "x64" IMP WIX_NATIVE_MACHINE = 34404)'

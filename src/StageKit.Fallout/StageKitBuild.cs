@@ -455,6 +455,14 @@ public abstract partial class StageKitBuild : FalloutBuild
             .ToArray();
 
     /// <summary>
+    /// Gets the software keywords formatted as a comma-separated list, which is retrieved from the main project's package tags.
+    /// </summary>
+    [field: AllowNull]
+    [field: MaybeNull]
+    public string SoftwareKeywords =>
+        field ??= string.Join(", ", SoftwarePackageTagsList);
+
+    /// <summary>
     /// Gets the file-name stem of the executable published by the main project.
     /// </summary>
     /// <remarks>

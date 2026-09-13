@@ -244,4 +244,23 @@ public class PublishUtilitiesTests
                 Directory.Delete(rootPath, true);
         }
     }
+
+    /// <summary>
+    /// Verifies that MSBuild command-line property values escape commas, semicolons, and percent signs using URL encoding.
+    /// </summary>
+    /// <param name="input">The raw property value.</param>
+    /// <param name="expected">The expected MSBuild-escaped value.</param>
+    [Theory]
+    [InlineData(null, "")]
+    [InlineData("", "")]
+    [InlineData("simple", "simple")]
+    [InlineData("tag1, tag2, tag3", "tag1%2C tag2%2C tag3")]
+    [InlineData("a;b;c", "a%3Bb%3Bc")]
+    [InlineData("100% Cotton, 0% Wool; None", "100%25 Cotton%2C 0%25 Wool%3B None")]
+    public void EscapeMSBuildPropertyValue_SpecialCharacters_EscapesPercentSemicolonComma(
+        string? input,
+        string expected)
+    {
+        Assert.Equal(expected, PublishUtilities.EscapeMSBuildPropertyValue(input));
+    }
 }

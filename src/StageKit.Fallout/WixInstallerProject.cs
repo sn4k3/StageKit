@@ -323,7 +323,13 @@ internal static class WixInstallerProject
             </PropertyGroup>
 
             <PropertyGroup>
-                <DefineConstants>$(DefineConstants);ApplicationName=$(ApplicationName);ApplicationExecutableName=$(ApplicationExecutableName);BuildVersion=$(BuildVersion);Company=$(Company);Copyright=$(Copyright);RepositoryUrl=$(RepositoryUrl);ApplicationIcon=$(ApplicationIcon);LicenseFile=$(LicenseFile);UpgradeCode=$(UpgradeCode);InstallerScope=$(InstallerScope)</DefineConstants>
+                <Description Condition="'$(Description)' == ''">$(PackageDescription)</Description>
+                <Keywords Condition="'$(Keywords)' == '' And '$(PackageTags)' != ''">$([System.String]::Copy('$(PackageTags)').Replace(';', ', '))</Keywords>
+                <Keywords Condition="'$(Keywords)' == ''">$(PackageTags)</Keywords>
+            </PropertyGroup>
+
+            <PropertyGroup>
+                <DefineConstants>$(DefineConstants);ApplicationName=$(ApplicationName);ApplicationExecutableName=$(ApplicationExecutableName);BuildVersion=$(BuildVersion);Company=$(Company);Copyright=$(Copyright);Description=$(Description);Keywords=$(Keywords);PackageTags=$(PackageTags);RepositoryUrl=$(RepositoryUrl);ApplicationIcon=$(ApplicationIcon);LicenseFile=$(LicenseFile);UpgradeCode=$(UpgradeCode);InstallerScope=$(InstallerScope)</DefineConstants>
             </PropertyGroup>
 
             <PropertyGroup Condition="'$(InstallerPathRegistrationMode)' != ''">
@@ -417,7 +423,9 @@ internal static class WixInstallerProject
                      RemoveExistingProducts before InstallInitialize, so the previous version is removed
                      outside this installation's rollback transaction. -->
                 <MajorUpgrade AllowDowngrades="yes"/>
-                <SummaryInformation Comments="$(var.Copyright)"/>
+                <SummaryInformation Description="$(var.Description)"
+                                    Keywords="$(var.Keywords)"
+                                    Comments="$(var.Copyright)"/>
                 <MediaTemplate EmbedCab="yes"/>
                 <util:QueryNativeMachine/>
                 <Launch Condition='Installed OR WIX_UPGRADE_DETECTED OR ("$(sys.BUILDARCH)" ~= "x64" IMP WIX_NATIVE_MACHINE = 34404)'
@@ -826,6 +834,8 @@ internal static class WixInstallerProject
         | `Platform` | `x64` or `arm64` |
         | `Company` | `SoftwareCompany` |
         | `Copyright` | `SoftwareCopyright` |
+        | `Description` | `SoftwareDescription` |
+        | `Keywords` | `SoftwareKeywords` |
         | `RepositoryUrl` | `SoftwareRepositoryUrl` |
         | `ApplicationIcon` | `WindowsIconFile` |
 

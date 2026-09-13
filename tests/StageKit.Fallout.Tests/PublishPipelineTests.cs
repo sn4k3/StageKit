@@ -777,9 +777,11 @@ public class PublishPipelineTests
             TestSoftwareExecutableName = "PublishedExecutable",
             TestMainProjectProperties = new Dictionary<string, string?>
             {
-                ["Company"] = "Example Company",
-                ["Copyright"] = "Copyright (c) 2026 Example",
-                ["RepositoryUrl"] = "https://github.com/example/product"
+                ["Company"] = "Example Company, Inc.",
+                ["Copyright"] = "Copyright (c) 2026, Example",
+                ["Description"] = "Product description, text",
+                ["RepositoryUrl"] = "https://github.com/example/product",
+                ["PackageTags"] = "tag1; tag2; tag3"
             }
         };
         build.SetWindowsAuthenticodeSettings("ABC123", "https://timestamp.example", "tools/signtool.exe");
@@ -796,10 +798,14 @@ public class PublishPipelineTests
             Assert.IsType<JsonElement>(settings.Properties["ApplicationName"]).GetString());
         Assert.Equal("PublishedExecutable",
             Assert.IsType<JsonElement>(settings.Properties["ApplicationExecutableName"]).GetString());
-        Assert.Equal("Example Company",
+        Assert.Equal("Example Company%2C Inc.",
             Assert.IsType<JsonElement>(settings.Properties["Company"]).GetString());
-        Assert.Equal("Copyright (c) 2026 Example",
+        Assert.Equal("Copyright (c) 2026%2C Example",
             Assert.IsType<JsonElement>(settings.Properties["Copyright"]).GetString());
+        Assert.Equal("Product description%2C text",
+            Assert.IsType<JsonElement>(settings.Properties["Description"]).GetString());
+        Assert.Equal("tag1%2C tag2%2C tag3",
+            Assert.IsType<JsonElement>(settings.Properties["Keywords"]).GetString());
         Assert.Equal("https://github.com/example/product",
             Assert.IsType<JsonElement>(settings.Properties["RepositoryUrl"]).GetString());
         Assert.Equal((string)build.WindowsIconFile,

@@ -32,7 +32,7 @@
         <RepositoryUrl>https://github.com/sn4k3/StageKit</RepositoryUrl>
         <PackageProjectUrl>$(RepositoryUrl)</PackageProjectUrl>
         <PackageReleaseNotes>$(RepositoryUrl)/releases</PackageReleaseNotes>
-        <PackageTags>application-toolkit;settings;autosave;backup;support-bundle;retention;single-instance;crash-reporting;exception-handling</PackageTags>
+        <PackageTags>stagekit;application-toolkit;settings;autosave;backup;support-bundle;retention;single-instance;crash-reporting;exception-handling</PackageTags>
         <EmbedUntrackedSources>true</EmbedUntrackedSources>
         <IncludeSymbols>true</IncludeSymbols>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>

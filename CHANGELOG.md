@@ -27,7 +27,7 @@
 - Uninstall directly from the WiX start menu shortcut, which now carries the application icon, instead of opening
   maintenance mode that `ARPNOMODIFY` disables
 - Mark the WiX shortcut components transitive so their conditions are re-evaluated on reinstall
-- Record the copyright in the WiX package summary information
+- Record the description, keywords (from project package tags), and copyright in the WiX package summary information
 - Authenticode-sign every executable and library in the WiX payload instead of only the entry executable, through an
   `InstallerPayloadToSign` item that can be redefined to narrow the set
 - Honour a preset `InstallerPathRegistration` in the WiX installer project instead of always overwriting it

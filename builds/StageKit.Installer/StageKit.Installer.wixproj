@@ -44,7 +44,13 @@
     </PropertyGroup>
 
     <PropertyGroup>
-        <DefineConstants>$(DefineConstants);ApplicationName=$(ApplicationName);ApplicationExecutableName=$(ApplicationExecutableName);BuildVersion=$(BuildVersion);Company=$(Company);Copyright=$(Copyright);RepositoryUrl=$(RepositoryUrl);ApplicationIcon=$(ApplicationIcon);LicenseFile=$(LicenseFile);UpgradeCode=$(UpgradeCode);InstallerScope=$(InstallerScope)</DefineConstants>
+        <Description Condition="'$(Description)' == ''">$(PackageDescription)</Description>
+        <Keywords Condition="'$(Keywords)' == '' And '$(PackageTags)' != ''">$([System.String]::Copy('$(PackageTags)').Replace(';', ', '))</Keywords>
+        <Keywords Condition="'$(Keywords)' == ''">$(PackageTags)</Keywords>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <DefineConstants>$(DefineConstants);ApplicationName=$(ApplicationName);ApplicationExecutableName=$(ApplicationExecutableName);BuildVersion=$(BuildVersion);Company=$(Company);Copyright=$(Copyright);Description=$(Description);Keywords=$(Keywords);PackageTags=$(PackageTags);RepositoryUrl=$(RepositoryUrl);ApplicationIcon=$(ApplicationIcon);LicenseFile=$(LicenseFile);UpgradeCode=$(UpgradeCode);InstallerScope=$(InstallerScope)</DefineConstants>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(InstallerPathRegistrationMode)' != ''">
@@ -109,7 +115,6 @@
     </Target>
 
     <Target Name="SignMsi" Condition="'$(SignOutput)' == 'true'">
-        <Exec Command="&quot;$(SignToolPath)&quot; sign /sha1 &quot;$(AuthenticodeCertificateThumbprint)&quot; /fd SHA256 /tr &quot;$(AuthenticodeTimestampUrl)&quot; /td SHA256 /d &quot;$(ApplicationName)&quot; /du &quot;$(RepositoryUrl)&quot; &quot;%(SignMsi.FullPath)&quot;"/>
+        <Exec Command="&quot;$(SignToolPath)&quot; sign /sha1 &quot;$(AuthenticodeCertificateThumbprint)&quot; /fd SHA256 /tr &quot;$(AuthenticodeTimestampUrl)&quot; /td SHA256 /d &quot;$(ApplicationName)&quot; /du &quot;$(RepositoryUrl)&quot; &quot;$(TargetPath)&quot;"/>
     </Target>
-
 </Project>
