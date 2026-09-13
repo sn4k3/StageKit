@@ -61,7 +61,6 @@ internal class Build : StageKitBuild
     protected override MacAppBundleOptions CreateMacAppBundleOptions()
     {
         var options = base.CreateMacAppBundleOptions();
-        options.MinimumSystemVersion = "12.0";
         options.ApplicationCategory = "public.app-category.developer-tools";
         return options;
     }
