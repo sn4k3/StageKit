@@ -68,6 +68,15 @@ public static class MacAppBundle
             StringEntry("NSHumanReadableCopyright", options.Copyright)
         }.ToList();
 
+        if (options.FileAssociations.Count > 0)
+        {
+            var documentTypes = CreateDocumentTypesElement(options);
+            if (documentTypes is not null)
+            {
+                entries.Add(documentTypes);
+            }
+        }
+
         entries.AddRange(ParseExtraInfoPListEntries(options.ExtraInfoPListEntries, entries));
         return CreatePropertyList(entries.ToArray());
     }
@@ -289,5 +298,66 @@ public static class MacAppBundle
     {
         return new XElement("entry", new XElement("key", key),
             new XElement("array", values.Select(value => new XElement("string", value))));
+    }
+
+    private static XElement? CreateDocumentTypesElement(MacAppBundleOptions options)
+    {
+        var dicts = new List<XElement>();
+        foreach (var association in options.FileAssociations)
+        {
+            var extensions = association.Extensions
+                .Select(ext => ext.TrimStart('*').TrimStart('.'))
+                .Where(ext => !string.IsNullOrWhiteSpace(ext) && ext != "*")
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (extensions.Count == 0 && association.ContentTypes.Count == 0)
+            {
+                continue;
+            }
+
+            var typeName = !string.IsNullOrWhiteSpace(association.Name)
+                ? association.Name
+                : $"{options.ProductName} {(extensions.Count > 0 ? extensions[0].ToUpperInvariant() : "Document")}";
+
+            var dictEntries = new List<XElement>
+            {
+                new("key", "CFBundleTypeName"),
+                new("string", typeName),
+                new("key", "CFBundleTypeRole"),
+                new("string", association.Role.ToString()),
+                new("key", "LSHandlerRank"),
+                new("string", association.HandlerRank.ToString())
+            };
+
+            if (extensions.Count > 0)
+            {
+                dictEntries.Add(new XElement("key", "CFBundleTypeExtensions"));
+                dictEntries.Add(new XElement("array", extensions.Select(ext => new XElement("string", ext))));
+            }
+
+            if (association.ContentTypes.Count > 0)
+            {
+                dictEntries.Add(new XElement("key", "LSItemContentTypes"));
+                dictEntries.Add(new XElement("array", association.ContentTypes.Select(type => new XElement("string", type))));
+            }
+
+            if (association.IconFile is not null)
+            {
+                dictEntries.Add(new XElement("key", "CFBundleTypeIconFile"));
+                dictEntries.Add(new XElement("string", association.IconFile.Name));
+            }
+
+            dicts.Add(new XElement("dict", dictEntries));
+        }
+
+        if (dicts.Count == 0)
+        {
+            return null;
+        }
+
+        return new XElement("entry",
+            new XElement("key", "CFBundleDocumentTypes"),
+            new XElement("array", dicts));
     }
 }

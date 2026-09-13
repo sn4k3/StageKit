@@ -198,6 +198,37 @@ public class MacAppBundleTests
         Assert.Throws<ArgumentException>(() => MacAppBundle.GetInfoPList(options));
     }
 
+    [Fact]
+    public void GetInfoPList_WithFileAssociations_ProducesCFBundleDocumentTypes()
+    {
+        var options = CreateOptions();
+        options.FileAssociations.Add(new FileAssociation([".sl1", "sl1s"], "StageKit Model", "application/x-sl1")
+        {
+            Role = DocumentRole.Editor,
+            HandlerRank = BundleHandlerRank.Owner,
+            ContentTypes = ["org.stagekit.model"]
+        });
+
+        var propertyList = MacAppBundle.GetInfoPList(options);
+        var document = XDocument.Parse(propertyList);
+
+        var docTypesKey = document.Descendants("key").FirstOrDefault(e => e.Value == "CFBundleDocumentTypes");
+        Assert.NotNull(docTypesKey);
+
+        var array = docTypesKey.ElementsAfterSelf("array").FirstOrDefault();
+        Assert.NotNull(array);
+
+        var dict = array.Elements("dict").FirstOrDefault();
+        Assert.NotNull(dict);
+
+        Assert.Contains(dict.Descendants("string"), e => e.Value == "StageKit Model");
+        Assert.Contains(dict.Descendants("string"), e => e.Value == "Editor");
+        Assert.Contains(dict.Descendants("string"), e => e.Value == "Owner");
+        Assert.Contains(dict.Descendants("string"), e => e.Value == "sl1");
+        Assert.Contains(dict.Descendants("string"), e => e.Value == "sl1s");
+        Assert.Contains(dict.Descendants("string"), e => e.Value == "org.stagekit.model");
+    }
+
     private static string GetDictionaryValue(XDocument document, string key)
     {
         return FindDictionaryValue(document, key) ?? throw new Xunit.Sdk.XunitException($"Missing plist key '{key}'.");

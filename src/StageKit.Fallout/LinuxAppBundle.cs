@@ -38,6 +38,13 @@ public static partial class LinuxAppBundle
 
         ArgumentException.ThrowIfNullOrWhiteSpace(iconName);
 
+        var mimeTypes = ResolveMimeTypes(options);
+        var hasMimeTypes = mimeTypes.Count > 0;
+        var execArgs = hasMimeTypes ? " %F" : string.Empty;
+        var mimeTypeLine = hasMimeTypes
+            ? $"\nMimeType={FormatDesktopList(mimeTypes, nameof(options.MimeTypes))}"
+            : string.Empty;
+
         var desktopEntry = $$"""
                              [Desktop Entry]
                              Type=Application
@@ -46,7 +53,7 @@ public static partial class LinuxAppBundle
                              Categories={{FormatDesktopList(options.Categories, nameof(options.Categories))}}
                              Keywords={{FormatDesktopList(options.Keywords, nameof(options.Keywords))}}
                              Icon={{EscapeDesktopValue(iconName)}}
-                             Exec="{{EscapeDesktopExecDoubleQuoted(executableName)}}"
+                             Exec="{{EscapeDesktopExecDoubleQuoted(executableName)}}"{{execArgs}}{{mimeTypeLine}}
                              Terminal={{options.Terminal.ToString().ToLowerInvariant()}}
                              SingleMainWindow={{options.SingleMainWindow.ToString().ToLowerInvariant()}}
                              """;
@@ -142,7 +149,13 @@ public static partial class LinuxAppBundle
             component.Add(new XElement("update_contact", options.UpdateContact));
         }
 
-        component.Add(new XElement("provides", new XElement("binary", GetExecutableName(options))));
+        var provides = new XElement("provides", new XElement("binary", GetExecutableName(options)));
+        foreach (var mimeType in ResolveMimeTypes(options))
+        {
+            provides.Add(new XElement("mediatype", mimeType));
+        }
+
+        component.Add(provides);
 
         var document = new XDocument(new XDeclaration("1.0", "UTF-8", null), component);
         return $"{document.Declaration}{Environment.NewLine}{document}".ReplaceLineEndings("\n");
@@ -203,18 +216,14 @@ public static partial class LinuxAppBundle
                  """.ReplaceLineEndings("\n");
     }
 
-    private static XElement? CreateScreenshots(IReadOnlyList<string> screenshotUrls)
+    private static XElement? CreateScreenshots(IEnumerable<string> screenshotUrls)
     {
         ArgumentNullException.ThrowIfNull(screenshotUrls);
-        if (screenshotUrls.Count == 0)
-        {
-            return null;
-        }
 
         var screenshots = new XElement("screenshots");
-        for (var index = 0; index < screenshotUrls.Count; index++)
+        var index = 0;
+        foreach (var screenshotUrl in screenshotUrls)
         {
-            var screenshotUrl = screenshotUrls[index];
             if (!Uri.TryCreate(screenshotUrl, UriKind.Absolute, out var uri) ||
                 uri.Scheme is not ("http" or "https"))
             {
@@ -229,9 +238,136 @@ public static partial class LinuxAppBundle
             }
 
             screenshots.Add(screenshot);
+            index++;
         }
 
-        return screenshots;
+        return index == 0 ? null : screenshots;
+    }
+
+    internal static List<string> ResolveMimeTypes(LinuxAppBundleOptions options)
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var mimeType in options.MimeTypes)
+        {
+            if (!string.IsNullOrWhiteSpace(mimeType))
+            {
+                set.Add(mimeType.Trim());
+            }
+        }
+
+        foreach (var association in options.FileAssociations)
+        {
+            if (!string.IsNullOrWhiteSpace(association.MimeType))
+            {
+                set.Add(association.MimeType.Trim());
+            }
+            else
+            {
+                foreach (var extension in association.Extensions)
+                {
+                    var resolved = ResolveMimeTypeFromExtension(extension);
+                    if (!string.IsNullOrWhiteSpace(resolved))
+                    {
+                        set.Add(resolved);
+                    }
+                }
+            }
+        }
+
+        return set.ToList();
+    }
+
+    internal static string ResolveMimeTypeFromExtension(string extension)
+    {
+        var clean = extension.TrimStart('*').TrimStart('.').ToLowerInvariant();
+        return clean switch
+        {
+            "" or "*" => string.Empty,
+
+            // Archives and compressed formats
+            "zip" => "application/zip",
+            "tar" => "application/x-tar",
+            "gz" or "tgz" => "application/gzip",
+            "bz2" or "tbz2" => "application/x-bzip2",
+            "xz" or "txz" => "application/x-xz",
+            "zst" => "application/zstd",
+            "7z" => "application/x-7z-compressed",
+            "rar" => "application/vnd.rar",
+            "iso" => "application/x-iso9660-image",
+            "dmg" => "application/x-apple-diskimage",
+
+            // Documents and text
+            "txt" => "text/plain",
+            "csv" => "text/csv",
+            "tsv" => "text/tab-separated-values",
+            "html" or "htm" => "text/html",
+            "css" => "text/css",
+            "js" or "mjs" => "text/javascript",
+            "json" or "jsonc" => "application/json",
+            "xml" => "application/xml",
+            "yaml" or "yml" => "application/yaml",
+            "md" or "markdown" => "text/markdown",
+            "rtf" => "application/rtf",
+            "pdf" => "application/pdf",
+            "doc" => "application/msword",
+            "docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "xls" => "application/vnd.ms-excel",
+            "xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "ppt" => "application/vnd.ms-powerpoint",
+            "pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "odt" => "application/vnd.oasis.opendocument.text",
+            "ods" => "application/vnd.oasis.opendocument.spreadsheet",
+            "odp" => "application/vnd.oasis.opendocument.presentation",
+
+            // Images
+            "png" => "image/png",
+            "jpg" or "jpeg" => "image/jpeg",
+            "gif" => "image/gif",
+            "bmp" => "image/bmp",
+            "webp" => "image/webp",
+            "svg" => "image/svg+xml",
+            "ico" => "image/x-icon",
+            "tiff" or "tif" => "image/tiff",
+            "avif" => "image/avif",
+            "heic" or "heif" => "image/heif",
+
+            // Audio
+            "mp3" => "audio/mpeg",
+            "wav" => "audio/wav",
+            "ogg" or "oga" => "audio/ogg",
+            "flac" => "audio/flac",
+            "aac" => "audio/aac",
+            "m4a" => "audio/x-m4a",
+            "wma" => "audio/x-ms-wma",
+            "opus" => "audio/opus",
+            "mid" or "midi" => "audio/midi",
+
+            // Video
+            "mp4" or "m4v" => "video/mp4",
+            "mkv" => "video/x-matroska",
+            "webm" => "video/webm",
+            "avi" => "video/x-msvideo",
+            "mov" => "video/quicktime",
+            "wmv" => "video/x-ms-wmv",
+            "flv" => "video/x-flv",
+            "ogv" => "video/ogg",
+
+            // Fonts
+            "ttf" => "font/ttf",
+            "otf" => "font/otf",
+            "woff" => "font/woff",
+            "woff2" => "font/woff2",
+
+            // 3D and models
+            "stl" => "model/stl",
+            "obj" => "model/obj",
+            "gltf" => "model/gltf+json",
+            "glb" => "model/gltf-binary",
+            "3mf" => "model/3mf",
+
+            _ => $"application/x-{clean}"
+        };
     }
 
     private static void ValidateOptions(LinuxAppBundleOptions options)
@@ -255,7 +391,7 @@ public static partial class LinuxAppBundle
         return executableName;
     }
 
-    private static void ValidateList(IReadOnlyList<string> values, string parameterName)
+    private static void ValidateList(IEnumerable<string> values, string parameterName)
     {
         ArgumentNullException.ThrowIfNull(values);
         if (values.Any(string.IsNullOrWhiteSpace))
@@ -264,12 +400,13 @@ public static partial class LinuxAppBundle
         }
     }
 
-    private static string FormatDesktopList(IReadOnlyList<string> values, string parameterName)
+    private static string FormatDesktopList(IEnumerable<string> values, string parameterName)
     {
         ValidateList(values, parameterName);
-        return values.Count == 0
+        var list = values as IReadOnlyCollection<string> ?? values.ToList();
+        return list.Count == 0
             ? string.Empty
-            : $"{string.Join(';', values.Select(EscapeDesktopListItem))};";
+            : $"{string.Join(';', list.Select(EscapeDesktopListItem))};";
     }
 
     [GeneratedRegex(@"\s+")]

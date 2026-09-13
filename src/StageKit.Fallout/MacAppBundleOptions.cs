@@ -22,6 +22,7 @@ public class MacAppBundleOptions
     [SetsRequiredMembers]
     public MacAppBundleOptions(StageKitBuild build)
     {
+        FileAssociations.UnionWith(build.FileAssociations);
         ProductName = build.SoftwareName;
         BundleIdentifier = build.SoftwareRDNS;
         Version = build.SoftwareVersion;
@@ -85,6 +86,11 @@ public class MacAppBundleOptions
     /// </summary>
     /// <value><see langword="true"/> if high-resolution display support is enabled; otherwise, <see langword="false"/>. The default is <see langword="true"/>.</value>
     public bool HighResolutionCapable { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the file associations configured for the macOS application bundle.
+    /// </summary>
+    public HashSet<FileAssociation> FileAssociations { get; set; } = [];
 
     /// <summary>
     /// Gets additional key/value entries inserted into the generated <c>Info.plist</c> dictionary.

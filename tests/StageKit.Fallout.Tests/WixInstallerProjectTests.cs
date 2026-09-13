@@ -56,7 +56,7 @@ public sealed class WixInstallerProjectTests
             Assert.Contains("InstallerScope must be perMachineOrUser, perUser, or perMachine", project,
                 StringComparison.Ordinal);
             Assert.Contains("InstallerPathRegistrationMode", project, StringComparison.Ordinal);
-            Assert.Contains("<ContextMenuOpenWithFiles Condition=\"'$(ContextMenuOpenWithFiles)' == ''\"></ContextMenuOpenWithFiles>", project, StringComparison.Ordinal);
+            Assert.Contains("<ContextMenuOpenWithFileAssociations Condition=\"'$(ContextMenuOpenWithFileAssociations)' == ''\"></ContextMenuOpenWithFileAssociations>", project, StringComparison.Ordinal);
             Assert.Contains("Target Name=\"ConfigureContextMenuOpenWith\"", project, StringComparison.Ordinal);
             Assert.Contains("InstallerPathRegistration must be Register, UserDefaultNo, or UserDefaultYes, but was",
                 project, StringComparison.Ordinal);
@@ -274,7 +274,7 @@ public sealed class WixInstallerProjectTests
             Assert.Contains("| `Description` | `SoftwareDescription` |", readme, StringComparison.Ordinal);
             Assert.Contains("| `Keywords` | `SoftwareKeywords` |", readme, StringComparison.Ordinal);
             Assert.Contains("## Context menu (\"Open with\")", readme, StringComparison.Ordinal);
-            Assert.Contains("<ContextMenuOpenWithFiles>.sl1;.sl1s;*.zip;*.photon</ContextMenuOpenWithFiles>", readme, StringComparison.Ordinal);
+            Assert.Contains("<ContextMenuOpenWithFileAssociations>.sl1;.sl1s;*.zip;*.photon</ContextMenuOpenWithFileAssociations>", readme, StringComparison.Ordinal);
         }
         finally
         {

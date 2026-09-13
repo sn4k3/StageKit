@@ -1,6 +1,7 @@
 # v0.3.9 (/09/2026)
 
-- Add `WindowsInstallerOptions` to Fallout to configure Windows installer options (including `ContextMenuOpenWithFiles` as a `HashSet<string>`, `SignToolPath`, Authenticode signing, and single-file payload) alongside WiX installer context menu registration
+- Add cross-platform unified file associations via `FileAssociation` and `FileAssociations` on `StageKitBuild`, automatically configuring Windows Explorer context menu / Open With registration in WiX installers, `CFBundleDocumentTypes` in macOS `Info.plist`, and `MimeType` associations, `Exec` file arguments (`%F`), and AppStream mediatype metadata in Linux desktop application bundles
+- Add `WindowsInstallerOptions` to Fallout to configure Windows installer options (including `ContextMenuOpenWithFileAssociations` as a `HashSet<FileAssociation>`, `SignToolPath`, Authenticode signing, and single-file payload) alongside WiX installer context menu registration
 - Enforce a configurable macOS minimum runtime version in the generated installation script, defaulting to macOS 13.0
 - Emit current AppStream developer metadata, including a configurable developer ID, for Linux application bundles
 - Normalize AppStream summaries by removing trailing periods

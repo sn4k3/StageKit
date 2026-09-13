@@ -15,8 +15,10 @@
         <InstallerPathRegistrationMode Condition="'$(InstallerPathRegistration)' == 'Register'">Register</InstallerPathRegistrationMode>
         <InstallerPathRegistrationMode Condition="'$(InstallerPathRegistration)' == 'UserDefaultNo'">UserDefaultNo</InstallerPathRegistrationMode>
         <InstallerPathRegistrationMode Condition="'$(InstallerPathRegistration)' == 'UserDefaultYes'">UserDefaultYes</InstallerPathRegistrationMode>
+        <!-- Optional file associations to register application capabilities in the Windows registry; blank disables. -->
+        <FileAssociations Condition="'$(FileAssociations)' == ''"></FileAssociations>
         <!-- Optional file patterns or extensions for the Windows Explorer context menu; blank disables. -->
-        <ContextMenuOpenWithFiles Condition="'$(ContextMenuOpenWithFiles)' == ''"></ContextMenuOpenWithFiles>
+        <ContextMenuOpenWithFileAssociations Condition="'$(ContextMenuOpenWithFileAssociations)' == ''"></ContextMenuOpenWithFileAssociations>
         <OutputName>$(ApplicationName)_$(RuntimeIdentifier)_v$(BuildVersion)</OutputName>
         <LicenseFile>$(MSBuildProjectDirectory)\Resources\License.rtf</LicenseFile>
         <InstallerDialogImage>$(MSBuildProjectDirectory)\Resources\InstallerDialogImage.png</InstallerDialogImage>
@@ -73,9 +75,26 @@
         <Content Include="Resources\License.rtf"/>
     </ItemGroup>
 
-    <Target Name="ConfigureContextMenuOpenWith" BeforeTargets="BeforeBuild;CoreCompile" Condition="'$(ContextMenuOpenWithFiles)' != ''">
+    <Target Name="ConfigureFileAssociations" BeforeTargets="BeforeBuild;CoreCompile" Condition="'$(FileAssociations)' != ''">
         <PropertyGroup>
-            <_RawContextMenuFiles>$([System.String]::Copy('$(ContextMenuOpenWithFiles)').Replace(',', ';').Replace('%2C', ';').Replace('%3B', ';'))</_RawContextMenuFiles>
+            <_RawFileAssoc>$([System.String]::Copy('$(FileAssociations)').Replace(',', ';').Replace('%2C', ';').Replace('%3B', ';'))</_RawFileAssoc>
+        </PropertyGroup>
+        <ItemGroup>
+            <_FileAssocSplitItems Include="$(_RawFileAssoc.Split(';', System.StringSplitOptions.RemoveEmptyEntries))" />
+            <_FileAssocTrimmedItems Include="@(_FileAssocSplitItems->Trim())" Condition="'%(Identity)' != ''" />
+            <_FileAssocCleanItems Include="@(_FileAssocTrimmedItems->'%(Identity)'.TrimStart('*'))" />
+            <_FileAssocDotted Include="@(_FileAssocCleanItems)" Condition="$([System.String]::Copy('%(Identity)').StartsWith('.')) and '%(Identity)' != '.'" />
+            <_FileAssocDotted Include="@(_FileAssocCleanItems->'.%(Identity)')" Condition="!$([System.String]::Copy('%(Identity)').StartsWith('.')) and '%(Identity)' != ''" />
+        </ItemGroup>
+        <PropertyGroup>
+            <_CleanedFileAssociations Condition="'@(_FileAssocDotted)' != ''">@(_FileAssocDotted, ',')</_CleanedFileAssociations>
+            <DefineConstants Condition="'$(_CleanedFileAssociations)' != ''">$(DefineConstants);FileAssociations=$(_CleanedFileAssociations)</DefineConstants>
+        </PropertyGroup>
+    </Target>
+
+    <Target Name="ConfigureContextMenuOpenWith" BeforeTargets="BeforeBuild;CoreCompile" Condition="'$(ContextMenuOpenWithFileAssociations)' != ''">
+        <PropertyGroup>
+            <_RawContextMenuFiles>$([System.String]::Copy('$(ContextMenuOpenWithFileAssociations)').Replace(',', ';').Replace('%2C', ';').Replace('%3B', ';'))</_RawContextMenuFiles>
         </PropertyGroup>
         <ItemGroup>
             <_ContextMenuSplitItems Include="$(_RawContextMenuFiles.Split(';', System.StringSplitOptions.RemoveEmptyEntries))" />
@@ -87,9 +106,9 @@
         </ItemGroup>
         <PropertyGroup>
             <ContextMenuOpenWithAppliesTo Condition="'@(_ContextMenuPatterns)' != ''">@(_ContextMenuPatterns->'System.FileName:&quot;%(Identity)&quot;', ' OR ')</ContextMenuOpenWithAppliesTo>
-            <ContextMenuOpenWithAppliesTo Condition="$([System.String]::Copy('$(ContextMenuOpenWithFiles)').Contains('System.FileName:'))">$(ContextMenuOpenWithFiles)</ContextMenuOpenWithAppliesTo>
+            <ContextMenuOpenWithAppliesTo Condition="$([System.String]::Copy('$(ContextMenuOpenWithFileAssociations)').Contains('System.FileName:'))">$(ContextMenuOpenWithFileAssociations)</ContextMenuOpenWithAppliesTo>
             <DefineConstants>$(DefineConstants);ContextMenuOpenWith=true</DefineConstants>
-            <DefineConstants Condition="'$(ContextMenuOpenWithFiles)' != '*' and '$(ContextMenuOpenWithAppliesTo)' != ''">$(DefineConstants);ContextMenuOpenWithAppliesTo=$(ContextMenuOpenWithAppliesTo)</DefineConstants>
+            <DefineConstants Condition="'$(ContextMenuOpenWithFileAssociations)' != '*' and '$(ContextMenuOpenWithAppliesTo)' != ''">$(DefineConstants);ContextMenuOpenWithAppliesTo=$(ContextMenuOpenWithAppliesTo)</DefineConstants>
         </PropertyGroup>
     </Target>
 

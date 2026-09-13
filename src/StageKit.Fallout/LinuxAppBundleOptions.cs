@@ -21,6 +21,7 @@ public class LinuxAppBundleOptions
     [SetsRequiredMembers]
     public LinuxAppBundleOptions(StageKitBuild build)
     {
+        FileAssociations.UnionWith(build.FileAssociations);
         ApplicationId = build.SoftwareRDNS;
         ProductName = build.SoftwareName;
         ExecutableName = build.SoftwareExecutableFileNameWithoutExtension;
@@ -31,7 +32,7 @@ public class LinuxAppBundleOptions
         DeveloperId = build.SoftwareCompanyRdns;
         Authors = build.SoftwareAuthors;
         DebPackageMaintainer = build.SoftwarePackageMaintainersRFC822;
-        Keywords = build.SoftwarePackageTagsList.ToList();
+        Keywords = [..build.SoftwarePackageTagsList];
     }
 
     /// <summary>
@@ -92,12 +93,12 @@ public class LinuxAppBundleOptions
     /// Gets the desktop menu categories.
     /// </summary>
     /// <value>The categories. The default contains <c>Utility</c>.</value>
-    public List<string> Categories { get; set; } = ["Utility"];
+    public HashSet<string> Categories { get; set; } = ["Utility"];
 
     /// <summary>
     /// Gets the terms used when searching for the application in desktop menus.
     /// </summary>
-    public List<string> Keywords { get; set; } = [];
+    public HashSet<string> Keywords { get; set; } = [];
 
     /// <summary>
     /// Gets a value that indicates whether the application runs in a terminal.
@@ -108,6 +109,16 @@ public class LinuxAppBundleOptions
     /// Gets a value that indicates whether the application uses one main window.
     /// </summary>
     public bool SingleMainWindow { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the file associations configured for the Linux desktop entry and AppStream metadata.
+    /// </summary>
+    public HashSet<FileAssociation> FileAssociations { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the MIME types configured for the Linux desktop entry and AppStream metadata.
+    /// </summary>
+    public HashSet<string> MimeTypes { get; set; } = [];
 
     /// <summary>
     /// Gets additional lines appended to the generated desktop entry.
@@ -145,12 +156,12 @@ public class LinuxAppBundleOptions
     /// Gets the ordered screenshot URLs included in AppStream metadata.
     /// </summary>
     /// <remarks>The first URL is marked as the default screenshot.</remarks>
-    public List<string> ScreenshotUrls { get; set; } = [];
+    public HashSet<string> ScreenshotUrls { get; set; } = [];
 
     /// <summary>
     /// Gets the input controls supported by the application.
     /// </summary>
-    public List<string> Controls { get; set; } = ["pointing", "keyboard", "touch"];
+    public HashSet<string> Controls { get; set; } = ["pointing", "keyboard", "touch"];
 
     /// <summary>
     /// Gets the minimum recommended display length in logical pixels.
@@ -176,7 +187,7 @@ public class LinuxAppBundleOptions
     /// <summary>
     /// Gets the Flatpak sandbox permissions.
     /// </summary>
-    public List<string> FlatpakFinishArguments { get; set; } =
+    public HashSet<string> FlatpakFinishArguments { get; set; } =
         ["--socket=x11", "--share=ipc", "--device=dri", "--share=network"];
 
     /// <summary>
@@ -209,7 +220,7 @@ public class LinuxAppBundleOptions
     /// <summary>
     /// Gets the interfaces connected to the Snap application.
     /// </summary>
-    public List<string> SnapPlugs { get; set; } =
+    public HashSet<string> SnapPlugs { get; set; } =
         ["desktop", "desktop-legacy", "opengl", "wayland", "x11", "network"];
 
     /// <summary>
@@ -217,5 +228,5 @@ public class LinuxAppBundleOptions
     /// </summary>
     /// <value>The stage packages. The default contains <c>libicu74</c>, matching the default <c>core24</c> base.</value>
     /// <remarks>Package names are base-specific and should be updated when <see cref="SnapBase"/> changes.</remarks>
-    public List<string> SnapStagePackages { get; set; } = ["libicu74"];
+    public HashSet<string> SnapStagePackages { get; set; } = ["libicu74"];
 }

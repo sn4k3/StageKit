@@ -250,6 +250,37 @@ public class LinuxAppBundleTests
         Assert.Throws<ArgumentException>(() => LinuxAppBundle.GetDesktopEntry(options));
     }
 
+    [Fact]
+    public void GetDesktopEntry_WithFileAssociations_ProducesMimeTypeAndExecArgument()
+    {
+        var options = CreateOptions();
+        options.FileAssociations.Add(new FileAssociation([".sl1", "*.sl1s"], "StageKit Model", "application/x-sl1"));
+        options.MimeTypes.Add("application/zip");
+
+        var desktopEntry = LinuxAppBundle.GetDesktopEntry(options);
+
+        Assert.Contains("Exec=\"Example\" %F", desktopEntry, StringComparison.Ordinal);
+        Assert.Contains("MimeType=", desktopEntry, StringComparison.Ordinal);
+        Assert.Contains("application/x-sl1;", desktopEntry, StringComparison.Ordinal);
+        Assert.Contains("application/zip;", desktopEntry, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GetAppStreamMetadata_WithFileAssociations_ProducesMediaTypeElements()
+    {
+        var options = CreateOptions();
+        options.FileAssociations.Add(new FileAssociation(".sl1", "StageKit Model", "application/x-sl1"));
+
+        var metadata = LinuxAppBundle.GetAppStreamMetadata(options);
+        var document = XDocument.Parse(metadata);
+
+        var provides = document.Descendants("provides").FirstOrDefault();
+        Assert.NotNull(provides);
+
+        var mediaTypes = provides.Elements("mediatype").Select(e => e.Value).ToList();
+        Assert.Contains("application/x-sl1", mediaTypes);
+    }
+
     private static LinuxAppBundleOptions CreateOptions()
     {
         return new LinuxAppBundleOptions

@@ -18,7 +18,7 @@ public abstract partial class StageKitBuild : FalloutBuild
     private static readonly string[] MainProjectPropertyNames =
     [
         "ArtifactsPath", "SolutionName", "ProductName", "AssemblyName", "Company", "CompanyRDNS", "Authors", "Summary",
-        "Description", "Version", "Copyright", "PackageLicenseExpression", "RepositoryUrl", "PackageTags", "ContextMenuOpenWithFiles",
+        "Description", "Version", "Copyright", "PackageLicenseExpression", "RepositoryUrl", "PackageTags", "FileAssociations", "ContextMenuOpenWithFileAssociations",
         nameof(BuildRuntimeManifestFileName)
     ];
 
@@ -553,6 +553,17 @@ public abstract partial class StageKitBuild : FalloutBuild
     }
 
     /// <summary>
+    /// Gets or sets the file associations configured across packaging platforms.
+    /// </summary>
+    [field: AllowNull]
+    [field: MaybeNull]
+    public HashSet<FileAssociation> FileAssociations
+    {
+        get => field ??= CreateFileAssociations();
+        set;
+    }
+
+    /// <summary>
     /// Gets the list of targets that this build depends on. These targets will be executed before the current build target.
     /// </summary>
     protected Target[] DependOnTargets { get; set; } = [];
@@ -594,6 +605,35 @@ public abstract partial class StageKitBuild : FalloutBuild
     protected virtual WindowsInstallerOptions CreateWindowsInstallerOptions()
     {
         return new WindowsInstallerOptions(this);
+    }
+
+    /// <summary>
+    /// Creates the default file associations.
+    /// </summary>
+    /// <returns>The default file associations.</returns>
+    protected virtual HashSet<FileAssociation> CreateFileAssociations()
+    {
+        var associations = new HashSet<FileAssociation>();
+        var contextMenuSetting = GetMainProjectProperty("FileAssociations");
+        if (string.IsNullOrWhiteSpace(contextMenuSetting))
+        {
+            contextMenuSetting = GetMainProjectProperty("ContextMenuOpenWithFileAssociations");
+        }
+
+        if (!string.IsNullOrWhiteSpace(contextMenuSetting))
+        {
+            var tokens = contextMenuSetting.Split([';', ','], StringSplitOptions.RemoveEmptyEntries);
+            foreach (var token in tokens)
+            {
+                var trimmed = token.Trim();
+                if (!string.IsNullOrWhiteSpace(trimmed))
+                {
+                    associations.Add(new FileAssociation(trimmed));
+                }
+            }
+        }
+
+        return associations;
     }
 
 
@@ -664,7 +704,8 @@ public abstract partial class StageKitBuild : FalloutBuild
 
         if (value is global::StageKit.Fallout.MacAppBundleOptions or
             global::StageKit.Fallout.LinuxAppBundleOptions or
-            global::StageKit.Fallout.WindowsInstallerOptions)
+            global::StageKit.Fallout.WindowsInstallerOptions or
+            global::StageKit.Fallout.FileAssociation)
             return JsonSerializer.Serialize(value, value.GetType());
 
         if (value is Solution solution)

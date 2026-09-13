@@ -176,7 +176,7 @@ live in `Directory.Build.props` or the project file:
 | `SoftwareRepositoryUrl`                           | `RepositoryUrl`                                                                                  |
 | `SoftwarePackageTags` / `SoftwarePackageTagsList` | `PackageTags`                                                                                    |
 | `BuildRuntimeManifestFileName`                    | `BuildRuntimeManifestFileName`, defaulting to `build-runtime.json`                               |
-| `ContextMenuOpenWithFiles`                        | `ContextMenuOpenWithFiles`                                                                       |
+| `ContextMenuOpenWithFileAssociations`             | `ContextMenuOpenWithFileAssociations`                                                            |
 
 `MainProject` is the **last** runnable, non-excluded project in solution order. `ExcludedProjectNameTokens` disqualifies
 candidates by name token (`test`, `demo`, `build`, `sample`, `fake`, `docs`, and more). Override `MainProject` directly

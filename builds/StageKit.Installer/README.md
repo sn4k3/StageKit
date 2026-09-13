@@ -46,12 +46,12 @@ installation directory as Windows Installer resolves it, so it carries a trailin
 
 ## Context menu ("Open with")
 
-Set `ContextMenuOpenWithFiles` in this project, on the command line, or through Fallout's
-`WindowsInstallerOptions.ContextMenuOpenWithFiles` to register the application in the Windows Explorer right-click
+Set `ContextMenuOpenWithFileAssociations` in this project, on the command line, or through Fallout's
+`WindowsInstallerOptions.ContextMenuOpenWithFileAssociations` to register the application in the Windows Explorer right-click
 context menu for specified file types or extensions:
 
 ```xml
-<ContextMenuOpenWithFiles>.sl1;.sl1s;*.zip;*.photon</ContextMenuOpenWithFiles>
+<ContextMenuOpenWithFileAssociations>.sl1;.sl1s;*.zip;*.photon</ContextMenuOpenWithFileAssociations>
 ```
 
 Leave it blank to omit context menu registration. Specify `*` to show the context menu for all files.

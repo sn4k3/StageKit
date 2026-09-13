@@ -156,11 +156,42 @@ public partial class StageKitBuild
             .SetProperty("SignToolPath", options.SignToolPath)
             .SetProperty("OutputName", context.BundleOutputPath.Name);
 
-        if (options.ContextMenuOpenWithFiles.Count > 0)
+        var contextMenuFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var association in options.ContextMenuOpenWithFileAssociations)
         {
-            var files = string.Join(";", options.ContextMenuOpenWithFiles);
-            settings = settings.SetProperty("ContextMenuOpenWithFiles",
+            foreach (var ext in association.Extensions)
+            {
+                var trimmed = ext.Trim();
+                if (!string.IsNullOrWhiteSpace(trimmed))
+                {
+                    contextMenuFiles.Add(trimmed);
+                }
+            }
+        }
+
+        if (contextMenuFiles.Count > 0)
+        {
+            var files = string.Join(";", contextMenuFiles);
+            settings = settings.SetProperty("ContextMenuOpenWithFileAssociations",
                 PublishUtilities.EscapeMSBuildPropertyValue(files));
+        }
+
+        if (options.FileAssociations.Count > 0)
+        {
+            var extensions = options.FileAssociations
+                .SelectMany(assoc => assoc.Extensions)
+                .Select(ext => ext.Trim().TrimStart('*'))
+                .Select(ext => ext.StartsWith('.') ? ext : $".{ext}")
+                .Where(ext => ext.Length > 1)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(ext => ext, StringComparer.OrdinalIgnoreCase);
+
+            var fileAssocString = string.Join(";", extensions);
+            if (!string.IsNullOrWhiteSpace(fileAssocString))
+            {
+                settings = settings.SetProperty("FileAssociations",
+                    PublishUtilities.EscapeMSBuildPropertyValue(fileAssocString));
+            }
         }
 
         return settings;

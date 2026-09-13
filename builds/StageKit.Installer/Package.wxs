@@ -2,6 +2,7 @@
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
     <?define InstallerRegistryKey = "Software\$(var.Company)\$(var.ApplicationName)\Installer" ?>
+    <?define ApplicationCapabilitiesRegistryKey = "Software\$(var.Company)\$(var.ApplicationName)\Capabilities" ?>
     <?if $(var.InstallerScope) = "perMachineOrUser" ?>
     <?define PackageScope = "perUserOrMachine" ?>
     <?else ?>
@@ -259,6 +260,36 @@
                     <RegistryValue Root="HKMU" Key="$(var.InstallerRegistryKey)"
                                    Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes"/>
                 </Component>
+
+                <?ifdef FileAssociations ?>
+                <Component Id="FileAssociationsCapabilityComponent" Guid="*">
+                    <RegistryKey Root="HKMU" Key="Software\RegisteredApplications">
+                        <RegistryValue Name="$(var.ApplicationName)" Value="$(var.ApplicationCapabilitiesRegistryKey)" Type="string" KeyPath="yes"/>
+                    </RegistryKey>
+                    <RegistryKey Root="HKMU" Key="$(var.ApplicationCapabilitiesRegistryKey)">
+                        <RegistryValue Name="ApplicationName" Value="$(var.ApplicationName)" Type="string"/>
+                        <RegistryValue Name="ApplicationDescription" Value="$(var.Description)" Type="string"/>
+                    </RegistryKey>
+                    <?foreach Ext in $(var.FileAssociations) ?>
+                    <RegistryKey Root="HKMU" Key="$(var.ApplicationCapabilitiesRegistryKey)\FileAssociations">
+                        <RegistryValue Name="$(var.Ext)" Value="$(var.ApplicationName)$(var.Ext)" Type="string"/>
+                    </RegistryKey>
+                    <RegistryKey Root="HKMU" Key="Software\Classes\$(var.ApplicationName)$(var.Ext)">
+                        <RegistryValue Value="$(var.ApplicationName) $(var.Ext) File" Type="string"/>
+                        <RegistryValue Name="FriendlyTypeName" Value="$(var.ApplicationName) $(var.Ext) File" Type="string"/>
+                        <RegistryKey Key="DefaultIcon">
+                            <RegistryValue Value="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe,0" Type="string"/>
+                        </RegistryKey>
+                        <RegistryKey Key="shell\open\command">
+                            <RegistryValue Value="&quot;[INSTALLFOLDER]$(var.ApplicationExecutableName).exe&quot; &quot;%1&quot;" Type="string"/>
+                        </RegistryKey>
+                    </RegistryKey>
+                    <RegistryKey Root="HKMU" Key="Software\Classes\$(var.Ext)\OpenWithProgids">
+                        <RegistryValue Name="$(var.ApplicationName)$(var.Ext)" Value="" Type="string"/>
+                    </RegistryKey>
+                    <?endforeach ?>
+                </Component>
+                <?endif ?>
 
                 <?ifdef ContextMenuOpenWith ?>
                 <Component Id="ContextMenuOpenWithComponent" Guid="*">

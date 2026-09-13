@@ -26,7 +26,9 @@ public class WindowsInstallerOptions
 
         IconFile = build.WindowsIconFile;
 
-        var contextMenuSetting = build.GetMainProjectProperty("ContextMenuOpenWithFiles");
+        FileAssociations.UnionWith(build.FileAssociations);
+
+        var contextMenuSetting = build.GetMainProjectProperty("ContextMenuOpenWithFileAssociations");
         if (!string.IsNullOrWhiteSpace(contextMenuSetting))
         {
             var tokens = contextMenuSetting.Split([';', ','], StringSplitOptions.RemoveEmptyEntries);
@@ -34,19 +36,26 @@ public class WindowsInstallerOptions
             {
                 var trimmed = token.Trim();
                 if (!string.IsNullOrWhiteSpace(trimmed))
-                    ContextMenuOpenWithFiles.Add(trimmed);
+                {
+                    ContextMenuOpenWithFileAssociations.Add(new FileAssociation(trimmed));
+                }
             }
         }
     }
 
     /// <summary>
-    /// Gets or sets the set of file patterns or extensions registered in the Windows Explorer "Open with" context menu.
+    /// Gets or sets the file associations configured for the Windows installer to register their capabilities in the registry.
+    /// </summary>
+    public HashSet<FileAssociation> FileAssociations { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the file associations registered in the Windows Explorer "Open with" context menu.
     /// </summary>
     /// <remarks>
-    /// If empty, context menu registration is omitted. If <c>*</c> is present, the context menu registers for all files.
+    /// If empty, context menu registration is omitted. If <c>*</c> is present in the association extensions, the context menu registers for all files.
     /// Extensions and patterns can be specified with or without leading dots/wildcards (e.g. <c>.sl1</c>, <c>sl1</c>, <c>*.zip</c>).
     /// </remarks>
-    public HashSet<string> ContextMenuOpenWithFiles { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public HashSet<FileAssociation> ContextMenuOpenWithFileAssociations { get; set; } = [];
 
     /// <summary>
     /// Gets or sets the path or command name of the Microsoft SignTool executable used to sign Windows installers.

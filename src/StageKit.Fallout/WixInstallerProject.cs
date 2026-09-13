@@ -293,8 +293,10 @@ internal static class WixInstallerProject
                 <InstallerPathRegistrationMode Condition="'$(InstallerPathRegistration)' == 'Register'">Register</InstallerPathRegistrationMode>
                 <InstallerPathRegistrationMode Condition="'$(InstallerPathRegistration)' == 'UserDefaultNo'">UserDefaultNo</InstallerPathRegistrationMode>
                 <InstallerPathRegistrationMode Condition="'$(InstallerPathRegistration)' == 'UserDefaultYes'">UserDefaultYes</InstallerPathRegistrationMode>
+                <!-- Optional file associations to register application capabilities in the Windows registry; blank disables. -->
+                <FileAssociations Condition="'$(FileAssociations)' == ''"></FileAssociations>
                 <!-- Optional file patterns or extensions for the Windows Explorer context menu; blank disables. -->
-                <ContextMenuOpenWithFiles Condition="'$(ContextMenuOpenWithFiles)' == ''"></ContextMenuOpenWithFiles>
+                <ContextMenuOpenWithFileAssociations Condition="'$(ContextMenuOpenWithFileAssociations)' == ''"></ContextMenuOpenWithFileAssociations>
                 <OutputName>$(ApplicationName)_$(RuntimeIdentifier)_v$(BuildVersion)</OutputName>
                 <LicenseFile>$(MSBuildProjectDirectory)\Resources\License.rtf</LicenseFile>
                 <InstallerDialogImage>$(MSBuildProjectDirectory)\Resources\InstallerDialogImage.png</InstallerDialogImage>
@@ -352,9 +354,26 @@ internal static class WixInstallerProject
                 <Content Include="Resources\License.rtf"/>
             </ItemGroup>
 
-            <Target Name="ConfigureContextMenuOpenWith" BeforeTargets="BeforeBuild;CoreCompile" Condition="'$(ContextMenuOpenWithFiles)' != ''">
+            <Target Name="ConfigureFileAssociations" BeforeTargets="BeforeBuild;CoreCompile" Condition="'$(FileAssociations)' != ''">
                 <PropertyGroup>
-                    <_RawContextMenuFiles>$([System.String]::Copy('$(ContextMenuOpenWithFiles)').Replace(',', ';').Replace('%2C', ';').Replace('%3B', ';'))</_RawContextMenuFiles>
+                    <_RawFileAssoc>$([System.String]::Copy('$(FileAssociations)').Replace(',', ';').Replace('%2C', ';').Replace('%3B', ';'))</_RawFileAssoc>
+                </PropertyGroup>
+                <ItemGroup>
+                    <_FileAssocSplitItems Include="$(_RawFileAssoc.Split(';', System.StringSplitOptions.RemoveEmptyEntries))" />
+                    <_FileAssocTrimmedItems Include="@(_FileAssocSplitItems->Trim())" Condition="'%(Identity)' != ''" />
+                    <_FileAssocCleanItems Include="@(_FileAssocTrimmedItems->'%(Identity)'.TrimStart('*'))" />
+                    <_FileAssocDotted Include="@(_FileAssocCleanItems)" Condition="$([System.String]::Copy('%(Identity)').StartsWith('.')) and '%(Identity)' != '.'" />
+                    <_FileAssocDotted Include="@(_FileAssocCleanItems->'.%(Identity)')" Condition="!$([System.String]::Copy('%(Identity)').StartsWith('.')) and '%(Identity)' != ''" />
+                </ItemGroup>
+                <PropertyGroup>
+                    <_CleanedFileAssociations Condition="'@(_FileAssocDotted)' != ''">@(_FileAssocDotted, ',')</_CleanedFileAssociations>
+                    <DefineConstants Condition="'$(_CleanedFileAssociations)' != ''">$(DefineConstants);FileAssociations=$(_CleanedFileAssociations)</DefineConstants>
+                </PropertyGroup>
+            </Target>
+
+            <Target Name="ConfigureContextMenuOpenWith" BeforeTargets="BeforeBuild;CoreCompile" Condition="'$(ContextMenuOpenWithFileAssociations)' != ''">
+                <PropertyGroup>
+                    <_RawContextMenuFiles>$([System.String]::Copy('$(ContextMenuOpenWithFileAssociations)').Replace(',', ';').Replace('%2C', ';').Replace('%3B', ';'))</_RawContextMenuFiles>
                 </PropertyGroup>
                 <ItemGroup>
                     <_ContextMenuSplitItems Include="$(_RawContextMenuFiles.Split(';', System.StringSplitOptions.RemoveEmptyEntries))" />
@@ -366,9 +385,9 @@ internal static class WixInstallerProject
                 </ItemGroup>
                 <PropertyGroup>
                     <ContextMenuOpenWithAppliesTo Condition="'@(_ContextMenuPatterns)' != ''">@(_ContextMenuPatterns->'System.FileName:&quot;%(Identity)&quot;', ' OR ')</ContextMenuOpenWithAppliesTo>
-                    <ContextMenuOpenWithAppliesTo Condition="$([System.String]::Copy('$(ContextMenuOpenWithFiles)').Contains('System.FileName:'))">$(ContextMenuOpenWithFiles)</ContextMenuOpenWithAppliesTo>
+                    <ContextMenuOpenWithAppliesTo Condition="$([System.String]::Copy('$(ContextMenuOpenWithFileAssociations)').Contains('System.FileName:'))">$(ContextMenuOpenWithFileAssociations)</ContextMenuOpenWithAppliesTo>
                     <DefineConstants>$(DefineConstants);ContextMenuOpenWith=true</DefineConstants>
-                    <DefineConstants Condition="'$(ContextMenuOpenWithFiles)' != '*' and '$(ContextMenuOpenWithAppliesTo)' != ''">$(DefineConstants);ContextMenuOpenWithAppliesTo=$(ContextMenuOpenWithAppliesTo)</DefineConstants>
+                    <DefineConstants Condition="'$(ContextMenuOpenWithFileAssociations)' != '*' and '$(ContextMenuOpenWithAppliesTo)' != ''">$(DefineConstants);ContextMenuOpenWithAppliesTo=$(ContextMenuOpenWithAppliesTo)</DefineConstants>
                 </PropertyGroup>
             </Target>
 
@@ -429,6 +448,7 @@ internal static class WixInstallerProject
              xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
              xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
             <?define InstallerRegistryKey = "Software\$(var.Company)\$(var.ApplicationName)\Installer" ?>
+            <?define ApplicationCapabilitiesRegistryKey = "Software\$(var.Company)\$(var.ApplicationName)\Capabilities" ?>
             <?if $(var.InstallerScope) = "perMachineOrUser" ?>
             <?define PackageScope = "perUserOrMachine" ?>
             <?else ?>
@@ -685,6 +705,36 @@ internal static class WixInstallerProject
                                            Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes"/>
                         </Component>
 
+                        <?ifdef FileAssociations ?>
+                        <Component Id="FileAssociationsCapabilityComponent" Guid="*">
+                            <RegistryKey Root="HKMU" Key="Software\RegisteredApplications">
+                                <RegistryValue Name="$(var.ApplicationName)" Value="$(var.ApplicationCapabilitiesRegistryKey)" Type="string" KeyPath="yes"/>
+                            </RegistryKey>
+                            <RegistryKey Root="HKMU" Key="$(var.ApplicationCapabilitiesRegistryKey)">
+                                <RegistryValue Name="ApplicationName" Value="$(var.ApplicationName)" Type="string"/>
+                                <RegistryValue Name="ApplicationDescription" Value="$(var.Description)" Type="string"/>
+                            </RegistryKey>
+                            <?foreach Ext in $(var.FileAssociations) ?>
+                            <RegistryKey Root="HKMU" Key="$(var.ApplicationCapabilitiesRegistryKey)\FileAssociations">
+                                <RegistryValue Name="$(var.Ext)" Value="$(var.ApplicationName)$(var.Ext)" Type="string"/>
+                            </RegistryKey>
+                            <RegistryKey Root="HKMU" Key="Software\Classes\$(var.ApplicationName)$(var.Ext)">
+                                <RegistryValue Value="$(var.ApplicationName) $(var.Ext) File" Type="string"/>
+                                <RegistryValue Name="FriendlyTypeName" Value="$(var.ApplicationName) $(var.Ext) File" Type="string"/>
+                                <RegistryKey Key="DefaultIcon">
+                                    <RegistryValue Value="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe,0" Type="string"/>
+                                </RegistryKey>
+                                <RegistryKey Key="shell\open\command">
+                                    <RegistryValue Value="&quot;[INSTALLFOLDER]$(var.ApplicationExecutableName).exe&quot; &quot;%1&quot;" Type="string"/>
+                                </RegistryKey>
+                            </RegistryKey>
+                            <RegistryKey Root="HKMU" Key="Software\Classes\$(var.Ext)\OpenWithProgids">
+                                <RegistryValue Name="$(var.ApplicationName)$(var.Ext)" Value="" Type="string"/>
+                            </RegistryKey>
+                            <?endforeach ?>
+                        </Component>
+                        <?endif ?>
+
                         <?ifdef ContextMenuOpenWith ?>
                         <Component Id="ContextMenuOpenWithComponent" Guid="*">
                             <RegistryKey Root="HKMU" Key="Software\Classes\*\shell\$(var.ApplicationName)"
@@ -929,12 +979,12 @@ internal static class WixInstallerProject
 
         ## Context menu ("Open with")
 
-        Set `ContextMenuOpenWithFiles` in this project, on the command line, or through Fallout's
-        `WindowsInstallerOptions.ContextMenuOpenWithFiles` to register the application in the Windows Explorer right-click
+        Set `ContextMenuOpenWithFileAssociations` in this project, on the command line, or through Fallout's
+        `WindowsInstallerOptions.ContextMenuOpenWithFileAssociations` to register the application in the Windows Explorer right-click
         context menu for specified file types or extensions:
 
         ```xml
-        <ContextMenuOpenWithFiles>.sl1;.sl1s;*.zip;*.photon</ContextMenuOpenWithFiles>
+        <ContextMenuOpenWithFileAssociations>.sl1;.sl1s;*.zip;*.photon</ContextMenuOpenWithFileAssociations>
         ```
 
         Leave it blank to omit context menu registration. Specify `*` to show the context menu for all files.

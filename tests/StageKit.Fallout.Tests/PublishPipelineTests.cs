@@ -840,14 +840,14 @@ public class PublishPipelineTests
             Assert.IsType<JsonElement>(settings.Properties["AuthenticodeTimestampUrl"]).GetString());
         Assert.Equal("tools/signtool.exe",
             Assert.IsType<JsonElement>(settings.Properties["SignToolPath"]).GetString());
-        Assert.False(settings.Properties.ContainsKey("ContextMenuOpenWithFiles"));
+        Assert.False(settings.Properties.ContainsKey("ContextMenuOpenWithFileAssociations"));
     }
 
     /// <summary>
     /// Verifies that context menu open with patterns configured in project properties are escaped and passed to WiX.
     /// </summary>
     [Fact]
-    public void ConfigureWindowsInstallerBuildSettings_ContextMenuOpenWithFilesFromProject_EscapesAndPassesProperty()
+    public void ConfigureWindowsInstallerBuildSettings_ContextMenuOpenWithFileAssociationsFromProject_EscapesAndPassesProperty()
     {
         var build = new TestBuild
         {
@@ -860,7 +860,7 @@ public class PublishPipelineTests
                 ["Description"] = "Product description",
                 ["RepositoryUrl"] = "https://github.com/example/product",
                 ["PackageTags"] = "tag1",
-                ["ContextMenuOpenWithFiles"] = ".sl1;.sl1s;*.zip;*.photon"
+                ["ContextMenuOpenWithFileAssociations"] = ".sl1;.sl1s;*.zip;*.photon"
             }
         };
         var context = CreateContext(build, "win-x64");
@@ -873,14 +873,14 @@ public class PublishPipelineTests
             "x64");
 
         Assert.Equal(".sl1%3B.sl1s%3B*.zip%3B*.photon",
-            Assert.IsType<JsonElement>(settings.Properties["ContextMenuOpenWithFiles"]).GetString());
+            Assert.IsType<JsonElement>(settings.Properties["ContextMenuOpenWithFileAssociations"]).GetString());
     }
 
     /// <summary>
     /// Verifies that context menu open with patterns set directly on WindowsInstallerOptions are escaped and passed to WiX.
     /// </summary>
     [Fact]
-    public void ConfigureWindowsInstallerBuildSettings_ContextMenuOpenWithFilesSetDirectly_EscapesAndPassesProperty()
+    public void ConfigureWindowsInstallerBuildSettings_ContextMenuOpenWithFileAssociationsSetDirectly_EscapesAndPassesProperty()
     {
         var build = new TestBuild
         {
@@ -889,15 +889,18 @@ public class PublishPipelineTests
             TestMainProjectProperties = new Dictionary<string, string?>
             {
                 ["Company"] = "Example Company",
+                ["CompanyRDNS"] = "com.example",
+                ["Authors"] = "Example Authors",
+                ["PackageLicenseExpression"] = "MIT",
                 ["Copyright"] = "Copyright (c) 2026",
                 ["Description"] = "Product description",
                 ["RepositoryUrl"] = "https://github.com/example/product",
                 ["PackageTags"] = "tag1"
             }
         };
-        build.WindowsInstallerOptions.ContextMenuOpenWithFiles.Add(".sl1");
-        build.WindowsInstallerOptions.ContextMenuOpenWithFiles.Add(".sl1s");
-        build.WindowsInstallerOptions.ContextMenuOpenWithFiles.Add("*.zip");
+        build.WindowsInstallerOptions.ContextMenuOpenWithFileAssociations.Add(new FileAssociation(".sl1"));
+        build.WindowsInstallerOptions.ContextMenuOpenWithFileAssociations.Add(new FileAssociation(".sl1s"));
+        build.WindowsInstallerOptions.ContextMenuOpenWithFileAssociations.Add(new FileAssociation("*.zip"));
         var context = CreateContext(build, "win-x64");
 
         var settings = build.InvokeConfigureWindowsInstallerBuildSettings(
@@ -908,7 +911,7 @@ public class PublishPipelineTests
             "x64");
 
         Assert.Equal(".sl1%3B.sl1s%3B*.zip",
-            Assert.IsType<JsonElement>(settings.Properties["ContextMenuOpenWithFiles"]).GetString());
+            Assert.IsType<JsonElement>(settings.Properties["ContextMenuOpenWithFileAssociations"]).GetString());
     }
 
     /// <summary>
@@ -932,8 +935,150 @@ public class PublishPipelineTests
         Assert.Equal("http://timestamp.digicert.com", options.AuthenticodeTimestampUrl);
         Assert.False(options.UseSingleFile);
         Assert.Null(options.IconFile);
-        Assert.Empty(options.ContextMenuOpenWithFiles);
-        Assert.IsType<HashSet<string>>(options.ContextMenuOpenWithFiles);
+        Assert.Empty(options.ContextMenuOpenWithFileAssociations);
+        Assert.IsType<HashSet<FileAssociation>>(options.ContextMenuOpenWithFileAssociations);
+    }
+
+    /// <summary>
+    /// Verifies that unified FileAssociations propagate to all platform options.
+    /// </summary>
+    [Fact]
+    public void FileAssociations_UnifiedConfiguration_PropagatesToAllPlatformOptions()
+    {
+        var build = new TestBuild
+        {
+            TestSoftwareName = "StageKitApp",
+            TestSoftwareExecutableName = "StageKitApp",
+            TestMainProject = CreateProject("Example.csproj"),
+            TestMainProjectProperties = new Dictionary<string, string?>
+            {
+                ["Company"] = "Example Company",
+                ["CompanyRDNS"] = "com.example",
+                ["Authors"] = "Example Authors",
+                ["PackageLicenseExpression"] = "MIT",
+                ["Copyright"] = "Copyright (c) 2026",
+                ["Description"] = "Product description",
+                ["RepositoryUrl"] = "https://github.com/example/product",
+                ["PackageTags"] = "tag1"
+            }
+        };
+        build.FileAssociations.Add(new FileAssociation([".sl1", ".sl1s"], "StageKit Model", "application/x-sl1"));
+        build.FileAssociations.Add(new FileAssociation("*.zip", "Zip Archive", "application/zip"));
+
+        Assert.Equal(2, build.WindowsInstallerOptions.FileAssociations.Count);
+        Assert.Equal(2, build.MacAppBundleOptions.FileAssociations.Count);
+        Assert.Equal(2, build.LinuxAppBundleOptions.FileAssociations.Count);
+    }
+
+    /// <summary>
+    /// Verifies that FileAssociations configured on WindowsInstallerOptions are passed as an MSBuild property for WiX registry capability.
+    /// </summary>
+    [Fact]
+    public void ConfigureWindowsInstallerBuildSettings_FileAssociations_PassesNormalizedProperty()
+    {
+        var build = new TestBuild
+        {
+            TestSoftwareName = "ProductName",
+            TestSoftwareExecutableName = "PublishedExecutable",
+            TestMainProjectProperties = new Dictionary<string, string?>
+            {
+                ["Company"] = "Example Company",
+                ["Copyright"] = "Copyright (c) 2026",
+                ["Description"] = "Product description",
+                ["RepositoryUrl"] = "https://github.com/example/product",
+                ["PackageTags"] = "tag1"
+            }
+        };
+        build.WindowsInstallerOptions.FileAssociations.Add(new FileAssociation(["*.sl1", "sl1s"], "StageKit Model"));
+        build.WindowsInstallerOptions.FileAssociations.Add(new FileAssociation(".zip", "Zip Archive"));
+
+        var context = CreateContext(build, "win-x64");
+        var settings = build.InvokeConfigureWindowsInstallerBuildSettings(
+            new DotNetBuildSettings(),
+            CreateProject("Installer.wixproj"),
+            context,
+            (AbsolutePath)Path.GetTempPath(),
+            "x64");
+
+        Assert.Equal(".sl1%3B.sl1s%3B.zip",
+            Assert.IsType<JsonElement>(settings.Properties["FileAssociations"]).GetString());
+    }
+
+    /// <summary>
+    /// Verifies that ContextMenuOpenWithFileAssociations on WindowsInstallerOptions are merged into ContextMenuOpenWithFileAssociations for WiX.
+    /// </summary>
+    [Fact]
+    public void ConfigureWindowsInstallerBuildSettings_ContextMenuOpenWithFileAssociations_PassesProperty()
+    {
+        var build = new TestBuild
+        {
+            TestSoftwareName = "ProductName",
+            TestSoftwareExecutableName = "PublishedExecutable",
+            TestMainProjectProperties = new Dictionary<string, string?>
+            {
+                ["Company"] = "Example Company",
+                ["Copyright"] = "Copyright (c) 2026",
+                ["Description"] = "Product description",
+                ["RepositoryUrl"] = "https://github.com/example/product",
+                ["PackageTags"] = "tag1"
+            }
+        };
+        build.WindowsInstallerOptions.ContextMenuOpenWithFileAssociations.Add(new FileAssociation([".sl1", "*.sl1s"]));
+        build.WindowsInstallerOptions.ContextMenuOpenWithFileAssociations.Add(new FileAssociation("*.zip"));
+
+        var context = CreateContext(build, "win-x64");
+        var settings = build.InvokeConfigureWindowsInstallerBuildSettings(
+            new DotNetBuildSettings(),
+            CreateProject("Installer.wixproj"),
+            context,
+            (AbsolutePath)Path.GetTempPath(),
+            "x64");
+
+        var contextMenuProp = Assert.IsType<JsonElement>(settings.Properties["ContextMenuOpenWithFileAssociations"]).GetString();
+        Assert.NotNull(contextMenuProp);
+        Assert.Contains(".sl1", contextMenuProp);
+        Assert.Contains("*.sl1s", contextMenuProp);
+        Assert.Contains("*.zip", contextMenuProp);
+    }
+
+    /// <summary>
+    /// Verifies that FileAssociation record equality, with-expressions, and hashing work correctly in a HashSet.
+    /// </summary>
+    [Fact]
+    public void FileAssociation_RecordEqualityAndHashSet_DeduplicatesCorrectly()
+    {
+        var assoc1 = new FileAssociation([".sl1", ".sl1s"], "Model File", "application/x-sl1")
+        {
+            Role = DocumentRole.Editor,
+            HandlerRank = BundleHandlerRank.Owner
+        };
+        var assoc2 = new FileAssociation([".SL1S", ".sl1"], "Model File", "application/x-sl1")
+        {
+            Role = DocumentRole.Editor,
+            HandlerRank = BundleHandlerRank.Owner
+        };
+
+        Assert.Equal(assoc1, assoc2);
+        Assert.Equal(assoc1.GetHashCode(), assoc2.GetHashCode());
+
+        var set = new HashSet<FileAssociation> { assoc1, assoc2 };
+        Assert.Single(set);
+
+        var assoc3 = assoc1 with { Role = DocumentRole.Viewer };
+        Assert.NotEqual(assoc1, assoc3);
+        set.Add(assoc3);
+        Assert.Equal(2, set.Count);
+
+        Assert.IsType<System.Collections.Immutable.ImmutableHashSet<string>>(assoc1.Extensions);
+        Assert.IsType<System.Collections.Immutable.ImmutableList<string>>(assoc1.ContentTypes);
+
+        foreach (var prop in typeof(FileAssociation).GetProperties())
+        {
+            var setMethod = prop.SetMethod;
+            Assert.True(
+                setMethod == null || setMethod.ReturnParameter.GetRequiredCustomModifiers().Contains(typeof(System.Runtime.CompilerServices.IsExternalInit)),
+                $"Property {prop.Name} must use init; instead of a mutable setter.");
+        }
     }
 
     /// <summary>
