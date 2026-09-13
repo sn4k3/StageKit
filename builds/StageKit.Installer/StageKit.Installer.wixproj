@@ -15,6 +15,8 @@
         <InstallerPathRegistrationMode Condition="'$(InstallerPathRegistration)' == 'Register'">Register</InstallerPathRegistrationMode>
         <InstallerPathRegistrationMode Condition="'$(InstallerPathRegistration)' == 'UserDefaultNo'">UserDefaultNo</InstallerPathRegistrationMode>
         <InstallerPathRegistrationMode Condition="'$(InstallerPathRegistration)' == 'UserDefaultYes'">UserDefaultYes</InstallerPathRegistrationMode>
+        <!-- Optional file patterns or extensions for the Windows Explorer context menu; blank disables. -->
+        <ContextMenuOpenWithFiles Condition="'$(ContextMenuOpenWithFiles)' == ''"></ContextMenuOpenWithFiles>
         <OutputName>$(ApplicationName)_$(RuntimeIdentifier)_v$(BuildVersion)</OutputName>
         <LicenseFile>$(MSBuildProjectDirectory)\Resources\License.rtf</LicenseFile>
         <InstallerDialogImage>$(MSBuildProjectDirectory)\Resources\InstallerDialogImage.png</InstallerDialogImage>
@@ -70,6 +72,26 @@
         <Content Include="Resources\InstallerDialogImage.png"/>
         <Content Include="Resources\License.rtf"/>
     </ItemGroup>
+
+    <Target Name="ConfigureContextMenuOpenWith" BeforeTargets="BeforeBuild;CoreCompile" Condition="'$(ContextMenuOpenWithFiles)' != ''">
+        <PropertyGroup>
+            <_RawContextMenuFiles>$([System.String]::Copy('$(ContextMenuOpenWithFiles)').Replace(',', ';').Replace('%2C', ';').Replace('%3B', ';'))</_RawContextMenuFiles>
+        </PropertyGroup>
+        <ItemGroup>
+            <_ContextMenuSplitItems Include="$(_RawContextMenuFiles.Split(';', System.StringSplitOptions.RemoveEmptyEntries))" />
+            <_ContextMenuTrimmedItems Include="@(_ContextMenuSplitItems->Trim())" Condition="'%(Identity)' != ''" />
+            <_ContextMenuPatterns Include="@(_ContextMenuTrimmedItems)" Condition="$([System.String]::Copy('%(Identity)').StartsWith('*.'))" />
+            <_ContextMenuPatterns Include="@(_ContextMenuTrimmedItems->'*%(Identity)')" Condition="!$([System.String]::Copy('%(Identity)').StartsWith('*.')) and $([System.String]::Copy('%(Identity)').StartsWith('.'))" />
+            <_ContextMenuPatterns Include="@(_ContextMenuTrimmedItems->'*.%(Identity)')" Condition="!$([System.String]::Copy('%(Identity)').StartsWith('*.')) and !$([System.String]::Copy('%(Identity)').StartsWith('.')) and !$([System.String]::Copy('%(Identity)').StartsWith('*'))" />
+            <_ContextMenuPatterns Include="@(_ContextMenuTrimmedItems)" Condition="!$([System.String]::Copy('%(Identity)').StartsWith('*.')) and !$([System.String]::Copy('%(Identity)').StartsWith('.')) and $([System.String]::Copy('%(Identity)').StartsWith('*'))" />
+        </ItemGroup>
+        <PropertyGroup>
+            <ContextMenuOpenWithAppliesTo Condition="'@(_ContextMenuPatterns)' != ''">@(_ContextMenuPatterns->'System.FileName:&quot;%(Identity)&quot;', ' OR ')</ContextMenuOpenWithAppliesTo>
+            <ContextMenuOpenWithAppliesTo Condition="$([System.String]::Copy('$(ContextMenuOpenWithFiles)').Contains('System.FileName:'))">$(ContextMenuOpenWithFiles)</ContextMenuOpenWithAppliesTo>
+            <DefineConstants>$(DefineConstants);ContextMenuOpenWith=true</DefineConstants>
+            <DefineConstants Condition="'$(ContextMenuOpenWithFiles)' != '*' and '$(ContextMenuOpenWithAppliesTo)' != ''">$(DefineConstants);ContextMenuOpenWithAppliesTo=$(ContextMenuOpenWithAppliesTo)</DefineConstants>
+        </PropertyGroup>
+    </Target>
 
     <Target Name="ValidateInstallerInputs" BeforeTargets="CoreCompile">
         <Error Condition="'$(InstallerDialogImage)' != '' And !Exists('$(InstallerDialogImage)')"

@@ -56,6 +56,8 @@ public sealed class WixInstallerProjectTests
             Assert.Contains("InstallerScope must be perMachineOrUser, perUser, or perMachine", project,
                 StringComparison.Ordinal);
             Assert.Contains("InstallerPathRegistrationMode", project, StringComparison.Ordinal);
+            Assert.Contains("<ContextMenuOpenWithFiles Condition=\"'$(ContextMenuOpenWithFiles)' == ''\"></ContextMenuOpenWithFiles>", project, StringComparison.Ordinal);
+            Assert.Contains("Target Name=\"ConfigureContextMenuOpenWith\"", project, StringComparison.Ordinal);
             Assert.Contains("InstallerPathRegistration must be Register, UserDefaultNo, or UserDefaultYes, but was",
                 project, StringComparison.Ordinal);
             Assert.Contains(@"Resources\License.rtf", project, StringComparison.Ordinal);
@@ -142,7 +144,7 @@ public sealed class WixInstallerProjectTests
             Assert.Contains("Comments=\"$(var.Copyright)\"/>", package,
                 StringComparison.Ordinal);
             Assert.Contains("<?define InstallerRegistryKey =", package, StringComparison.Ordinal);
-            Assert.Equal(15, package.Split("Key=\"$(var.InstallerRegistryKey)\"").Length - 1);
+            Assert.Equal(16, package.Split("Key=\"$(var.InstallerRegistryKey)\"").Length - 1);
             Assert.DoesNotContain("Key=\"Software\\$(var.Company)\\$(var.ApplicationName)\\Installer\"", package,
                 StringComparison.Ordinal);
             Assert.Contains("SearchMachineInstallLocation", package, StringComparison.Ordinal);
@@ -239,6 +241,17 @@ public sealed class WixInstallerProjectTests
             Assert.Contains("Icon=\"ProductIcon.ico\" IconIndex=\"0\"", startMenuComponent,
                 StringComparison.Ordinal);
 
+            var contextMenuComponent = GetComponent(package, "ContextMenuOpenWithComponent");
+            Assert.Contains(@"Software\Classes\*\shell\$(var.ApplicationName)", contextMenuComponent, StringComparison.Ordinal);
+            Assert.Contains(@"Root=""HKMU""", contextMenuComponent, StringComparison.Ordinal);
+            Assert.Contains(@"Value=""Open with $(var.ApplicationName)""", contextMenuComponent, StringComparison.Ordinal);
+            Assert.Contains(@"Name=""Icon"" Value=""[INSTALLFOLDER]$(var.ApplicationExecutableName).exe""", contextMenuComponent, StringComparison.Ordinal);
+            Assert.Contains(@"Name=""Position"" Value=""Top""", contextMenuComponent, StringComparison.Ordinal);
+            Assert.Contains("<?ifdef ContextMenuOpenWithAppliesTo ?>", contextMenuComponent, StringComparison.Ordinal);
+            Assert.Contains(@"<RegistryValue Name=""AppliesTo"" Value=""$(var.ContextMenuOpenWithAppliesTo)""", contextMenuComponent, StringComparison.Ordinal);
+            Assert.Contains(@"<RegistryKey Key=""command""", contextMenuComponent, StringComparison.Ordinal);
+            Assert.Contains(@"<RegistryValue Value=""&quot;[INSTALLFOLDER]$(var.ApplicationExecutableName).exe&quot; &quot;%1&quot;""", contextMenuComponent, StringComparison.Ordinal);
+
             var desktopComponent = GetComponent(package, "DesktopShortcutComponent");
             Assert.Contains("Directory=\"DesktopFolder\"", desktopComponent, StringComparison.Ordinal);
             Assert.Contains("Root=\"HKMU\"", desktopComponent, StringComparison.Ordinal);
@@ -260,6 +273,8 @@ public sealed class WixInstallerProjectTests
             var readme = File.ReadAllText(Path.Combine(directory, "README.md"));
             Assert.Contains("| `Description` | `SoftwareDescription` |", readme, StringComparison.Ordinal);
             Assert.Contains("| `Keywords` | `SoftwareKeywords` |", readme, StringComparison.Ordinal);
+            Assert.Contains("## Context menu (\"Open with\")", readme, StringComparison.Ordinal);
+            Assert.Contains("<ContextMenuOpenWithFiles>.sl1;.sl1s;*.zip;*.photon</ContextMenuOpenWithFiles>", readme, StringComparison.Ordinal);
         }
         finally
         {

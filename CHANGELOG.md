@@ -1,5 +1,6 @@
 # v0.3.9 (/09/2026)
 
+- Add `WindowsInstallerOptions` to Fallout to configure Windows installer options (including `ContextMenuOpenWithFiles` as a `HashSet<string>`, `SignToolPath`, Authenticode signing, and single-file payload) alongside WiX installer context menu registration
 - Enforce a configurable macOS minimum runtime version in the generated installation script, defaulting to macOS 13.0
 - Emit current AppStream developer metadata, including a configurable developer ID, for Linux application bundles
 - Normalize AppStream summaries by removing trailing periods

@@ -35,11 +35,14 @@ public class PublishPipelineTests
         var packagingTypes = buildType.GetProperty(nameof(StageKitBuild.PackagingTypes));
         Assert.NotNull(packagingTypes);
         Assert.Equal(typeof(ApplicationPackagingType[]), packagingTypes.PropertyType);
+        var cleanupExtensions = buildType.GetProperty(nameof(StageKitBuild.PublishCleanupExtensions));
+        Assert.NotNull(cleanupExtensions);
+        Assert.Equal(typeof(HashSet<string>), cleanupExtensions.PropertyType);
         var frameworkDependent = buildType.GetProperty(nameof(StageKitBuild.FrameworkDependent));
         Assert.NotNull(frameworkDependent);
         Assert.NotNull(frameworkDependent.GetCustomAttribute<ParameterAttribute>());
         Assert.NotNull(buildType.GetProperty(nameof(StageKitBuild.DeletePublishDirectories)));
-        Assert.NotNull(buildType.GetProperty(nameof(StageKitBuild.UseSingleFileForInstaller)));
+        Assert.Null(buildType.GetProperty("UseSingleFileForInstaller"));
         var readyToRun = buildType.GetProperty(nameof(StageKitBuild.PublishReadyToRun));
         Assert.NotNull(readyToRun);
         Assert.NotNull(readyToRun.GetCustomAttribute<ParameterAttribute>());
@@ -766,6 +769,27 @@ public class PublishPipelineTests
     }
 
     /// <summary>
+    /// Verifies that MSI staging uses a single-file publish when WindowsInstallerOptions.UseSingleFile is enabled.
+    /// </summary>
+    [Fact]
+    public void CreateInstallerPublishSettings_OptionsUseSingleFileTrue_EnablesSingleFileForInstallerPayload()
+    {
+        var build = new TestBuild
+        {
+            UseDefaultSettings = true,
+            TestMainProject = CreateProject("Example.csproj")
+        };
+        build.WindowsInstallerOptions.UseSingleFile = true;
+        var context = CreateContext(build, "win-x64");
+        var installerOutput = (AbsolutePath)Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}");
+
+        var settings = build.InvokeCreateInstallerPublishSettings(context, installerOutput);
+
+        Assert.True(Assert.IsType<JsonElement>(settings.Properties["PublishSingleFile"]).GetBoolean());
+        Assert.Equal(installerOutput, settings.Output);
+    }
+
+    /// <summary>
     /// Verifies that Windows installer settings keep product and executable names distinct.
     /// </summary>
     [Fact]
@@ -816,6 +840,100 @@ public class PublishPipelineTests
             Assert.IsType<JsonElement>(settings.Properties["AuthenticodeTimestampUrl"]).GetString());
         Assert.Equal("tools/signtool.exe",
             Assert.IsType<JsonElement>(settings.Properties["SignToolPath"]).GetString());
+        Assert.False(settings.Properties.ContainsKey("ContextMenuOpenWithFiles"));
+    }
+
+    /// <summary>
+    /// Verifies that context menu open with patterns configured in project properties are escaped and passed to WiX.
+    /// </summary>
+    [Fact]
+    public void ConfigureWindowsInstallerBuildSettings_ContextMenuOpenWithFilesFromProject_EscapesAndPassesProperty()
+    {
+        var build = new TestBuild
+        {
+            TestSoftwareName = "ProductName",
+            TestSoftwareExecutableName = "PublishedExecutable",
+            TestMainProjectProperties = new Dictionary<string, string?>
+            {
+                ["Company"] = "Example Company",
+                ["Copyright"] = "Copyright (c) 2026",
+                ["Description"] = "Product description",
+                ["RepositoryUrl"] = "https://github.com/example/product",
+                ["PackageTags"] = "tag1",
+                ["ContextMenuOpenWithFiles"] = ".sl1;.sl1s;*.zip;*.photon"
+            }
+        };
+        var context = CreateContext(build, "win-x64");
+
+        var settings = build.InvokeConfigureWindowsInstallerBuildSettings(
+            new DotNetBuildSettings(),
+            CreateProject("Installer.wixproj"),
+            context,
+            (AbsolutePath)Path.GetTempPath(),
+            "x64");
+
+        Assert.Equal(".sl1%3B.sl1s%3B*.zip%3B*.photon",
+            Assert.IsType<JsonElement>(settings.Properties["ContextMenuOpenWithFiles"]).GetString());
+    }
+
+    /// <summary>
+    /// Verifies that context menu open with patterns set directly on WindowsInstallerOptions are escaped and passed to WiX.
+    /// </summary>
+    [Fact]
+    public void ConfigureWindowsInstallerBuildSettings_ContextMenuOpenWithFilesSetDirectly_EscapesAndPassesProperty()
+    {
+        var build = new TestBuild
+        {
+            TestSoftwareName = "ProductName",
+            TestSoftwareExecutableName = "PublishedExecutable",
+            TestMainProjectProperties = new Dictionary<string, string?>
+            {
+                ["Company"] = "Example Company",
+                ["Copyright"] = "Copyright (c) 2026",
+                ["Description"] = "Product description",
+                ["RepositoryUrl"] = "https://github.com/example/product",
+                ["PackageTags"] = "tag1"
+            }
+        };
+        build.WindowsInstallerOptions.ContextMenuOpenWithFiles.Add(".sl1");
+        build.WindowsInstallerOptions.ContextMenuOpenWithFiles.Add(".sl1s");
+        build.WindowsInstallerOptions.ContextMenuOpenWithFiles.Add("*.zip");
+        var context = CreateContext(build, "win-x64");
+
+        var settings = build.InvokeConfigureWindowsInstallerBuildSettings(
+            new DotNetBuildSettings(),
+            CreateProject("Installer.wixproj"),
+            context,
+            (AbsolutePath)Path.GetTempPath(),
+            "x64");
+
+        Assert.Equal(".sl1%3B.sl1s%3B*.zip",
+            Assert.IsType<JsonElement>(settings.Properties["ContextMenuOpenWithFiles"]).GetString());
+    }
+
+    /// <summary>
+    /// Verifies that WindowsInstallerOptions exposes expected properties and defaults.
+    /// </summary>
+    [Fact]
+    public void WindowsInstallerOptions_DefaultsAndCustomization_ConfiguredCorrectly()
+    {
+        var buildType = typeof(StageKitBuild);
+        Assert.Null(buildType.GetProperty("ContextMenuOpenWithFiles"));
+        Assert.Null(buildType.GetProperty("WindowsAuthenticodeTimestampUrl"));
+        Assert.Null(buildType.GetProperty("WindowsSignToolPath"));
+
+        var optionsProperty = buildType.GetProperty(nameof(StageKitBuild.WindowsInstallerOptions));
+        Assert.NotNull(optionsProperty);
+        Assert.Equal(typeof(WindowsInstallerOptions), optionsProperty.PropertyType);
+
+        var options = new WindowsInstallerOptions();
+        Assert.Equal("signtool.exe", options.SignToolPath);
+        Assert.Null(options.AuthenticodeCertificateThumbprint);
+        Assert.Equal("http://timestamp.digicert.com", options.AuthenticodeTimestampUrl);
+        Assert.False(options.UseSingleFile);
+        Assert.Null(options.IconFile);
+        Assert.Empty(options.ContextMenuOpenWithFiles);
+        Assert.IsType<HashSet<string>>(options.ContextMenuOpenWithFiles);
     }
 
     /// <summary>
@@ -3737,9 +3855,11 @@ public class PublishPipelineTests
         internal void SetWindowsAuthenticodeSettings(string thumbprint, string timestampUrl, string signToolPath)
         {
             WindowsAuthenticodeCertificateThumbprint = thumbprint;
-            WindowsAuthenticodeTimestampUrl = timestampUrl;
-            WindowsSignToolPath = signToolPath;
+            WindowsInstallerOptions.AuthenticodeTimestampUrl = timestampUrl;
+            WindowsInstallerOptions.SignToolPath = signToolPath;
         }
+
+
 
         internal bool UseDefaultSettings { get; set; }
 
@@ -3940,11 +4060,19 @@ public class PublishPipelineTests
 
         protected override AbsolutePath PublishStagingDirectory => TestPublishStagingDirectory;
 
-        protected override string? GetMainProjectProperty(string propertyName)
+        protected internal override string? GetMainProjectProperty(string propertyName)
         {
-            return TestMainProjectProperties.TryGetValue(propertyName, out var value)
-                ? value
-                : base.GetMainProjectProperty(propertyName);
+            if (TestMainProjectProperties.TryGetValue(propertyName, out var value))
+                return value;
+
+            try
+            {
+                return TestMainProject is not null ? base.GetMainProjectProperty(propertyName) : null;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
         }
 
         internal void InvokePublishRuntime(PublishRidContext context)
@@ -4139,7 +4267,7 @@ public class PublishPipelineTests
 
         internal void SetPublishCleanupExtensions(params string[] extensions)
         {
-            PublishCleanupExtensions = extensions;
+            PublishCleanupExtensions = new HashSet<string>(extensions, StringComparer.OrdinalIgnoreCase);
         }
 
         internal void SetPublishMultiArch(bool publishMultiArch)

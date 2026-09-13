@@ -260,6 +260,25 @@
                                    Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes"/>
                 </Component>
 
+                <?ifdef ContextMenuOpenWith ?>
+                <Component Id="ContextMenuOpenWithComponent" Guid="*">
+                    <RegistryKey Root="HKMU" Key="Software\Classes\*\shell\$(var.ApplicationName)"
+                                 ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+                        <RegistryValue Value="Open with $(var.ApplicationName)" Type="string" KeyPath="yes"/>
+                        <RegistryValue Name="Icon" Value="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe" Type="string"/>
+                        <RegistryValue Name="Position" Value="Top" Type="string"/>
+                        <?ifdef ContextMenuOpenWithAppliesTo ?>
+                        <RegistryValue Name="AppliesTo" Value="$(var.ContextMenuOpenWithAppliesTo)" Type="string"/>
+                        <?endif ?>
+                        <RegistryKey Key="command" ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+                            <RegistryValue Value="&quot;[INSTALLFOLDER]$(var.ApplicationExecutableName).exe&quot; &quot;%1&quot;" Type="string"/>
+                        </RegistryKey>
+                    </RegistryKey>
+                    <RegistryValue Root="HKMU" Key="$(var.InstallerRegistryKey)"
+                                   Name="ContextMenuOpenWith" Type="integer" Value="1"/>
+                </Component>
+                <?endif ?>
+
                 <Files Include="!(bindpath.Publish)\**">
                     <Exclude Files="!(bindpath.Publish)\$(var.ApplicationExecutableName).exe"/>
                 </Files>

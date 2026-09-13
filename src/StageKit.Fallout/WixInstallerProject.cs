@@ -293,6 +293,8 @@ internal static class WixInstallerProject
                 <InstallerPathRegistrationMode Condition="'$(InstallerPathRegistration)' == 'Register'">Register</InstallerPathRegistrationMode>
                 <InstallerPathRegistrationMode Condition="'$(InstallerPathRegistration)' == 'UserDefaultNo'">UserDefaultNo</InstallerPathRegistrationMode>
                 <InstallerPathRegistrationMode Condition="'$(InstallerPathRegistration)' == 'UserDefaultYes'">UserDefaultYes</InstallerPathRegistrationMode>
+                <!-- Optional file patterns or extensions for the Windows Explorer context menu; blank disables. -->
+                <ContextMenuOpenWithFiles Condition="'$(ContextMenuOpenWithFiles)' == ''"></ContextMenuOpenWithFiles>
                 <OutputName>$(ApplicationName)_$(RuntimeIdentifier)_v$(BuildVersion)</OutputName>
                 <LicenseFile>$(MSBuildProjectDirectory)\Resources\License.rtf</LicenseFile>
                 <InstallerDialogImage>$(MSBuildProjectDirectory)\Resources\InstallerDialogImage.png</InstallerDialogImage>
@@ -349,6 +351,26 @@ internal static class WixInstallerProject
                 <Content Include="Resources\InstallerDialogImage.png"/>
                 <Content Include="Resources\License.rtf"/>
             </ItemGroup>
+
+            <Target Name="ConfigureContextMenuOpenWith" BeforeTargets="BeforeBuild;CoreCompile" Condition="'$(ContextMenuOpenWithFiles)' != ''">
+                <PropertyGroup>
+                    <_RawContextMenuFiles>$([System.String]::Copy('$(ContextMenuOpenWithFiles)').Replace(',', ';').Replace('%2C', ';').Replace('%3B', ';'))</_RawContextMenuFiles>
+                </PropertyGroup>
+                <ItemGroup>
+                    <_ContextMenuSplitItems Include="$(_RawContextMenuFiles.Split(';', System.StringSplitOptions.RemoveEmptyEntries))" />
+                    <_ContextMenuTrimmedItems Include="@(_ContextMenuSplitItems->Trim())" Condition="'%(Identity)' != ''" />
+                    <_ContextMenuPatterns Include="@(_ContextMenuTrimmedItems)" Condition="$([System.String]::Copy('%(Identity)').StartsWith('*.'))" />
+                    <_ContextMenuPatterns Include="@(_ContextMenuTrimmedItems->'*%(Identity)')" Condition="!$([System.String]::Copy('%(Identity)').StartsWith('*.')) and $([System.String]::Copy('%(Identity)').StartsWith('.'))" />
+                    <_ContextMenuPatterns Include="@(_ContextMenuTrimmedItems->'*.%(Identity)')" Condition="!$([System.String]::Copy('%(Identity)').StartsWith('*.')) and !$([System.String]::Copy('%(Identity)').StartsWith('.')) and !$([System.String]::Copy('%(Identity)').StartsWith('*'))" />
+                    <_ContextMenuPatterns Include="@(_ContextMenuTrimmedItems)" Condition="!$([System.String]::Copy('%(Identity)').StartsWith('*.')) and !$([System.String]::Copy('%(Identity)').StartsWith('.')) and $([System.String]::Copy('%(Identity)').StartsWith('*'))" />
+                </ItemGroup>
+                <PropertyGroup>
+                    <ContextMenuOpenWithAppliesTo Condition="'@(_ContextMenuPatterns)' != ''">@(_ContextMenuPatterns->'System.FileName:&quot;%(Identity)&quot;', ' OR ')</ContextMenuOpenWithAppliesTo>
+                    <ContextMenuOpenWithAppliesTo Condition="$([System.String]::Copy('$(ContextMenuOpenWithFiles)').Contains('System.FileName:'))">$(ContextMenuOpenWithFiles)</ContextMenuOpenWithAppliesTo>
+                    <DefineConstants>$(DefineConstants);ContextMenuOpenWith=true</DefineConstants>
+                    <DefineConstants Condition="'$(ContextMenuOpenWithFiles)' != '*' and '$(ContextMenuOpenWithAppliesTo)' != ''">$(DefineConstants);ContextMenuOpenWithAppliesTo=$(ContextMenuOpenWithAppliesTo)</DefineConstants>
+                </PropertyGroup>
+            </Target>
 
             <Target Name="ValidateInstallerInputs" BeforeTargets="CoreCompile">
                 <Error Condition="'$(InstallerDialogImage)' != '' And !Exists('$(InstallerDialogImage)')"
@@ -663,6 +685,25 @@ internal static class WixInstallerProject
                                            Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes"/>
                         </Component>
 
+                        <?ifdef ContextMenuOpenWith ?>
+                        <Component Id="ContextMenuOpenWithComponent" Guid="*">
+                            <RegistryKey Root="HKMU" Key="Software\Classes\*\shell\$(var.ApplicationName)"
+                                         ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+                                <RegistryValue Value="Open with $(var.ApplicationName)" Type="string" KeyPath="yes"/>
+                                <RegistryValue Name="Icon" Value="[INSTALLFOLDER]$(var.ApplicationExecutableName).exe" Type="string"/>
+                                <RegistryValue Name="Position" Value="Top" Type="string"/>
+                                <?ifdef ContextMenuOpenWithAppliesTo ?>
+                                <RegistryValue Name="AppliesTo" Value="$(var.ContextMenuOpenWithAppliesTo)" Type="string"/>
+                                <?endif ?>
+                                <RegistryKey Key="command" ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+                                    <RegistryValue Value="&quot;[INSTALLFOLDER]$(var.ApplicationExecutableName).exe&quot; &quot;%1&quot;" Type="string"/>
+                                </RegistryKey>
+                            </RegistryKey>
+                            <RegistryValue Root="HKMU" Key="$(var.InstallerRegistryKey)"
+                                           Name="ContextMenuOpenWith" Type="integer" Value="1"/>
+                        </Component>
+                        <?endif ?>
+
                         <Files Include="!(bindpath.Publish)\**">
                             <Exclude Files="!(bindpath.Publish)\$(var.ApplicationExecutableName).exe"/>
                         </Files>
@@ -885,6 +926,18 @@ internal static class WixInstallerProject
         upgrades, and the install directory owned by this MSI is removed from PATH during uninstall without removing
         unrelated PATH entries. The entry is the installation directory as Windows Installer resolves it, so it carries
         a trailing separator.
+
+        ## Context menu ("Open with")
+
+        Set `ContextMenuOpenWithFiles` in this project, on the command line, or through Fallout's
+        `WindowsInstallerOptions.ContextMenuOpenWithFiles` to register the application in the Windows Explorer right-click
+        context menu for specified file types or extensions:
+
+        ```xml
+        <ContextMenuOpenWithFiles>.sl1;.sl1s;*.zip;*.photon</ContextMenuOpenWithFiles>
+        ```
+
+        Leave it blank to omit context menu registration. Specify `*` to show the context menu for all files.
 
         ## Authenticode signing
 

@@ -150,7 +150,6 @@ Declared with Fallout's `[Parameter]` attribute, so each can be supplied on the 
 | `FrameworkDependent`        | `false`                                                     | Publish framework-dependent applications instead of self-contained applications.                 |
 | `PublishMultiArch`          | `false`                                                     | Create one macOS app bundle containing both x64 and arm64 executables. Requires both macOS RIDs. |
 | `DeletePublishDirectories`  | `false`                                                     | Delete raw publish directories after publishing.                                                 |
-| `UseSingleFileForInstaller` | `false`                                                     | Use the single-file executable as the Windows installer payload.                                 |
 | ReadyToRun                  | false                                                       | Publish ReadyToRun (R2R) compiled applications.                                                  |
 | PublishTrimmed              | false                                                       | Publish trimmed applications.                                                                    |
 | AppImageCompression         | null                                                        | Squashfs compression passed to appimagetool. Use 'default' for appimagetool default.             |
@@ -177,6 +176,7 @@ live in `Directory.Build.props` or the project file:
 | `SoftwareRepositoryUrl`                           | `RepositoryUrl`                                                                                  |
 | `SoftwarePackageTags` / `SoftwarePackageTagsList` | `PackageTags`                                                                                    |
 | `BuildRuntimeManifestFileName`                    | `BuildRuntimeManifestFileName`, defaulting to `build-runtime.json`                               |
+| `ContextMenuOpenWithFiles`                        | `ContextMenuOpenWithFiles`                                                                       |
 
 `MainProject` is the **last** runnable, non-excluded project in solution order. `ExcludedProjectNameTokens` disqualifies
 candidates by name token (`test`, `demo`, `build`, `sample`, `fake`, `docs`, and more). Override `MainProject` directly
@@ -261,8 +261,8 @@ the system PATH. The entry is the installation directory as Windows Installer re
 separator.
 
 Set `WindowsAuthenticodeCertificateThumbprint` to a SHA-1 certificate thumbprint to sign the staged application
-executable and final MSI. Fallout forwards `WindowsAuthenticodeTimestampUrl` (defaulting to DigiCert's RFC 3161 service)
-and `WindowsSignToolPath` (defaulting to `signtool.exe`) to the WiX build. The certificate must be available in the
+executable and final MSI. Fallout forwards `WindowsInstallerOptions.AuthenticodeTimestampUrl` (defaulting to DigiCert's RFC 3161 service)
+and `WindowsInstallerOptions.SignToolPath` (defaulting to `signtool.exe`) to the WiX build. The certificate must be available in the
 current user's certificate store; leaving the thumbprint blank disables signing. Every `.exe` and `.dll` in the payload
 is signed, which for a self-contained publish replaces the signatures the .NET runtime binaries ship with and costs one
 timestamped `signtool` invocation per file; redefine the `InstallerPayloadToSign` item in the WiX project to narrow
@@ -483,7 +483,7 @@ internal class Build : StageKitBuild
 | `BeforePublishRid` / `AfterPublishRid`                                                  | `Action<PublishRidContext>` hooks around each runtime publish                                                    |
 | `AssetName`                                                                             | `Func<PublishRidContext, string>` returning the base artifact name (simple file name, no directory or extension) |
 | `ConfigurePublishRid`                                                                   | `Func<DotNetPublishSettings, PublishRidContext, DotNetPublishSettings>` to adjust publish settings per RID       |
-| `CreateMacAppBundleOptions()` / `CreateLinuxAppBundleOptions()`                         | Lazily resolved bundle metadata (`Info.plist`, `.desktop`, AppStream, entitlements)                              |
+| `CreateMacAppBundleOptions()` / `CreateLinuxAppBundleOptions()` / `CreateWindowsInstallerOptions()` | Lazily resolved bundle and installer options (`Info.plist`, `.desktop`, WiX MSI)                                 |
 | `ConfigureWindowsInstallerBuildSettings(...)`                                           | Adjusts the MSBuild settings passed to each WiX installer project                                                |
 | `PackagingTypes`, `PublishCleanupExtensions`, `RIds`                                    | Protected setters for build-wide publish configuration                                                           |
 | `MediaDirectory`, `WindowsIconFile`, `MacOSIconFile`, `LinuxIconFile`, `ChangelogFile`, `ReleaseNotesFile` | `virtual` path overrides                                                                                         |

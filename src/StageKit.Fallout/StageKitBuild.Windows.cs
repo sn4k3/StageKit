@@ -19,7 +19,8 @@ public partial class StageKitBuild
         PublishRidContext context,
         AbsolutePath outputPath)
     {
-        return UseSingleFileForInstaller
+        var useSingleFile = WindowsInstallerOptions.UseSingleFile;
+        return useSingleFile
             ? CreateSingleFilePublishSettings(context, outputPath)
             : CreatePublishSettings(context)
                 .SetOutput(outputPath)
@@ -73,7 +74,8 @@ public partial class StageKitBuild
         try
         {
             var installerSourcePath = context.PublishPath;
-            if (UseSingleFileForInstaller)
+            var useSingleFile = WindowsInstallerOptions.UseSingleFile;
+            if (useSingleFile)
             {
                 var installerPublishPath = InstallerPayloadDirectory / Guid.NewGuid().ToString("N");
                 normalPublishPath = installerPublishPath;
@@ -127,7 +129,13 @@ public partial class StageKitBuild
         AbsolutePath sourcePath,
         string platform)
     {
-        return settings
+        var options = WindowsInstallerOptions;
+        var certificateThumbprint = !string.IsNullOrWhiteSpace(WindowsAuthenticodeCertificateThumbprint)
+            ? WindowsAuthenticodeCertificateThumbprint
+            : options.AuthenticodeCertificateThumbprint;
+        var iconFile = options.IconFile ?? WindowsIconFile;
+
+        settings = settings
             .SetProjectFile(project)
             .SetConfiguration(Configuration)
             .SetPlatform(platform)
@@ -142,11 +150,20 @@ public partial class StageKitBuild
             .SetProperty("Description", PublishUtilities.EscapeMSBuildPropertyValue(SoftwareDescription))
             .SetProperty("Keywords", PublishUtilities.EscapeMSBuildPropertyValue(SoftwareKeywords))
             .SetProperty("RepositoryUrl", SoftwareRepositoryUrl)
-            .SetProperty("ApplicationIcon", WindowsIconFile)
-            .SetProperty("AuthenticodeCertificateThumbprint", WindowsAuthenticodeCertificateThumbprint ?? string.Empty)
-            .SetProperty("AuthenticodeTimestampUrl", WindowsAuthenticodeTimestampUrl)
-            .SetProperty("SignToolPath", WindowsSignToolPath)
+            .SetProperty("ApplicationIcon", iconFile)
+            .SetProperty("AuthenticodeCertificateThumbprint", certificateThumbprint ?? string.Empty)
+            .SetProperty("AuthenticodeTimestampUrl", options.AuthenticodeTimestampUrl)
+            .SetProperty("SignToolPath", options.SignToolPath)
             .SetProperty("OutputName", context.BundleOutputPath.Name);
+
+        if (options.ContextMenuOpenWithFiles.Count > 0)
+        {
+            var files = string.Join(";", options.ContextMenuOpenWithFiles);
+            settings = settings.SetProperty("ContextMenuOpenWithFiles",
+                PublishUtilities.EscapeMSBuildPropertyValue(files));
+        }
+
+        return settings;
     }
 
     /// <summary>

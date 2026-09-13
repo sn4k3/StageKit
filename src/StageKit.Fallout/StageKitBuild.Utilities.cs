@@ -146,9 +146,16 @@ public partial class StageKitBuild
     /// </summary>
     /// <param name="propertyName">The MSBuild property name.</param>
     /// <returns>The evaluated property value, or <see langword="null"/> when it is not defined.</returns>
-    protected virtual string? GetMainProjectProperty(string propertyName)
+    protected internal virtual string? GetMainProjectProperty(string propertyName)
     {
-        return GetProjectProperty(MainProject, propertyName);
+        try
+        {
+            return GetProjectProperty(MainProject, propertyName);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
     /// <summary>

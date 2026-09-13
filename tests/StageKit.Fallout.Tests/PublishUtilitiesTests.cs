@@ -263,4 +263,39 @@ public class PublishUtilitiesTests
     {
         Assert.Equal(expected, PublishUtilities.EscapeMSBuildPropertyValue(input));
     }
+
+    /// <summary>
+    /// Verifies that context menu applies-to queries format various extension and pattern syntaxes into AQS.
+    /// </summary>
+    [Theory]
+    [InlineData(null, "")]
+    [InlineData("", "")]
+    [InlineData("   ", "")]
+    [InlineData("*", "")]
+    [InlineData(".sl1", "System.FileName:\"*.sl1\"")]
+    [InlineData("sl1", "System.FileName:\"*.sl1\"")]
+    [InlineData("*.sl1", "System.FileName:\"*.sl1\"")]
+    [InlineData(".sl1;.sl1s;*.zip;photon", "System.FileName:\"*.sl1\" OR System.FileName:\"*.sl1s\" OR System.FileName:\"*.zip\" OR System.FileName:\"*.photon\"")]
+    [InlineData(".sl1, .sl1s, *.zip", "System.FileName:\"*.sl1\" OR System.FileName:\"*.sl1s\" OR System.FileName:\"*.zip\"")]
+    [InlineData("System.FileName:\"*.sl1\" OR System.FileName:\"*.zip\"", "System.FileName:\"*.sl1\" OR System.FileName:\"*.zip\"")]
+    public void FormatContextMenuAppliesTo_PatternsAndExtensions_FormatsCorrectly(
+        string? input,
+        string expected)
+    {
+        Assert.Equal(expected, PublishUtilities.FormatContextMenuAppliesTo(input));
+    }
+
+    /// <summary>
+    /// Verifies that context menu applies-to queries format hash set collections into AQS.
+    /// </summary>
+    [Fact]
+    public void FormatContextMenuAppliesTo_HashSet_FormatsCorrectly()
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".sl1", "zip", "*.photon" };
+        var formatted = PublishUtilities.FormatContextMenuAppliesTo(set);
+        Assert.Equal("System.FileName:\"*.sl1\" OR System.FileName:\"*.zip\" OR System.FileName:\"*.photon\"", formatted);
+
+        var wildcardSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".sl1", "*" };
+        Assert.Equal(string.Empty, PublishUtilities.FormatContextMenuAppliesTo(wildcardSet));
+    }
 }

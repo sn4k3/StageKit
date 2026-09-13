@@ -44,6 +44,18 @@ per-user installation cannot write the system PATH. The selected option is resto
 and uninstall removes this install directory from PATH while preserving unrelated entries. The entry is the
 installation directory as Windows Installer resolves it, so it carries a trailing separator.
 
+## Context menu ("Open with")
+
+Set `ContextMenuOpenWithFiles` in this project, on the command line, or through Fallout's
+`WindowsInstallerOptions.ContextMenuOpenWithFiles` to register the application in the Windows Explorer right-click
+context menu for specified file types or extensions:
+
+```xml
+<ContextMenuOpenWithFiles>.sl1;.sl1s;*.zip;*.photon</ContextMenuOpenWithFiles>
+```
+
+Leave it blank to omit context menu registration. Specify `*` to show the context menu for all files.
+
 ## Authenticode signing
 
 Set `AuthenticodeCertificateThumbprint` to the SHA-1 thumbprint of a code-signing certificate in the current user's

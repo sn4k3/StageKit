@@ -18,7 +18,7 @@ public abstract partial class StageKitBuild : FalloutBuild
     private static readonly string[] MainProjectPropertyNames =
     [
         "ArtifactsPath", "SolutionName", "ProductName", "AssemblyName", "Company", "CompanyRDNS", "Authors", "Summary",
-        "Description", "Version", "Copyright", "PackageLicenseExpression", "RepositoryUrl", "PackageTags",
+        "Description", "Version", "Copyright", "PackageLicenseExpression", "RepositoryUrl", "PackageTags", "ContextMenuOpenWithFiles",
         nameof(BuildRuntimeManifestFileName)
     ];
 
@@ -542,6 +542,17 @@ public abstract partial class StageKitBuild : FalloutBuild
     }
 
     /// <summary>
+    /// Gets or sets the options used to create Windows installers.
+    /// </summary>
+    [field: AllowNull]
+    [field: MaybeNull]
+    public WindowsInstallerOptions WindowsInstallerOptions
+    {
+        get => field ??= CreateWindowsInstallerOptions();
+        set;
+    }
+
+    /// <summary>
     /// Gets the list of targets that this build depends on. These targets will be executed before the current build target.
     /// </summary>
     protected Target[] DependOnTargets { get; set; } = [];
@@ -570,6 +581,19 @@ public abstract partial class StageKitBuild : FalloutBuild
     protected virtual LinuxAppBundleOptions CreateLinuxAppBundleOptions()
     {
         return new LinuxAppBundleOptions(this);
+    }
+
+    /// <summary>
+    /// Creates the default Windows installer options.
+    /// </summary>
+    /// <remarks>
+    /// Resolved lazily on first use so derived builds can customize the options without forcing MSBuild
+    /// project evaluation from their constructor.
+    /// </remarks>
+    /// <returns>The default Windows installer options.</returns>
+    protected virtual WindowsInstallerOptions CreateWindowsInstallerOptions()
+    {
+        return new WindowsInstallerOptions(this);
     }
 
 
@@ -639,7 +663,8 @@ public abstract partial class StageKitBuild : FalloutBuild
             return text;
 
         if (value is global::StageKit.Fallout.MacAppBundleOptions or
-            global::StageKit.Fallout.LinuxAppBundleOptions)
+            global::StageKit.Fallout.LinuxAppBundleOptions or
+            global::StageKit.Fallout.WindowsInstallerOptions)
             return JsonSerializer.Serialize(value, value.GetType());
 
         if (value is Solution solution)
