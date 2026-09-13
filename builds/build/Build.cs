@@ -30,6 +30,13 @@ internal class Build : StageKitBuild
             ApplicationPackagingType.MacOSPkg,
             ApplicationPackagingType.DotNetSingleFile
         ];
+        
+        FileAssociations.UnionWith([
+            new FileAssociation(".skini", "StageKit SKINI File", "application/x-stagekit-skini"),
+            new FileAssociation(".skjson", "StageKit SKJSON File", "application/x-stagekit-skjson"),
+        ]);
+        
+        WindowsInstallerOptions.SyncContextMenuOpenWithFileAssociations();
     }
 
     /// <summary>
@@ -47,8 +54,7 @@ internal class Build : StageKitBuild
         options.AppRunScriptBeforeExec = $$"""
                                            function help() {
                                               echo '   _____ __                   __ __ _ __' 
-                                              echo '  / ___// /_____ _____ ____  / //_/(_) /_'
-                                              echo '  \__ \/ __/ __ `/ __ `/ _ \/ ,<  / / __/'
+                                              echo '  / ___// /_____ _____ ____  / //_/(_) /_'\n                                              echo '  \__ \/ __/ __ `/ __ `/ _ \/ ,<  / / __/'
                                               echo ' ___/ / /_/ /_/ / /_/ /  __/ /| |/ / /_'
                                               echo '/____/\__/\__,_/\__, /\___/_/ |_/_/\__/' 
                                               echo '               /____/'

@@ -198,4 +198,34 @@ public class PackagingMetadataTests
         Assert.Contains("--install-location '/Applications'", command, StringComparison.Ordinal);
         Assert.EndsWith("'/tmp/Test App.pkg'", command, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void FileAssociation_Constructor_WithMimeTypeSecondAndNameThird_SwapsIntelligently()
+    {
+        var assoc = new FileAssociation(".skini", "application/x-stagekit-skini", "StageKit SKINI File");
+
+        Assert.Contains(".skini", assoc.Extensions);
+        Assert.Equal("application/x-stagekit-skini", assoc.MimeType);
+        Assert.Equal("StageKit SKINI File", assoc.Name);
+    }
+
+    [Fact]
+    public void FileAssociation_Constructor_WithNameSecondAndMimeTypeThird_PreservesOrder()
+    {
+        var assoc = new FileAssociation(".skini", "StageKit SKINI File", "application/x-stagekit-skini");
+
+        Assert.Contains(".skini", assoc.Extensions);
+        Assert.Equal("StageKit SKINI File", assoc.Name);
+        Assert.Equal("application/x-stagekit-skini", assoc.MimeType);
+    }
+
+    [Fact]
+    public void FileAssociation_Constructor_WithMultipleExtensionsAndSwappedArgs_SwapsIntelligently()
+    {
+        var assoc = new FileAssociation([".skini", ".skin"], "application/x-stagekit-skini", "StageKit SKINI File");
+
+        Assert.Equal(2, assoc.Extensions.Count);
+        Assert.Equal("application/x-stagekit-skini", assoc.MimeType);
+        Assert.Equal("StageKit SKINI File", assoc.Name);
+    }
 }

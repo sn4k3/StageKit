@@ -116,11 +116,6 @@ public class LinuxAppBundleOptions
     public HashSet<FileAssociation> FileAssociations { get; set; } = [];
 
     /// <summary>
-    /// Gets or sets the MIME types configured for the Linux desktop entry and AppStream metadata.
-    /// </summary>
-    public HashSet<string> MimeTypes { get; set; } = [];
-
-    /// <summary>
     /// Gets additional lines appended to the generated desktop entry.
     /// </summary>
     /// <value>The custom desktop entry lines, or <see langword="null"/> to append nothing.</value>

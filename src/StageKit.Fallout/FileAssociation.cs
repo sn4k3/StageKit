@@ -55,6 +55,7 @@ public record FileAssociation
         }
 
         _extensions = builder.ToImmutable();
+
         Name = name;
         MimeType = mimeType;
     }

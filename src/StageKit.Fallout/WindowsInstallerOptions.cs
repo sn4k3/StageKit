@@ -86,4 +86,13 @@ public class WindowsInstallerOptions
     /// </summary>
     /// <value>The icon file path, or <see langword="null"/> to use <see cref="StageKitBuild.WindowsIconFile"/>.</value>
     public AbsolutePath? IconFile { get; set; }
+
+    /// <summary>
+    /// Synchronizes the context menu "Open with" file associations with the main file associations.
+    /// </summary>
+    public void SyncContextMenuOpenWithFileAssociations()
+    {
+        ContextMenuOpenWithFileAssociations.Clear();
+        ContextMenuOpenWithFileAssociations.UnionWith(FileAssociations);
+    }
 }

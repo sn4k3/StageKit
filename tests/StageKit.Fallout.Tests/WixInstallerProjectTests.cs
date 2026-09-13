@@ -58,6 +58,8 @@ public sealed class WixInstallerProjectTests
             Assert.Contains("InstallerPathRegistrationMode", project, StringComparison.Ordinal);
             Assert.Contains("<ContextMenuOpenWithFileAssociations Condition=\"'$(ContextMenuOpenWithFileAssociations)' == ''\"></ContextMenuOpenWithFileAssociations>", project, StringComparison.Ordinal);
             Assert.Contains("Target Name=\"ConfigureContextMenuOpenWith\"", project, StringComparison.Ordinal);
+            Assert.Contains("Target Name=\"ConfigureFileAssociations\"", project, StringComparison.Ordinal);
+            Assert.Contains("@(_FileAssocDotted, '%3B')", project, StringComparison.Ordinal);
             Assert.Contains("InstallerPathRegistration must be Register, UserDefaultNo, or UserDefaultYes, but was",
                 project, StringComparison.Ordinal);
             Assert.Contains(@"Resources\License.rtf", project, StringComparison.Ordinal);

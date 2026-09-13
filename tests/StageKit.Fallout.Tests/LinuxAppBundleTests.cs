@@ -255,7 +255,7 @@ public class LinuxAppBundleTests
     {
         var options = CreateOptions();
         options.FileAssociations.Add(new FileAssociation([".sl1", "*.sl1s"], "StageKit Model", "application/x-sl1"));
-        options.MimeTypes.Add("application/zip");
+        options.FileAssociations.Add(new FileAssociation(".zip", "ZIP Archive", "application/zip"));
 
         var desktopEntry = LinuxAppBundle.GetDesktopEntry(options);
 

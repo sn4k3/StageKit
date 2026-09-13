@@ -356,17 +356,16 @@ internal static class WixInstallerProject
 
             <Target Name="ConfigureFileAssociations" BeforeTargets="BeforeBuild;CoreCompile" Condition="'$(FileAssociations)' != ''">
                 <PropertyGroup>
-                    <_RawFileAssoc>$([System.String]::Copy('$(FileAssociations)').Replace(',', ';').Replace('%2C', ';').Replace('%3B', ';'))</_RawFileAssoc>
+                    <_RawFileAssoc>$([System.String]::Copy('$(FileAssociations)').Replace(',', ';').Replace('%2C', ';').Replace('%3B', ';').Replace('*', ''))</_RawFileAssoc>
                 </PropertyGroup>
                 <ItemGroup>
                     <_FileAssocSplitItems Include="$(_RawFileAssoc.Split(';', System.StringSplitOptions.RemoveEmptyEntries))" />
                     <_FileAssocTrimmedItems Include="@(_FileAssocSplitItems->Trim())" Condition="'%(Identity)' != ''" />
-                    <_FileAssocCleanItems Include="@(_FileAssocTrimmedItems->'%(Identity)'.TrimStart('*'))" />
-                    <_FileAssocDotted Include="@(_FileAssocCleanItems)" Condition="$([System.String]::Copy('%(Identity)').StartsWith('.')) and '%(Identity)' != '.'" />
-                    <_FileAssocDotted Include="@(_FileAssocCleanItems->'.%(Identity)')" Condition="!$([System.String]::Copy('%(Identity)').StartsWith('.')) and '%(Identity)' != ''" />
+                    <_FileAssocDotted Include="@(_FileAssocTrimmedItems)" Condition="$([System.String]::Copy('%(Identity)').StartsWith('.')) and '%(Identity)' != '.'" />
+                    <_FileAssocDotted Include="@(_FileAssocTrimmedItems->'.%(Identity)')" Condition="!$([System.String]::Copy('%(Identity)').StartsWith('.')) and '%(Identity)' != ''" />
                 </ItemGroup>
                 <PropertyGroup>
-                    <_CleanedFileAssociations Condition="'@(_FileAssocDotted)' != ''">@(_FileAssocDotted, ',')</_CleanedFileAssociations>
+                    <_CleanedFileAssociations Condition="'@(_FileAssocDotted)' != ''">@(_FileAssocDotted, '%3B')</_CleanedFileAssociations>
                     <DefineConstants Condition="'$(_CleanedFileAssociations)' != ''">$(DefineConstants);FileAssociations=$(_CleanedFileAssociations)</DefineConstants>
                 </PropertyGroup>
             </Target>

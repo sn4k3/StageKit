@@ -42,7 +42,7 @@ public static partial class LinuxAppBundle
         var hasMimeTypes = mimeTypes.Count > 0;
         var execArgs = hasMimeTypes ? " %F" : string.Empty;
         var mimeTypeLine = hasMimeTypes
-            ? $"\nMimeType={FormatDesktopList(mimeTypes, nameof(options.MimeTypes))}"
+            ? $"\nMimeType={FormatDesktopList(mimeTypes, nameof(options.FileAssociations))}"
             : string.Empty;
 
         var desktopEntry = $$"""
@@ -247,14 +247,6 @@ public static partial class LinuxAppBundle
     internal static List<string> ResolveMimeTypes(LinuxAppBundleOptions options)
     {
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var mimeType in options.MimeTypes)
-        {
-            if (!string.IsNullOrWhiteSpace(mimeType))
-            {
-                set.Add(mimeType.Trim());
-            }
-        }
 
         foreach (var association in options.FileAssociations)
         {
