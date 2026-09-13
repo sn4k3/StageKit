@@ -248,17 +248,29 @@ editing.
 The generated project defines `InstallerScope` as `perMachineOrUser`, allowing users to choose their scope while
 defaulting to a non-elevated per-user installation. Set the property to `perUser` or `perMachine` in the `.wixproj` to
 enforce one scope and hide the selector. The property can also be overridden when building the WiX project with
-`-p:InstallerScope=...`.
+`-p:InstallerScope=...`. The selector is disabled while a previous installation is detected, because Windows Installer
+keeps a product in the context it was first installed in. A silent installation of a `perMachineOrUser` package is
+per-user unless it is invoked with `msiexec /i <package>.msi ALLUSERS=1 /qn`.
 
 Set the `InstallerPathRegistration` property to `Register` to always append the installation directory
 to PATH; `UserDefaultNo` to show an unchecked option; or `UserDefaultYes` to show a checked option. Leaving it blank
 disables PATH registration. Per-user installations update the current user's PATH, per-machine installations update the
-system PATH, and uninstall removes the installer-managed entry.
+system PATH, and uninstall removes the installer-managed entry. Which of the two applies follows the installation
+context Windows Installer resolved, not the scope picked in the wizard, because a per-user installation cannot write
+the system PATH. The entry is the installation directory as Windows Installer resolves it, so it carries a trailing
+separator.
 
 Set `WindowsAuthenticodeCertificateThumbprint` to a SHA-1 certificate thumbprint to sign the staged application
 executable and final MSI. Fallout forwards `WindowsAuthenticodeTimestampUrl` (defaulting to DigiCert's RFC 3161 service)
 and `WindowsSignToolPath` (defaulting to `signtool.exe`) to the WiX build. The certificate must be available in the
-current user's certificate store; leaving the thumbprint blank disables signing.
+current user's certificate store; leaving the thumbprint blank disables signing. Every `.exe` and `.dll` in the payload
+is signed, which for a self-contained publish replaces the signatures the .NET runtime binaries ship with and costs one
+timestamped `signtool` invocation per file; redefine the `InstallerPayloadToSign` item in the WiX project to narrow
+that set.
+
+A full uninstall deletes the installer's registry key outright, so it leaves nothing behind. Remembered preferences —
+installation directory, scope, shortcut and PATH choices — still survive upgrades and repairs, because `AppSearch`
+captures them into properties long before `RemoveExistingProducts` removes the previous version.
 
 Two upgrade codes are generated, one per platform, and written into the project. **They must stay stable**: changing one
 makes Windows treat later installers as a different product instead of an upgrade. For that reason the target refuses to

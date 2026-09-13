@@ -63,6 +63,13 @@ public sealed class WixInstallerProjectTests
             Assert.Contains("WixToolset.Util.wixext", project, StringComparison.Ordinal);
             Assert.Contains("SignInstallerPayload", project, StringComparison.Ordinal);
             Assert.Contains("<Target Name=\"SignMsi\"", project, StringComparison.Ordinal);
+            // Every binary in the payload is signed, through an item the consumer can redefine.
+            Assert.Contains(
+                "<InstallerPayloadToSign Include=\"$(PublishDirectory)\\**\\*.exe;$(PublishDirectory)\\**\\*.dll\"/>",
+                project, StringComparison.Ordinal);
+            Assert.Contains("&quot;%(InstallerPayloadToSign.FullPath)&quot;", project, StringComparison.Ordinal);
+            // A scaffolded project leaves PATH registration off until the developer opts in.
+            Assert.DoesNotContain("<InstallerPathRegistration>", project, StringComparison.Ordinal);
 
             var package = File.ReadAllText(Path.Combine(directory, "Package.wxs"));
             Assert.Contains("!(bindpath.Publish)", package, StringComparison.Ordinal);
@@ -82,33 +89,31 @@ public sealed class WixInstallerProjectTests
             Assert.Contains(
                 "Installed OR WIX_UPGRADE_DETECTED OR (\"$(sys.BUILDARCH)\" ~= \"x64\" IMP WIX_NATIVE_MACHINE = 34404)",
                 package, StringComparison.Ordinal);
-            Assert.Contains("<Publish Property=\"INSTALLSCOPE_UI_COMPLETE\" Value=\"1\" Order=\"1\"/>", package,
-                StringComparison.Ordinal);
             Assert.Contains("<Publish Property=\"ALLUSERS\" Value=\"2\" Order=\"2\"", package,
                 StringComparison.Ordinal);
             Assert.Contains("<Publish Property=\"MSIINSTALLPERUSER\" Value=\"1\" Order=\"3\"", package,
                 StringComparison.Ordinal);
             Assert.Contains("<Publish Property=\"ALLUSERS\" Value=\"2\" Order=\"4\"", package,
                 StringComparison.Ordinal);
-            Assert.Contains("<Property Id=\"INSTALLSCOPE_UI_COMPLETE\" Secure=\"yes\"/>", package,
-                StringComparison.Ordinal);
             Assert.Contains("<Property Id=\"INSTALLFOLDER\" Secure=\"yes\"/>", package,
                 StringComparison.Ordinal);
-            var executePerUserAction = package[package.IndexOf(
-                "Action=\"Set_INSTALLSCOPE_PerUser_Execute\"", StringComparison.Ordinal)..];
-            Assert.StartsWith("Action=\"Set_INSTALLSCOPE_PerUser_Execute\"", executePerUserAction,
-                StringComparison.Ordinal);
-            Assert.Contains(
-                "Condition=\"NOT INSTALLSCOPE_UI_COMPLETE AND USERINSTALLFOLDER AND NOT MACHINEINSTALLFOLDER\"",
-                executePerUserAction[..300], StringComparison.Ordinal);
 
-            var executePerMachineAction = package[package.IndexOf(
-                "Action=\"Set_INSTALLSCOPE_PerMachine_Execute\"", StringComparison.Ordinal)..];
-            Assert.StartsWith("Action=\"Set_INSTALLSCOPE_PerMachine_Execute\"", executePerMachineAction,
-                StringComparison.Ordinal);
-            Assert.Contains(
-                "Condition=\"NOT INSTALLSCOPE_UI_COMPLETE AND MACHINEINSTALLFOLDER AND NOT USERINSTALLFOLDER\"",
-                executePerMachineAction[..300], StringComparison.Ordinal);
+            // INSTALLSCOPE drives the wizard only. Windows Installer resets ALLUSERS to 1 or to an empty
+            // string once it resolves the context, so ALLUSERS is the only value the rest of the package
+            // can test: INSTALLSCOPE is never carried into a condition outside the InstallUISequence.
+            Assert.DoesNotContain("INSTALLSCOPE_UI_COMPLETE", package, StringComparison.Ordinal);
+
+            // A remembered directory must never override an explicit wizard or command-line choice.
+            var userRestore = package[package.IndexOf(
+                "Action=\"Set_INSTALLFOLDER_User_Execute\"", StringComparison.Ordinal)..];
+            Assert.Contains("Condition=\"NOT Installed AND NOT INSTALLFOLDER AND NOT ALLUSERS AND USERINSTALLFOLDER\"",
+                userRestore[..300], StringComparison.Ordinal);
+
+            var machineRestore = package[package.IndexOf(
+                "Action=\"Set_INSTALLFOLDER_Machine_Execute\"", StringComparison.Ordinal)..];
+            Assert.Contains("Condition=\"NOT Installed AND NOT INSTALLFOLDER AND ALLUSERS AND MACHINEINSTALLFOLDER\"",
+                machineRestore[..300], StringComparison.Ordinal);
+
             Assert.Contains("Value=\"[MACHINEPROGRAMFILESFOLDER]\\$(var.ApplicationName)\"", package,
                 StringComparison.Ordinal);
             Assert.Contains("<RemoveRegistryValue Root=\"HKMU\"", package, StringComparison.Ordinal);
@@ -116,26 +121,38 @@ public sealed class WixInstallerProjectTests
             Assert.Contains("Property=\"INSTALLSCOPE\"", package, StringComparison.Ordinal);
             Assert.Contains("Id=\"WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT\" Value=\"Start program after install\"",
                 package, StringComparison.Ordinal);
-            Assert.Contains("WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1", package, StringComparison.Ordinal);
+            Assert.Contains("<Property Id=\"WIXUI_EXITDIALOGOPTIONALCHECKBOX\" Value=\"1\"/>", package,
+                StringComparison.Ordinal);
+            // The checkbox is shown whenever this product is not installed, upgrades included, so the
+            // action behind it has to use the same condition instead of going inert after an upgrade.
+            Assert.Contains(
+                "Condition=\"WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed\"", package,
+                StringComparison.Ordinal);
             Assert.DoesNotContain("Property=\"STARTAFTERINSTALL\"", package, StringComparison.Ordinal);
+            Assert.Contains("<SummaryInformation Comments=\"$(var.Copyright)\"/>", package,
+                StringComparison.Ordinal);
             Assert.Contains("<?define InstallerRegistryKey =", package, StringComparison.Ordinal);
-            Assert.Equal(18, package.Split("Key=\"$(var.InstallerRegistryKey)\"").Length - 1);
+            Assert.Equal(15, package.Split("Key=\"$(var.InstallerRegistryKey)\"").Length - 1);
             Assert.DoesNotContain("Key=\"Software\\$(var.Company)\\$(var.ApplicationName)\\Installer\"", package,
                 StringComparison.Ordinal);
             Assert.Contains("SearchMachineInstallLocation", package, StringComparison.Ordinal);
             Assert.Contains("SearchUserInstallLocation", package, StringComparison.Ordinal);
-            Assert.Contains("<Component Id=\"InstallLocationRegistryComponent\" Guid=\"\">", package,
-                StringComparison.Ordinal);
             Assert.Contains("<Component Id=\"InstalledStateRegistryComponent\" Guid=\"*\">", package,
                 StringComparison.Ordinal);
-            Assert.Contains("<RegistryKey Root=\"HKMU\" Key=\"$(var.InstallerRegistryKey)\">", package,
-                StringComparison.Ordinal);
+            // A full uninstall has to leave nothing behind, so the key is force-deleted and no component
+            // opts out of removal with a null component GUID.
+            Assert.Contains(
+                "<RegistryKey Root=\"HKMU\" Key=\"$(var.InstallerRegistryKey)\" ForceDeleteOnUninstall=\"yes\">",
+                package, StringComparison.Ordinal);
+            Assert.DoesNotContain("Guid=\"\"", package, StringComparison.Ordinal);
             Assert.Contains("Name=\"InstallLocation\" Type=\"string\" Value=\"[INSTALLFOLDER]\"", package,
                 StringComparison.Ordinal);
-            Assert.Contains("Name=\"ProductCode\" Type=\"string\" Value=\"[ProductCode]\"", package,
+            Assert.Contains("Name=\"ProductCode\" Type=\"string\" Value=\"[ProductCode]\" KeyPath=\"yes\"", package,
                 StringComparison.Ordinal);
-            Assert.Contains("Name=\"InstalledStateComponent-$(var.Platform)\" Type=\"integer\" Value=\"1\"", package,
-                StringComparison.Ordinal);
+            // Only one architecture can ever be installed, so no key path is kept apart per platform and
+            // the platform only appears as recorded metadata.
+            Assert.DoesNotContain("Component-$(var.Platform)", package, StringComparison.Ordinal);
+            Assert.Equal(1, package.Split("$(var.Platform)").Length - 1);
             Assert.Contains("Name=\"Version\" Type=\"string\" Value=\"$(var.BuildVersion)\"", package,
                 StringComparison.Ordinal);
             Assert.Contains("Name=\"Architecture\" Type=\"string\" Value=\"$(var.Platform)\"", package,
@@ -152,6 +169,12 @@ public sealed class WixInstallerProjectTests
                 package, StringComparison.Ordinal);
             Assert.Contains("System=\"no\" Value=\"[INSTALLFOLDER]\"", package, StringComparison.Ordinal);
             Assert.Contains("System=\"yes\" Value=\"[INSTALLFOLDER]\"", package, StringComparison.Ordinal);
+            // A per-user installation cannot write the system PATH, so these have to follow the context
+            // Windows Installer resolved rather than the wizard's INSTALLSCOPE.
+            Assert.Contains("Condition=\"NOT ALLUSERS AND PATHREGISTRATIONSTATE = 1\"", package,
+                StringComparison.Ordinal);
+            Assert.Contains("Condition=\"ALLUSERS AND PATHREGISTRATIONSTATE = 1\"", package,
+                StringComparison.Ordinal);
             Assert.Contains("Value=\"[PATHREGISTRATIONSTATE]\"", package, StringComparison.Ordinal);
             Assert.Contains("Name=\"UserPathEnvironment\" Type=\"integer\" Value=\"1\" KeyPath=\"yes\"", package,
                 StringComparison.Ordinal);
@@ -159,15 +182,40 @@ public sealed class WixInstallerProjectTests
                 StringComparison.Ordinal);
             Assert.Contains("<Publish Property=\"PATHREGISTRATIONSTATE\" Value=\"0\"", package,
                 StringComparison.Ordinal);
-            Assert.Contains("Transitive=\"yes\"", package, StringComparison.Ordinal);
             Assert.Contains("RegisterInstallPath", package, StringComparison.Ordinal);
-            Assert.Contains("UserDefaultNo", package, StringComparison.Ordinal);
+            // The option is shown for every mode except Register, which needs no user choice.
+            Assert.Contains("<?if $(var.InstallerPathRegistration) != \"Register\" ?>", package,
+                StringComparison.Ordinal);
             Assert.Contains("SearchUserStartMenuShortcut", package, StringComparison.Ordinal);
             Assert.Contains("SearchMachineStartMenuShortcut", package, StringComparison.Ordinal);
             Assert.Contains("SearchUserDesktopShortcut", package, StringComparison.Ordinal);
             Assert.Contains("SearchMachineDesktopShortcut", package, StringComparison.Ordinal);
-            Assert.Contains("Set_CREATESTARTMENUSHORTCUT_Unchecked", package, StringComparison.Ordinal);
-            Assert.Contains("Set_CREATEDESKTOPSHORTCUT_Unchecked", package, StringComparison.Ordinal);
+
+            // Silent and basic-UI installs never run the InstallUISequence, so every remembered choice
+            // needs an execute-sequence counterpart guarded by the matching wizard-completion flag.
+            Assert.Contains("<Property Id=\"SHORTCUTS_UI_COMPLETE\" Secure=\"yes\"/>", package,
+                StringComparison.Ordinal);
+            Assert.Contains("<Publish Property=\"SHORTCUTS_UI_COMPLETE\" Value=\"1\"", package,
+                StringComparison.Ordinal);
+            foreach (var property in (string[])["CREATESTARTMENUSHORTCUT", "CREATEDESKTOPSHORTCUT"])
+            {
+                foreach (var state in (string[])["Checked", "Unchecked"])
+                {
+                    Assert.Contains($"Action=\"Set_{property}_{state}\"", package, StringComparison.Ordinal);
+
+                    var executeAction = package[package.IndexOf(
+                        $"Action=\"Set_{property}_{state}_Execute\"", StringComparison.Ordinal)..];
+                    Assert.Contains("Sequence=\"execute\"", executeAction[..400], StringComparison.Ordinal);
+                    Assert.Contains("Condition=\"NOT SHORTCUTS_UI_COMPLETE AND (", executeAction[..400],
+                        StringComparison.Ordinal);
+                }
+            }
+
+            // Windows Installer keeps a product in its original context, so the wizard must not offer to
+            // create a second installation in the other one while a previous installation is present.
+            Assert.Contains(
+                "DisableCondition=\"WIX_UPGRADE_DETECTED\" EnableCondition=\"NOT WIX_UPGRADE_DETECTED\"",
+                package, StringComparison.Ordinal);
 
             var startMenuComponent = GetComponent(package, "StartMenuShortcutComponent");
             Assert.Contains("Directory=\"ApplicationProgramsFolder\"", startMenuComponent,
@@ -175,12 +223,18 @@ public sealed class WixInstallerProjectTests
             Assert.Contains("Root=\"HKMU\"", startMenuComponent, StringComparison.Ordinal);
             Assert.DoesNotContain("Root=\"HKCU\"", startMenuComponent, StringComparison.Ordinal);
             Assert.DoesNotContain("Root=\"HKLM\"", startMenuComponent, StringComparison.Ordinal);
+            Assert.Contains("Transitive=\"yes\"", startMenuComponent, StringComparison.Ordinal);
+            // WixUI sets ARPNOMODIFY, so the shortcut uninstalls instead of opening maintenance mode.
+            Assert.Contains("Arguments=\"/x [ProductCode]\"", startMenuComponent, StringComparison.Ordinal);
+            Assert.Contains("Icon=\"ProductIcon.ico\" IconIndex=\"0\"", startMenuComponent,
+                StringComparison.Ordinal);
 
             var desktopComponent = GetComponent(package, "DesktopShortcutComponent");
             Assert.Contains("Directory=\"DesktopFolder\"", desktopComponent, StringComparison.Ordinal);
             Assert.Contains("Root=\"HKMU\"", desktopComponent, StringComparison.Ordinal);
             Assert.DoesNotContain("Root=\"HKCU\"", desktopComponent, StringComparison.Ordinal);
             Assert.DoesNotContain("Root=\"HKLM\"", desktopComponent, StringComparison.Ordinal);
+            Assert.Contains("Transitive=\"yes\"", desktopComponent, StringComparison.Ordinal);
 
             Assert.StartsWith(@"{\rtf1", File.ReadAllText(Path.Combine(resourcesDirectory, "License.rtf")),
                 StringComparison.Ordinal);

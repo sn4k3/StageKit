@@ -8,6 +8,25 @@
   upgrade preference restoration, uninstall cleanup, and checked or unchecked user defaults
 - Isolate WiX intermediate outputs by installer name to prevent incremental builds from reusing another version's MSI
 - Keep WiX shortcut registry state in the selected user or machine installation scope
+- Stop the WiX installer from overriding a chosen installation directory with the remembered one, which silently
+  redirected wizard and `INSTALLFOLDER=` command-line choices back to the previous directory
+- Restore the WiX shortcut preferences on silent and basic-UI installations, which never run the wizard and so
+  recreated shortcuts the user had removed
+- Scope the WiX PATH entry and remembered directory by the installation context Windows Installer resolved
+  (`ALLUSERS`) rather than by the wizard's `INSTALLSCOPE`, so a per-user installation writes the user PATH instead of
+  failing with an access denied error while trying to write the system PATH
+- Delete the WiX installer registry key on uninstall so nothing is left behind
+- Keep the WiX "Start program after install" checkbox working after a major upgrade instead of showing it inert, and
+  check it by default
+- Disable the WiX installation scope selector while a previous installation is detected, since Windows Installer keeps
+  a product in the context it was first installed in
+- Uninstall directly from the WiX start menu shortcut, which now carries the application icon, instead of opening
+  maintenance mode that `ARPNOMODIFY` disables
+- Mark the WiX shortcut components transitive so their conditions are re-evaluated on reinstall
+- Record the copyright in the WiX package summary information
+- Authenticode-sign every executable and library in the WiX payload instead of only the entry executable, through an
+  `InstallerPayloadToSign` item that can be redefined to narrow the set
+- Honour a preset `InstallerPathRegistration` in the WiX installer project instead of always overwriting it
 - Add the StageKit demo icon to its window and taskbar entry
 
 # v0.3.8 (11/09/2026)

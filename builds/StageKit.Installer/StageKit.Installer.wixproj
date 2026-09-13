@@ -12,7 +12,6 @@
         <InstallerPlatform>$(Platform)</InstallerPlatform>
         <!-- perMachineOrUser (default), perUser, or perMachine. -->
         <InstallerScope Condition="'$(InstallerScope)' == ''">perMachineOrUser</InstallerScope>
-        <InstallerPathRegistration>UserDefaultYes</InstallerPathRegistration>
         <!-- Register, UserDefaultNo, or UserDefaultYes; blank disables PATH registration. -->
         <InstallerPathRegistrationMode Condition="'$(InstallerPathRegistration)' == 'Register'">Register</InstallerPathRegistrationMode>
         <InstallerPathRegistrationMode Condition="'$(InstallerPathRegistration)' == 'UserDefaultNo'">UserDefaultNo</InstallerPathRegistrationMode>
@@ -98,9 +97,16 @@
                Text="Installer license '$(LicenseFile)' does not exist."/>
     </Target>
 
+    <!-- Every signable binary in the payload, which for a self-contained publish replaces the signatures
+         the runtime binaries ship with. Redefine this item to narrow the set, for example to
+         $(PublishDirectory)\$(ApplicationExecutableName).exe for the entry executable alone. -->
+    <ItemGroup Condition="'$(SignOutput)' == 'true'">
+        <InstallerPayloadToSign Include="$(PublishDirectory)\**\*.exe;$(PublishDirectory)\**\*.dll"/>
+    </ItemGroup>
+
     <Target Name="SignInstallerPayload" BeforeTargets="CoreCompile"
             Condition="'$(SignOutput)' == 'true'">
-        <Exec Command="&quot;$(SignToolPath)&quot; sign /sha1 &quot;$(AuthenticodeCertificateThumbprint)&quot; /fd SHA256 /tr &quot;$(AuthenticodeTimestampUrl)&quot; /td SHA256 /d &quot;$(ApplicationName)&quot; /du &quot;$(RepositoryUrl)&quot; &quot;$(PublishDirectory)\$(ApplicationExecutableName).exe&quot;"/>
+        <Exec Command="&quot;$(SignToolPath)&quot; sign /sha1 &quot;$(AuthenticodeCertificateThumbprint)&quot; /fd SHA256 /tr &quot;$(AuthenticodeTimestampUrl)&quot; /td SHA256 /d &quot;$(ApplicationName)&quot; /du &quot;$(RepositoryUrl)&quot; &quot;%(InstallerPayloadToSign.FullPath)&quot;"/>
     </Target>
 
     <Target Name="SignMsi" Condition="'$(SignOutput)' == 'true'">
