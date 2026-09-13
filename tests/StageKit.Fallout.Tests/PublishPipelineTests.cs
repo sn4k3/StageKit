@@ -728,7 +728,13 @@ public class PublishPipelineTests
         var build = new TestBuild
         {
             TestSoftwareName = "ProductName",
-            TestSoftwareExecutableName = "PublishedExecutable"
+            TestSoftwareExecutableName = "PublishedExecutable",
+            TestMainProjectProperties = new Dictionary<string, string?>
+            {
+                ["Company"] = "Example Company",
+                ["Copyright"] = "Copyright (c) 2026 Example",
+                ["RepositoryUrl"] = "https://github.com/example/product"
+            }
         };
         build.SetWindowsAuthenticodeSettings("ABC123", "https://timestamp.example", "tools/signtool.exe");
         var context = CreateContext(build, "win-x64");
@@ -744,6 +750,14 @@ public class PublishPipelineTests
             Assert.IsType<JsonElement>(settings.Properties["ApplicationName"]).GetString());
         Assert.Equal("PublishedExecutable",
             Assert.IsType<JsonElement>(settings.Properties["ApplicationExecutableName"]).GetString());
+        Assert.Equal("Example Company",
+            Assert.IsType<JsonElement>(settings.Properties["Company"]).GetString());
+        Assert.Equal("Copyright (c) 2026 Example",
+            Assert.IsType<JsonElement>(settings.Properties["Copyright"]).GetString());
+        Assert.Equal("https://github.com/example/product",
+            Assert.IsType<JsonElement>(settings.Properties["RepositoryUrl"]).GetString());
+        Assert.Equal((string)build.WindowsIconFile,
+            Assert.IsType<JsonElement>(settings.Properties["ApplicationIcon"]).GetString());
         Assert.Equal("ABC123",
             Assert.IsType<JsonElement>(settings.Properties["AuthenticodeCertificateThumbprint"]).GetString());
         Assert.Equal("https://timestamp.example",
@@ -3796,6 +3810,9 @@ public class PublishPipelineTests
         internal AbsolutePath TestLinuxIconFile { get; set; } =
             Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}.svg");
 
+        internal AbsolutePath TestWindowsIconFile { get; set; } =
+            Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}.ico");
+
         internal AbsolutePath TestAppImageToolCacheDirectory { get; set; } =
             Path.Combine(Path.GetTempPath(), $"stagekit-{Guid.NewGuid():N}-appimagetool");
 
@@ -3844,6 +3861,8 @@ public class PublishPipelineTests
         public override AbsolutePath MacOSIconFile => TestMacOSIconFile;
 
         public override AbsolutePath LinuxIconFile => TestLinuxIconFile;
+
+        public override AbsolutePath WindowsIconFile => TestWindowsIconFile;
 
         public override AbsolutePath PublishDirectory => TestPublishDirectory;
 

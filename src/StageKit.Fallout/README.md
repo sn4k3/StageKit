@@ -486,7 +486,7 @@ internal class Build : StageKitBuild
 | `CreateMacAppBundleOptions()` / `CreateLinuxAppBundleOptions()`                         | Lazily resolved bundle metadata (`Info.plist`, `.desktop`, AppStream, entitlements)                              |
 | `ConfigureWindowsInstallerBuildSettings(...)`                                           | Adjusts the MSBuild settings passed to each WiX installer project                                                |
 | `PackagingTypes`, `PublishCleanupExtensions`, `RIds`                                    | Protected setters for build-wide publish configuration                                                           |
-| `MediaDirectory`, `MacOSIconFile`, `LinuxIconFile`, `ChangelogFile`, `ReleaseNotesFile` | `virtual` path overrides                                                                                         |
+| `MediaDirectory`, `WindowsIconFile`, `MacOSIconFile`, `LinuxIconFile`, `ChangelogFile`, `ReleaseNotesFile` | `virtual` path overrides                                                                                         |
 
 Nearly every publish and bundle step (`CreatePublishSettings`, `PublishRuntime`, `CreateBundles`, `CreatePortableZip`,
 `CreateMacOSApp`, `CreateLinuxAppImage`, `CreateWindowsInstallers`, …) is `protected virtual` and can be replaced.

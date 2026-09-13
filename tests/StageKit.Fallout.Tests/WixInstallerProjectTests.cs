@@ -104,6 +104,11 @@ public sealed class WixInstallerProjectTests
             Assert.DoesNotContain("INSTALLSCOPE_UI_COMPLETE", package, StringComparison.Ordinal);
 
             // A remembered directory must never override an explicit wizard or command-line choice.
+            var userDefault = package[package.IndexOf(
+                "Action=\"Set_INSTALLFOLDER_User_Default_Execute\"", StringComparison.Ordinal)..];
+            Assert.Contains("Condition=\"NOT Installed AND NOT INSTALLFOLDER AND NOT ALLUSERS AND NOT USERINSTALLFOLDER\"",
+                userDefault[..400], StringComparison.Ordinal);
+
             var userRestore = package[package.IndexOf(
                 "Action=\"Set_INSTALLFOLDER_User_Execute\"", StringComparison.Ordinal)..];
             Assert.Contains("Condition=\"NOT Installed AND NOT INSTALLFOLDER AND NOT ALLUSERS AND USERINSTALLFOLDER\"",
@@ -214,7 +219,7 @@ public sealed class WixInstallerProjectTests
             // Windows Installer keeps a product in its original context, so the wizard must not offer to
             // create a second installation in the other one while a previous installation is present.
             Assert.Contains(
-                "DisableCondition=\"WIX_UPGRADE_DETECTED\" EnableCondition=\"NOT WIX_UPGRADE_DETECTED\"",
+                "DisableCondition=\"WIX_UPGRADE_DETECTED OR Installed\" EnableCondition=\"NOT WIX_UPGRADE_DETECTED AND NOT Installed\"",
                 package, StringComparison.Ordinal);
 
             var startMenuComponent = GetComponent(package, "StartMenuShortcutComponent");

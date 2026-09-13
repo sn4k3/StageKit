@@ -18,8 +18,12 @@
 - Delete the WiX installer registry key on uninstall so nothing is left behind
 - Keep the WiX "Start program after install" checkbox working after a major upgrade instead of showing it inert, and
   check it by default
-- Disable the WiX installation scope selector while a previous installation is detected, since Windows Installer keeps
-  a product in the context it was first installed in
+- Default silent per-user WiX installations to the user programs directory so unprivileged installs succeed without
+  requiring elevation or failing against Program Files
+- Forward `Company`, `Copyright`, `RepositoryUrl`, and `WindowsIconFile` from the Windows publish pipeline to the WiX
+  installer build
+- Disable the WiX installation scope selector during maintenance or while a previous installation is detected, since
+  Windows Installer keeps a product in the context it was first installed in
 - Uninstall directly from the WiX start menu shortcut, which now carries the application icon, instead of opening
   maintenance mode that `ARPNOMODIFY` disables
 - Mark the WiX shortcut components transitive so their conditions are re-evaluated on reinstall

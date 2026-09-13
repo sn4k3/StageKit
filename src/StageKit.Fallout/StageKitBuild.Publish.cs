@@ -99,6 +99,11 @@ public partial class StageKitBuild
     public virtual AbsolutePath LinuxIconFile => MediaDirectory / $"{SoftwareName}.svg";
 
     /// <summary>
+    /// Gets the icon file used for Windows application bundles and installers.
+    /// </summary>
+    public virtual AbsolutePath WindowsIconFile => MediaDirectory / $"{SoftwareName}.ico";
+
+    /// <summary>
     /// Gets the installer projects discovered in the solution.
     /// </summary>
     public virtual IReadOnlyCollection<Project> InstallerProjects =>

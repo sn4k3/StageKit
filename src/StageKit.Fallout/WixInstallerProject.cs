@@ -466,6 +466,10 @@ internal static class WixInstallerProject
                              After="Set_INSTALLSCOPE_PerUser" Sequence="ui"
                              Condition="MACHINEINSTALLFOLDER AND NOT USERINSTALLFOLDER"/>
                 <?endif ?>
+                <SetProperty Id="INSTALLFOLDER" Action="Set_INSTALLFOLDER_User_Default_Execute"
+                             Value="[LocalAppDataFolder]Programs\$(var.ApplicationName)"
+                             Before="CostFinalize" Sequence="execute"
+                             Condition="NOT Installed AND NOT INSTALLFOLDER AND NOT ALLUSERS AND NOT USERINSTALLFOLDER"/>
                 <SetProperty Id="INSTALLFOLDER" Action="Set_INSTALLFOLDER_User_Execute" Value="[USERINSTALLFOLDER]"
                              Before="CostFinalize" Sequence="execute"
                              Condition="NOT Installed AND NOT INSTALLFOLDER AND NOT ALLUSERS AND USERINSTALLFOLDER"/>
@@ -680,7 +684,7 @@ internal static class WixInstallerProject
                         <?if $(var.InstallerScope) = "perMachineOrUser" ?>
                         <Control Id="InstallScope" Type="RadioButtonGroup" X="20" Y="60" Width="330" Height="45"
                                  Property="INSTALLSCOPE"
-                                 DisableCondition="WIX_UPGRADE_DETECTED" EnableCondition="NOT WIX_UPGRADE_DETECTED">
+                                 DisableCondition="WIX_UPGRADE_DETECTED OR Installed" EnableCondition="NOT WIX_UPGRADE_DETECTED AND NOT Installed">
                             <RadioButtonGroup Property="INSTALLSCOPE">
                                 <RadioButton Value="perMachine" X="0" Y="0" Width="310" Height="16"
                                              Text="Install for all users (requires administrator privileges)"/>
@@ -820,9 +824,10 @@ internal static class WixInstallerProject
         | `BuildVersion` | `SoftwareVersion` |
         | `OutputName` | The release asset name |
         | `Platform` | `x64` or `arm64` |
-
-        `Company`, `Copyright`, `RepositoryUrl`, and `ApplicationIcon` come from the repository's
-        `Directory.Build.props`.
+        | `Company` | `SoftwareCompany` |
+        | `Copyright` | `SoftwareCopyright` |
+        | `RepositoryUrl` | `SoftwareRepositoryUrl` |
+        | `ApplicationIcon` | `WindowsIconFile` |
 
         ## Before the first release
 
