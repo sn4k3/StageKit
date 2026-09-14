@@ -16,9 +16,11 @@ See the [WiX artwork documentation](https://docs.firegiant.com/wix/tools/wixext/
 
 ## Installation scope
 
-`InstallerScope` defaults to `perMachineOrUser`, which lets the user choose the installation scope in the wizard and
-initially selects a non-elevated per-user installation. Set it to `perUser` or `perMachine` in the project or with
-`-p:InstallerScope=...` to enforce that scope and hide the selector. Unsupported values fail the build.
+`InstallerScope` defaults to `perMachineOrUser` (`InstallerScope.PerMachineOrUser`), which lets the user choose the
+installation scope in the wizard and initially selects a non-elevated per-user installation. Set it to `perUser`
+(`InstallerScope.PerUser`) or `perMachine` (`InstallerScope.PerMachine`) in the project, via Fallout's
+`WindowsInstallerOptions.Scope`, or with `-p:InstallerScope=...` to enforce that scope and hide the selector.
+Unsupported values fail the build.
 
 Windows Installer keeps a product in the context it was first installed in, so the selector is disabled while a previous
 installation is detected. A silent installation is per-user unless `ALLUSERS=1` is passed:
@@ -29,14 +31,15 @@ msiexec /i StageKit_win-x64_v0.0.0.msi ALLUSERS=1 /qn
 
 ## PATH registration
 
-Set `InstallerPathRegistration` in the project or with `-p:InstallerPathRegistration=...`:
+Set `InstallerPathRegistration` in the project, via Fallout's `WindowsInstallerOptions.PathRegistration` (using the
+`PathRegistration` enum), or with `-p:InstallerPathRegistration=...`:
 
-| Value            | Behavior                                                         |
-|------------------|------------------------------------------------------------------|
-| *(blank)*        | Disable PATH registration and hide the option.                   |
-| `Register`       | Always append the install directory to PATH and hide the option. |
-| `UserDefaultNo`  | Show an unchecked option for the user.                           |
-| `UserDefaultYes` | Show a checked option for the user.                              |
+| Value / Enum                   | Behavior                                                         |
+|--------------------------------|------------------------------------------------------------------|
+| *(blank)* / `None`             | Disable PATH registration and hide the option.                   |
+| `Register` / `Register`        | Always append the install directory to PATH and hide the option. |
+| `UserDefaultNo` / `UserDefaultNo` | Show an unchecked option for the user.                         |
+| `UserDefaultYes` / `UserDefaultYes` | Show a checked option for the user.                           |
 
 Per-user installations update the current user's PATH; per-machine installations update the system PATH. Which of the
 two applies follows the installation context Windows Installer resolved, not the scope picked in the wizard, because a
@@ -44,11 +47,19 @@ per-user installation cannot write the system PATH. The selected option is resto
 and uninstall removes this install directory from PATH while preserving unrelated entries. The entry is the
 installation directory as Windows Installer resolves it, so it carries a trailing separator.
 
-## Context menu ("Open with")
+## Context menu ("Open with") and file associations
 
-Set `ContextMenuOpenWithFileAssociations` in this project, on the command line, or through Fallout's
-`WindowsInstallerOptions.ContextMenuOpenWithFileAssociations` to register the application in the Windows Explorer right-click
-context menu for specified file types or extensions:
+File associations can be configured uniformly across all bundle formats by populating `StageKitBuild.FileAssociations`
+with `FileAssociation` items, or customized for Windows directly through `WindowsInstallerOptions.ContextMenuOpenWithFileAssociations`:
+
+```csharp
+FileAssociations =
+[
+    new FileAssociation(".stg", "StageKit File", "application/x-stagekit")
+];
+```
+
+In the WiX project or on the command line via MSBuild, configure `ContextMenuOpenWithFileAssociations` directly:
 
 ```xml
 <ContextMenuOpenWithFileAssociations>.sl1;.sl1s;*.zip;*.photon</ContextMenuOpenWithFileAssociations>
@@ -56,12 +67,20 @@ context menu for specified file types or extensions:
 
 Leave it blank to omit context menu registration. Specify `*` to show the context menu for all files.
 
+## Shortcut & launch defaults
+
+Configure default checkboxes in `WindowsInstallerOptions` or through MSBuild:
+- `DefaultDesktopShortcut`: whether the Desktop shortcut checkbox is checked by default (`true`).
+- `DefaultStartMenuShortcut`: whether the Start menu shortcut checkbox is checked by default (`true`).
+- `DefaultStartProgramAfterInstall`: whether to launch the app after setup completes (`true`).
+- `SingleFile`: whether the installer packages a single-file payload instead of a folder payload.
+
 ## Authenticode signing
 
 Set `AuthenticodeCertificateThumbprint` to the SHA-1 thumbprint of a code-signing certificate in the current user's
 certificate store. The build signs the staged application executable and the final MSI with SHA-256 and an RFC 3161
-timestamp. Override `AuthenticodeTimestampUrl` or `SignToolPath` when required. Leaving the thumbprint blank disables
-signing.
+timestamp. Override `AuthenticodeTimestampUrl` or `SignToolPath` in `WindowsInstallerOptions` when required. Leaving
+the thumbprint blank disables signing.
 
 Every `.exe` and `.dll` in the payload is signed, which for a self-contained publish replaces the signatures the .NET
 runtime binaries ship with. Redefine the `InstallerPayloadToSign` item to narrow that set:

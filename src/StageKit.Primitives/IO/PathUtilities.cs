@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices;
 using StageKit.Primitives.System;
 
 namespace StageKit.Primitives;
@@ -5,8 +7,151 @@ namespace StageKit.Primitives;
 /// <summary>
 /// Provides cross-platform path helper methods.
 /// </summary>
-public static class PathUtilities
+public static partial class PathUtilities
 {
+    private static readonly Guid FolderIdDownloads = new("374DE290-123F-4565-9164-39C4925E467B");
+
+    /// <summary>
+    /// Gets the path to the current user's Downloads directory, or <see langword="null"/> if it cannot be determined.
+    /// </summary>
+    public static string? DownloadsDirectoryPath => field ??= GetDownloadsDirectory();
+
+    /// <summary>
+    /// Gets the path to the current user's Downloads directory, or <see langword="null"/> if it cannot be determined.
+    /// </summary>
+    /// <returns>The path to the Downloads directory, or <see langword="null"/> when unavailable.</returns>
+    public static string? GetDownloadsDirectory()
+    {
+        TryGetDownloadsDirectory(out var path);
+        return path;
+    }
+
+    /// <summary>
+    /// Tries to resolve the path to the current user's Downloads directory.
+    /// </summary>
+    /// <param name="path">The resolved directory path, or <see langword="null"/> if resolution fails.</param>
+    /// <returns><see langword="true"/> if the Downloads directory path was resolved; otherwise, <see langword="false"/>.</returns>
+    /// <remarks>
+    /// On Windows, queries SHGetKnownFolderPath (FOLDERID_Downloads) with registry and user profile fallbacks.
+    /// On Linux, queries XDG_DOWNLOAD_DIR configuration with user profile fallback.
+    /// On macOS, resolves the Downloads directory under the user home profile.
+    /// </remarks>
+    public static bool TryGetDownloadsDirectory([NotNullWhen(true)] out string? path)
+    {
+        path = null;
+
+        if (OperatingSystem.IsWindows())
+        {
+            try
+            {
+                if (SHGetKnownFolderPath(in FolderIdDownloads, 0, IntPtr.Zero, out var ppszPath) == 0 && ppszPath != IntPtr.Zero)
+                {
+                    try
+                    {
+                        var resolved = Marshal.PtrToStringUni(ppszPath);
+                        if (!string.IsNullOrWhiteSpace(resolved))
+                        {
+                            path = resolved;
+                            return true;
+                        }
+                    }
+                    finally
+                    {
+                        Marshal.FreeCoTaskMem(ppszPath);
+                    }
+                }
+            }
+            catch
+            {
+                // Fall through to registry or user profile
+            }
+
+            try
+            {
+                using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+                    @"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders");
+                if (key?.GetValue("{374DE290-123F-4565-9164-39C4925E467B}") is string regPath &&
+                    !string.IsNullOrWhiteSpace(regPath))
+                {
+                    var expanded = Environment.ExpandEnvironmentVariables(regPath);
+                    if (!string.IsNullOrWhiteSpace(expanded))
+                    {
+                        path = expanded;
+                        return true;
+                    }
+                }
+            }
+            catch
+            {
+                // Fall through to user profile
+            }
+        }
+        else if (OperatingSystem.IsLinux())
+        {
+            try
+            {
+                var configHome = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+                if (string.IsNullOrWhiteSpace(configHome))
+                {
+                    var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                    if (!string.IsNullOrWhiteSpace(home))
+                        configHome = Path.Combine(home, ".config");
+                }
+
+                if (!string.IsNullOrWhiteSpace(configHome))
+                {
+                    var userDirsFile = Path.Combine(configHome, "user-dirs.dirs");
+                    if (File.Exists(userDirsFile))
+                    {
+                        foreach (var line in File.ReadLines(userDirsFile))
+                        {
+                            var trimmed = line.Trim();
+                            if (trimmed.StartsWith("XDG_DOWNLOAD_DIR=", StringComparison.Ordinal))
+                            {
+                                var raw = trimmed["XDG_DOWNLOAD_DIR=".Length..].Trim('"', '\'');
+                                var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                                var resolved = raw.Replace("$HOME", home).Replace("${HOME}", home);
+                                if (!string.IsNullOrWhiteSpace(resolved))
+                                {
+                                    path = resolved;
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Fall through to user profile
+            }
+        }
+
+        try
+        {
+            var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (!string.IsNullOrWhiteSpace(userProfile))
+            {
+                var candidate = Path.Combine(userProfile, "Downloads");
+                path = candidate;
+                return true;
+            }
+        }
+        catch
+        {
+            // Best effort
+        }
+
+        return false;
+    }
+
+    [LibraryImport("shell32.dll", EntryPoint = "SHGetKnownFolderPath")]
+    private static partial int SHGetKnownFolderPath(
+        in Guid rfid,
+        uint dwFlags,
+        IntPtr hToken,
+        out IntPtr ppszPath);
+
     /// <summary>
     /// Gets the string comparison used for file-system paths on the current platform.
     /// </summary>

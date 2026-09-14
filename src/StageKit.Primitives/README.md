@@ -22,6 +22,10 @@ All public helpers are exposed from the `StageKit.Primitives` namespace. IO-rela
 - Bash ANSI-C and Windows batch value quoting helpers through `StringExtensions`
 - Host-aware operating-system names, network availability, path comparison, URL/file-manager launching, and Unix
   executable-permission helpers
+- Dark mode and high-contrast system theme detection (`IsDarkMode`, `IsHighContrast`)
+- Power status and sleep prevention (`PreventSleep`, `IsOnBatteryPower`, `BatteryChargePercentage`, `GetPowerStatus`)
+- Interactive terminal launching (`OpenTerminal`, `OpenInTerminal`)
+- Drive capacity and free disk space queries (`GetAvailableFreeSpace`, `GetDiskStatus`, `HostDiskStatus`)
 - Disposable base type with thread-safe idempotent disposal through `DisposableObject`
 - Finalizable disposable base type through `UnmanagedDisposableObject`
 - Leave-open lifecycle base type through `LeaveOpenDisposableObject`
@@ -107,6 +111,80 @@ Physical-memory properties use bytes and describe OS-visible memory, not contain
 `HostMemoryStatus` is an immutable, platform-neutral value containing total, available, and used physical memory plus
 the percentage in use.
 
+### Theme & High Contrast
+
+Query whether the host operating system currently prefers a dark mode or high-contrast accessibility theme:
+
+```csharp
+bool isDark = HostSystem.IsDarkMode;
+bool isHighContrast = HostSystem.IsHighContrast;
+```
+
+Windows inspects personalization registry settings and queries `SystemParametersInfoW(SPI_GETHIGHCONTRAST)`. macOS
+queries system defaults (`AppleInterfaceStyle` and `com.apple.universalaccess increaseContrast`). Linux queries
+`gsettings` color-scheme and accessibility keys alongside the `GTK_THEME` environment variable.
+
+### Power & Sleep Prevention
+
+Inhibit host system sleep during long operations, with optional display stay-awake:
+
+```csharp
+using var token = HostSystem.PreventSleep(keepDisplayOn: true);
+// Host will not enter sleep mode until token is disposed.
+```
+
+Windows uses `SetThreadExecutionState`, macOS manages a background `caffeinate` process, and Linux invokes
+`systemd-inhibit`.
+
+Query host power, battery charge percentage, and charging state:
+
+```csharp
+if (HostSystem.TryGetPowerStatus(out var power))
+{
+    Console.WriteLine($"On battery: {power.IsOnBatteryPower}");
+    Console.WriteLine($"Charge: {power.BatteryChargePercentage}%");
+    Console.WriteLine($"Charging: {power.IsBatteryCharging}");
+}
+```
+
+The returned `HostPowerStatus` record struct provides platform-neutral battery diagnostics across Windows, macOS, and Linux.
+
+### Disk space & Drive status
+
+Query available free disk space or volume status for any file, directory, or drive path:
+
+```csharp
+long freeBytes = HostSystem.GetAvailableFreeSpace(downloadPath);
+
+if (HostSystem.TryGetDiskStatus(downloadPath, out var disk))
+{
+    Console.WriteLine($"Drive: {disk.Value.DriveName}");
+    Console.WriteLine($"Total: {disk.Value.TotalSizeGigabytes:F2} GB");
+    Console.WriteLine($"Free: {disk.Value.AvailableFreeSpaceGigabytes:F2} GB");
+    Console.WriteLine($"Format: {disk.Value.DriveFormat}");
+}
+```
+
+Windows uses native `GetDiskFreeSpaceExW` alongside `DriveInfo`; Unix environments match the longest mount point from
+available system drives.
+
+### Interactive Terminal Launching
+
+Launch an interactive terminal window or execute a shell command interactively:
+
+```csharp
+// Open interactive terminal at specified directory
+HostSystem.OpenTerminal(projectDirectory);
+await HostSystem.OpenTerminalAsync(projectDirectory, cancellationToken);
+
+// Open interactive terminal running a specific command
+HostSystem.OpenInTerminal("dotnet watch", projectDirectory, keepOpen: true);
+await HostSystem.OpenInTerminalAsync("dotnet watch", projectDirectory, keepOpen: true, cancellationToken);
+```
+
+Windows prefers Windows Terminal (`wt.exe`) with fallback to `cmd.exe`. macOS activates `Terminal.app` via AppleScript.
+Linux resolves installed terminal emulators (`gnome-terminal`, `konsole`, `xfce4-terminal`, `x-terminal-emulator`, `xterm`).
+
 ## SafeFile
 
 Use `SafeFile` when you need to write a file through a temporary file and then replace the destination.
@@ -182,7 +260,18 @@ if (!PathUtilities.IsSubPathOf(candidatePath, rootPath))
 }
 
 var entryName = PathUtilities.NormalizeArchiveEntryName(relativePath);
+
+// Resolve current user's Downloads folder
+string? downloadsPath = PathUtilities.DownloadsDirectoryPath;
+if (PathUtilities.TryGetDownloadsDirectory(out string? resolvedDownloads))
+{
+    Console.WriteLine(resolvedDownloads);
+}
 ```
+
+On Windows, `DownloadsDirectoryPath` calls native `SHGetKnownFolderPath` with `FOLDERID_Downloads` before falling back
+to User Shell Folders registry keys and `%USERPROFILE%\Downloads`. Linux parses `XDG_DOWNLOAD_DIR` from
+`~/.config/user-dirs.dirs`, and macOS resolves `~/Downloads`.
 
 Use `FileUtilities` when a value must be one simple file or directory name rather than a rooted or nested path:
 

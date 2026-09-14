@@ -22,6 +22,7 @@ exposes ready-made targets to restore, compile, run, and publish an application 
 - Self-contained publish by default, with optional ReadyToRun and framework-dependent deployment
 - Bundle creation: portable zip, .NET single-file, WiX installer, macOS `.app`/DMG/PKG, Linux AppImage, Flatpak, Debian,
   RPM, Arch Linux, and Snap packages
+- Unified cross-platform file associations via `FileAssociation` and `FileAssociations`
 - Multi-architecture macOS bundles (`osx-x64` + `osx-arm64` in one `.app`)
 - Versioned build runtime manifest emitted with each distributable for diagnostics and release tooling
 - Release notes extracted from the top `CHANGELOG.md` section
@@ -228,7 +229,23 @@ Duplicate values and `None` are removed while preserving selection order. Format
 skipped with a warning rather than failing the build. Set `PackagingTypes` to `[]` to publish runtime outputs without
 creating packages.
 
-### Windows installer project
+## Cross-platform file associations
+
+Unified file associations can be defined once in `StageKitBuild.FileAssociations` and automatically propagate to every
+supported platform bundle format:
+
+```csharp
+FileAssociations =
+[
+    new FileAssociation(".stg", "StageKit File", "application/x-stagekit")
+];
+```
+
+- **Windows WiX Installer**: Automatically registers Windows Explorer context menu / "Open with" handlers for each extension.
+- **macOS Bundles (`.app`)**: Automatically configures `CFBundleDocumentTypes` entries in `Info.plist`.
+- **Linux Bundles**: Automatically populates `MimeType` associations in `.desktop` files, adds `%F` arguments to `Exec`, and includes AppStream mediatype metadata.
+
+### Windows installer options & WiX project
 
 `Publish` builds every WiX project in the solution when `PackagingTypes` contains `WindowsInstaller`. Run
 `GenerateWindowsWixInstaller` once to scaffold that project:
@@ -245,20 +262,44 @@ same-version packages as major upgrades. Every product-specific value — publis
 name, version, platform, and asset name — is passed by the pipeline at build time, so the project builds without
 editing.
 
-The generated project defines `InstallerScope` as `perMachineOrUser`, allowing users to choose their scope while
-defaulting to a non-elevated per-user installation. Set the property to `perUser` or `perMachine` in the `.wixproj` to
-enforce one scope and hide the selector. The property can also be overridden when building the WiX project with
-`-p:InstallerScope=...`. The selector is disabled while a previous installation is detected, because Windows Installer
-keeps a product in the context it was first installed in. A silent installation of a `perMachineOrUser` package is
-per-user unless it is invoked with `msiexec /i <package>.msi ALLUSERS=1 /qn`.
+Windows installer options are configured in C# via `WindowsInstallerOptions` on `StageKitBuild`:
 
-Set the `InstallerPathRegistration` property to `Register` to always append the installation directory
-to PATH; `UserDefaultNo` to show an unchecked option; or `UserDefaultYes` to show a checked option. Leaving it blank
-disables PATH registration. Per-user installations update the current user's PATH, per-machine installations update the
-system PATH, and uninstall removes the installer-managed entry. Which of the two applies follows the installation
-context Windows Installer resolved, not the scope picked in the wizard, because a per-user installation cannot write
-the system PATH. The entry is the installation directory as Windows Installer resolves it, so it carries a trailing
-separator.
+```csharp
+WindowsInstallerOptions = new WindowsInstallerOptions
+{
+    Scope = InstallerScope.PerMachineOrUser,
+    PathRegistration = PathRegistration.UserDefaultYes,
+    DefaultDesktopShortcut = true,
+    DefaultStartMenuShortcut = true,
+    DefaultStartProgramAfterInstall = true,
+    SingleFile = false
+};
+```
+
+#### Installation scope
+
+`WindowsInstallerOptions.Scope` uses the strongly typed `InstallerScope` enum:
+- `InstallerScope.PerMachineOrUser`: User chooses the installation scope in the wizard, defaulting to non-elevated per-user.
+- `InstallerScope.PerUser`: Enforces per-user installation and hides the selector.
+- `InstallerScope.PerMachine`: Enforces per-machine installation and hides the selector.
+
+The scope can also be overridden when building the WiX project with `-p:InstallerScope=perUser` or `-p:InstallerScope=perMachine`.
+The selector is disabled while a previous installation is detected, because Windows Installer keeps a product in the
+context it was first installed in. A silent installation of a `perMachineOrUser` package is per-user unless it is
+invoked with `msiexec /i <package>.msi ALLUSERS=1 /qn`.
+
+#### PATH registration
+
+`WindowsInstallerOptions.PathRegistration` uses the strongly typed `PathRegistration` enum:
+- `PathRegistration.None`: Disables PATH registration and hides the wizard option.
+- `PathRegistration.Register`: Always appends the installation directory to PATH and hides the option.
+- `PathRegistration.UserDefaultNo`: Shows an unchecked checkbox for the user during setup.
+- `PathRegistration.UserDefaultYes`: Shows a checked checkbox for the user during setup.
+
+Per-user installations update the current user's PATH, per-machine installations update the system PATH, and uninstall
+removes the installer-managed entry. Which of the two applies follows the installation context Windows Installer
+resolved, not the scope picked in the wizard, because a per-user installation cannot write the system PATH. The entry is
+the installation directory as Windows Installer resolves it, so it carries a trailing separator.
 
 Set `WindowsAuthenticodeCertificateThumbprint` to a SHA-1 certificate thumbprint to sign the staged application
 executable and final MSI. Fallout forwards `WindowsInstallerOptions.AuthenticodeTimestampUrl` (defaulting to DigiCert's RFC 3161 service)

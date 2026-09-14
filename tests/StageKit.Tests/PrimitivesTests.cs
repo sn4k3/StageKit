@@ -1220,6 +1220,17 @@ public sealed class PrimitivesTests
         Assert.Equal("folder/file.txt", PathUtilities.NormalizeArchiveEntryName(@"folder\file.txt"));
     }
 
+    [Fact]
+    public void PathUtilities_DownloadsDirectory_ResolvesValidPath()
+    {
+        var path = PathUtilities.DownloadsDirectoryPath;
+        Assert.False(string.IsNullOrWhiteSpace(path));
+        Assert.True(Path.IsPathRooted(path));
+        Assert.Equal(path, PathUtilities.GetDownloadsDirectory());
+        Assert.True(PathUtilities.TryGetDownloadsDirectory(out var tryPath));
+        Assert.Equal(path, tryPath);
+    }
+
     [Theory]
     [InlineData("asset.zip", true)]
     [InlineData("", false)]

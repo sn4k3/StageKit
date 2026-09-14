@@ -184,6 +184,58 @@ public static partial class HostSystem
         return StartAsync(CreateShowExistingFileStartInfo(filePath), cancellationToken);
     }
 
+    /// <summary>
+    /// Opens an interactive terminal window at the specified working directory, or the current directory if omitted.
+    /// </summary>
+    /// <param name="workingDirectory">The initial working directory, or <see langword="null"/> to use the current directory.</param>
+    /// <returns><see langword="true"/> if the terminal window was started; otherwise, <see langword="false"/>.</returns>
+    public static bool OpenTerminal(string? workingDirectory = null)
+    {
+        return Start(CreateOpenTerminalStartInfo(workingDirectory));
+    }
+
+    /// <summary>
+    /// Asynchronously opens an interactive terminal window at the specified working directory, or the current directory if omitted.
+    /// </summary>
+    /// <param name="workingDirectory">The initial working directory, or <see langword="null"/> to use the current directory.</param>
+    /// <param name="cancellationToken">The token used to cancel the request before it starts.</param>
+    /// <returns>A task containing <see langword="true"/> if the terminal window was started; otherwise, <see langword="false"/>.</returns>
+    public static Task<bool> OpenTerminalAsync(string? workingDirectory = null, CancellationToken cancellationToken = default)
+    {
+        return StartAsync(CreateOpenTerminalStartInfo(workingDirectory), cancellationToken);
+    }
+
+    /// <summary>
+    /// Opens an interactive terminal window and runs the specified command or script.
+    /// </summary>
+    /// <param name="command">The command line to run in the terminal.</param>
+    /// <param name="workingDirectory">The initial working directory, or <see langword="null"/> to use the current directory.</param>
+    /// <param name="keepOpen"><see langword="true"/> to keep the terminal window open after the command exits; otherwise, <see langword="false"/>.</param>
+    /// <returns><see langword="true"/> if the terminal window was started; otherwise, <see langword="false"/>.</returns>
+    public static bool OpenInTerminal(string command, string? workingDirectory = null, bool keepOpen = true)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(command);
+        return Start(CreateOpenInTerminalStartInfo(command, workingDirectory, keepOpen));
+    }
+
+    /// <summary>
+    /// Asynchronously opens an interactive terminal window and runs the specified command or script.
+    /// </summary>
+    /// <param name="command">The command line to run in the terminal.</param>
+    /// <param name="workingDirectory">The initial working directory, or <see langword="null"/> to use the current directory.</param>
+    /// <param name="keepOpen"><see langword="true"/> to keep the terminal window open after the command exits; otherwise, <see langword="false"/>.</param>
+    /// <param name="cancellationToken">The token used to cancel the request before it starts.</param>
+    /// <returns>A task containing <see langword="true"/> if the terminal window was started; otherwise, <see langword="false"/>.</returns>
+    public static Task<bool> OpenInTerminalAsync(
+        string command,
+        string? workingDirectory = null,
+        bool keepOpen = true,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(command);
+        return StartAsync(CreateOpenInTerminalStartInfo(command, workingDirectory, keepOpen), cancellationToken);
+    }
+
     internal static ProcessStartInfo? CreateOpenTargetStartInfo(string target)
     {
         if (OperatingSystem.IsWindows())
@@ -222,6 +274,176 @@ public static partial class HostSystem
         return OperatingSystem.IsLinux() && directoryPath is not null
             ? CreateLauncherStartInfo("xdg-open", directoryPath)
             : null;
+    }
+
+    internal static ProcessStartInfo? CreateOpenTerminalStartInfo(string? workingDirectory = null)
+    {
+        string? resolvedDir = null;
+        if (!string.IsNullOrWhiteSpace(workingDirectory))
+        {
+            if (!Directory.Exists(workingDirectory))
+                return null;
+
+            try
+            {
+                resolvedDir = Path.GetFullPath(workingDirectory);
+            }
+            catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException or NotSupportedException)
+            {
+                return null;
+            }
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            if (TryFindExecutable("wt.exe", out var wtPath))
+            {
+                var psi = new ProcessStartInfo(wtPath) { UseShellExecute = true };
+                if (resolvedDir is not null)
+                    psi.Arguments = $"-d \"{resolvedDir}\"";
+                return psi;
+            }
+
+            var cmdPsi = new ProcessStartInfo("cmd.exe") { UseShellExecute = true };
+            if (resolvedDir is not null)
+            {
+                cmdPsi.WorkingDirectory = resolvedDir;
+                cmdPsi.Arguments = $"/k \"cd /d \"\"{resolvedDir}\"\"\"";
+            }
+            return cmdPsi;
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            return resolvedDir is not null
+                ? CreateLauncherStartInfo("/usr/bin/open", "-a", "Terminal", resolvedDir)
+                : CreateLauncherStartInfo("/usr/bin/open", "-a", "Terminal");
+        }
+
+        if (OperatingSystem.IsLinux())
+        {
+            var terminal = ResolveLinuxTerminalExecutable();
+            if (terminal is null) return null;
+
+            var fileName = Path.GetFileName(terminal);
+            if (fileName.Equals("gnome-terminal", StringComparison.OrdinalIgnoreCase) ||
+                fileName.Equals("xfce4-terminal", StringComparison.OrdinalIgnoreCase))
+            {
+                return resolvedDir is not null
+                    ? CreateLauncherStartInfo(terminal, $"--working-directory={resolvedDir}")
+                    : CreateLauncherStartInfo(terminal);
+            }
+
+            if (fileName.Equals("konsole", StringComparison.OrdinalIgnoreCase))
+            {
+                return resolvedDir is not null
+                    ? CreateLauncherStartInfo(terminal, "--workdir", resolvedDir)
+                    : CreateLauncherStartInfo(terminal);
+            }
+
+            var startInfo = CreateLauncherStartInfo(terminal);
+            if (resolvedDir is not null)
+                startInfo.WorkingDirectory = resolvedDir;
+            return startInfo;
+        }
+
+        return null;
+    }
+
+    internal static ProcessStartInfo? CreateOpenInTerminalStartInfo(
+        string command,
+        string? workingDirectory = null,
+        bool keepOpen = true)
+    {
+        if (string.IsNullOrWhiteSpace(command))
+            return null;
+
+        string? resolvedDir = null;
+        if (!string.IsNullOrWhiteSpace(workingDirectory))
+        {
+            if (!Directory.Exists(workingDirectory))
+                return null;
+
+            try
+            {
+                resolvedDir = Path.GetFullPath(workingDirectory);
+            }
+            catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException or NotSupportedException)
+            {
+                return null;
+            }
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            var flag = keepOpen ? "/k" : "/c";
+            if (TryFindExecutable("wt.exe", out var wtPath))
+            {
+                var dirArg = resolvedDir is not null ? $"-d \"{resolvedDir}\" " : string.Empty;
+                return new ProcessStartInfo(wtPath, $"{dirArg}cmd.exe {flag} {command}") { UseShellExecute = true };
+            }
+
+            var psi = new ProcessStartInfo("cmd.exe", $"{flag} {command}") { UseShellExecute = true };
+            if (resolvedDir is not null)
+                psi.WorkingDirectory = resolvedDir;
+            return psi;
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            var fullCommand = resolvedDir is not null
+                ? $"cd '{resolvedDir.Replace("'", "'\\''")}' && {command}"
+                : command;
+            if (!keepOpen)
+                fullCommand += "; exit";
+
+            var escaped = fullCommand.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            return CreateLauncherStartInfo("/usr/bin/osascript",
+                "-e", $"tell application \"Terminal\" to do script \"{escaped}\"",
+                "-e", "tell application \"Terminal\" to activate");
+        }
+
+        if (OperatingSystem.IsLinux())
+        {
+            var terminal = ResolveLinuxTerminalExecutable();
+            if (terminal is null) return null;
+
+            var fileName = Path.GetFileName(terminal);
+            var shellCmd = keepOpen ? $"{command}; exec bash" : command;
+
+            if (fileName.Equals("gnome-terminal", StringComparison.OrdinalIgnoreCase) ||
+                fileName.Equals("xfce4-terminal", StringComparison.OrdinalIgnoreCase))
+            {
+                return resolvedDir is not null
+                    ? CreateLauncherStartInfo(terminal, $"--working-directory={resolvedDir}", "--", "bash", "-c", shellCmd)
+                    : CreateLauncherStartInfo(terminal, "--", "bash", "-c", shellCmd);
+            }
+
+            if (fileName.Equals("konsole", StringComparison.OrdinalIgnoreCase))
+            {
+                return resolvedDir is not null
+                    ? CreateLauncherStartInfo(terminal, "--workdir", resolvedDir, "-e", "bash", "-c", shellCmd)
+                    : CreateLauncherStartInfo(terminal, "-e", "bash", "-c", shellCmd);
+            }
+
+            var fallbackStartInfo = CreateLauncherStartInfo(terminal, "-e", $"bash -c \"{shellCmd}\"");
+            if (resolvedDir is not null)
+                fallbackStartInfo.WorkingDirectory = resolvedDir;
+            return fallbackStartInfo;
+        }
+
+        return null;
+    }
+
+    private static string? ResolveLinuxTerminalExecutable()
+    {
+        ReadOnlySpan<string> candidates = ["x-terminal-emulator", "gnome-terminal", "konsole", "xfce4-terminal", "xterm"];
+        foreach (var candidate in candidates)
+        {
+            if (TryFindExecutable(candidate, out var found))
+                return found;
+        }
+        return null;
     }
 
     /// <summary>

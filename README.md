@@ -73,6 +73,11 @@ curl -fsSL https://raw.githubusercontent.com/sn4k3/StageKit/refs/heads/main/scri
 - Dependency-light primitives package for atomic file writes, host URL/file-manager launching, and disposable/resource
   helpers
 - Cross-platform host memory snapshots through `HostSystem.GetMemoryStatus()` and `TryGetMemoryStatus(out var memory)`
+- Cross-platform sleep prevention and battery/power status snapshots through `HostSystem.PreventSleep()` and `HostPowerStatus`
+- Host theme detection for dark mode and accessibility high contrast through `HostSystem.IsDarkMode` and `HostSystem.IsHighContrast`
+- Cross-platform drive capacity and free disk space queries through `HostSystem.GetAvailableFreeSpace()`, `HostSystem.GetDiskStatus()`, and `HostDiskStatus`
+- Interactive terminal window launching through `HostSystem.OpenTerminal()` and `HostSystem.OpenInTerminal()`
+- Standard Downloads directory resolution through `PathUtilities.DownloadsDirectoryPath`
 - First-run and onboarding state persistence
 - Serializable crash reports with exception chains, stack traces, runtime information, and process stats
 - AppDomain and task scheduler unhandled exception helpers
@@ -81,7 +86,8 @@ curl -fsSL https://raw.githubusercontent.com/sn4k3/StageKit/refs/heads/main/scri
 - Portable profile path parsing with `ApplicationKit.IsPortable` state
 - Small application "birthday" helpers for version/about screens
 - GitHub release discovery, secure asset downloads, and staged cross-platform application updates
-- Reusable build pipeline that publishes and bundles applications for Windows, Linux, and macOS, and generates Bash and
+- Reusable build pipeline that publishes and bundles applications for Windows, Linux, and macOS (with unified file
+  associations, strongly-typed WiX installer options, and notarized macOS bundles), and generates Bash and
   Windows PowerShell GitHub Releases installation scripts from the selected package formats
 
 ## Repository Layout
