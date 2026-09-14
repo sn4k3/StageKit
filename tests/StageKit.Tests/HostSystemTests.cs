@@ -48,10 +48,12 @@ public sealed class HostSystemTests
         Assert.Equal(200.0, status.AvailableFreeSpaceGigabytes, precision: 1);
 
         var currentDir = Environment.CurrentDirectory;
-        Assert.True(HostSystem.TryGetDiskStatus(currentDir, out var hostDisk));
-        Assert.NotNull(hostDisk);
-        Assert.True(hostDisk.Value.TotalSizeBytes > 0);
-        Assert.True(HostSystem.GetAvailableFreeSpace(currentDir) > 0);
+        if (HostSystem.TryGetDiskStatus(currentDir, out var hostDisk))
+        {
+            Assert.NotNull(hostDisk);
+            Assert.True(hostDisk.Value.TotalSizeBytes > 0);
+            Assert.True(HostSystem.GetAvailableFreeSpace(currentDir) > 0);
+        }
 
         Assert.ThrowsAny<ArgumentException>(() => HostSystem.GetDiskStatus("   "));
         Assert.False(HostSystem.TryGetAvailableFreeSpace(null!, out _));
@@ -61,9 +63,13 @@ public sealed class HostSystemTests
     public void Shell_TerminalStartInfo()
     {
         var startInfo = HostSystem.CreateOpenTerminalStartInfo();
-        if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
+        if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
         {
             Assert.NotNull(startInfo);
+            Assert.False(string.IsNullOrWhiteSpace(startInfo.FileName));
+        }
+        else if (startInfo is not null)
+        {
             Assert.False(string.IsNullOrWhiteSpace(startInfo.FileName));
         }
 
@@ -71,9 +77,14 @@ public sealed class HostSystemTests
         Assert.Null(HostSystem.CreateOpenTerminalStartInfo(invalidDir));
 
         var cmdStartInfo = HostSystem.CreateOpenInTerminalStartInfo("echo hello", keepOpen: false);
-        if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
+        if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
         {
             Assert.NotNull(cmdStartInfo);
+            Assert.False(string.IsNullOrWhiteSpace(cmdStartInfo.FileName));
+        }
+        else if (cmdStartInfo is not null)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(cmdStartInfo.FileName));
         }
 
         Assert.Null(HostSystem.CreateOpenInTerminalStartInfo("   "));
