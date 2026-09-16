@@ -518,7 +518,6 @@ internal static class WindowsInstallScript
                                         return
                                     }
 
-                                    Show-Header
                                     if ($ResolvedArguments.Action -eq 'list') {
                                         Show-AvailableVersions
                                         return

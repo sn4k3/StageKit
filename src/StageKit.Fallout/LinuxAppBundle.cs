@@ -123,21 +123,15 @@ public static partial class LinuxAppBundle
             new XElement("categories", options.Categories.Select(category => new XElement("category", category))),
             new XElement("supports", options.Controls.Select(control => new XElement("control", control))));
 
-        if (options.MinimumDisplayLength is not null)
+        if (options.MinimumDisplayLength > 0)
         {
-            if (options.MinimumDisplayLength <= 0)
-            {
-                throw new ArgumentException("The minimum display length must be greater than zero.",
-                    nameof(options.MinimumDisplayLength));
-            }
-
             component.Add(
                 new XElement(
                     "recommends",
                     new XElement(
                         "display_length",
                         new XAttribute("compare", "ge"),
-                        options.MinimumDisplayLength.Value)));
+                        options.MinimumDisplayLength)));
         }
 
         component.Add(new XElement("launchable", new XAttribute("type", "desktop-id"),

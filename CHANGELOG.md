@@ -1,3 +1,9 @@
+# v0.4.1 (16/09/2026)
+
+- Make `LinuxAppBundleOptions.MinimumDisplayLength` non-nullable and omit the AppStream display-length recommendation
+  when its value is zero or negative
+- Stop generated install and uninstall script runs from printing help headers unless help is explicitly requested
+
 # v0.4.0 (13/09/2026)
 
 - Add `HostSystem.IsDarkMode` and `HostSystem.IsHighContrast` for detecting operating-system dark theme and accessibility

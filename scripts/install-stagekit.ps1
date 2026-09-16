@@ -442,7 +442,6 @@ if ($ResolvedArguments.Action -eq 'help') {
     return
 }
 
-Show-Header
 if ($ResolvedArguments.Action -eq 'list') {
     Show-AvailableVersions
     return

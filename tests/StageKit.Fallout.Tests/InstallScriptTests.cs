@@ -70,6 +70,8 @@ public class InstallScriptTests
             [ApplicationPackagingType.LinuxDeb]);
 
         Assert.Contains("show_header()", script, StringComparison.Ordinal);
+        Assert.Contains("show_help() {\n  show_header", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("parse_arguments \"$@\"\nshow_header", script, StringComparison.Ordinal);
         Assert.Contains("Usage:", script, StringComparison.Ordinal);
         Assert.Contains("--help", script, StringComparison.Ordinal);
         Assert.Contains("--version VERSION", script, StringComparison.Ordinal);
@@ -299,6 +301,9 @@ public class InstallScriptTests
             [ApplicationPackagingType.WindowsInstaller]);
 
         Assert.Contains("function Show-Header", script, StringComparison.Ordinal);
+        Assert.Contains("function Show-Help {\r\n    Show-Header", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("    Show-Header\r\n    if ($ResolvedArguments.Action -eq 'list')", script,
+            StringComparison.Ordinal);
         Assert.Contains("Usage:", script, StringComparison.Ordinal);
         Assert.Contains("-Help", script, StringComparison.Ordinal);
         Assert.Contains("-Version VERSION", script, StringComparison.Ordinal);

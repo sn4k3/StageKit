@@ -183,8 +183,8 @@ public class LinuxAppBundleOptions
     /// <summary>
     /// Gets the minimum recommended display length in logical pixels.
     /// </summary>
-    /// <value>The minimum display length, or <see langword="null"/> to omit the recommendation.</value>
-    public int? MinimumDisplayLength { get; set; } = 760;
+    /// <value>The minimum display length, or a non-positive value to omit the recommendation. The default is 760.</value>
+    public int MinimumDisplayLength { get; set; } = 760;
 
     /// <summary>
     /// Gets the Flatpak runtime identifier.

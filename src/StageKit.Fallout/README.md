@@ -328,10 +328,10 @@ Run `GenerateInstallScript` to create `scripts/install-<software-name>.sh`,
 `scripts/uninstall-<software-name>.sh`, `scripts/install-<software-name>.ps1`, and
 `scripts/uninstall-<software-name>.ps1`. The target is independent of `Publish`, so it can describe packages produced by
 separate Windows, Linux, and macOS runners without trying to build them locally. A script is omitted when none of its
-supported formats are selected. Every installer run prints a command header, its help command shows detailed usage,
-`list` shows all published GitHub release versions, and `list-changelog` shows GitHub release notes for up to 20
-versions by default. Pass a different positive limit when needed. Install the latest version or select an older release
-to downgrade:
+supported formats are selected. The help command shows detailed usage without printing it during normal install or
+uninstall runs. `list` shows all published GitHub release versions, and `list-changelog` shows GitHub release notes for
+up to 20 versions by default. Pass a different positive limit when needed. Install the latest version or select an older
+release to downgrade:
 
 ```bash
 ./scripts/install-myapp.sh
@@ -424,7 +424,8 @@ Debian, RPM, and Arch Linux payloads install the application under `/usr/lib/<pa
 strict confinement, common desktop interfaces, and the `libicu74` stage package required by self-contained .NET apps;
 customize `DeveloperId`, `SnapBase`, `SnapConfinement`, `SnapPlugs`, or `SnapStagePackages` through
 `LinuxAppBundleOptions`. `DeveloperId` defaults to `CompanyRDNS` and identifies the publishing organization in AppStream
-metadata. Stage-package names are base-specific, so update `SnapStagePackages` when changing `SnapBase`. Native package
+metadata. `MinimumDisplayLength` defaults to 760 logical pixels; set it to zero or a negative value to omit the AppStream
+display-length recommendation. Stage-package names are base-specific, so update `SnapStagePackages` when changing `SnapBase`. Native package
 tools and the selected Flatpak/Snap runtime bases must already be available on the build host. Debian payloads are
 staged in the operating system's temporary directory so `dpkg-deb` receives valid Unix permissions even when the
 repository is on a Windows-mounted WSL path such as `/mnt/c` or `/mnt/d`.

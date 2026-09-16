@@ -127,6 +127,32 @@ public class LinuxAppBundleTests
         Assert.Equal("oars-1.0", document.Descendants("content_rating").Single().Attribute("type")?.Value);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void GetAppStreamMetadata_NonPositiveMinimumDisplayLength_OmitsRecommendation(int minimumDisplayLength)
+    {
+        var options = CreateOptions();
+        options.MinimumDisplayLength = minimumDisplayLength;
+
+        var document = XDocument.Parse(LinuxAppBundle.GetAppStreamMetadata(options));
+
+        Assert.Empty(document.Descendants("display_length"));
+    }
+
+    [Fact]
+    public void GetAppStreamMetadata_PositiveMinimumDisplayLength_WritesRecommendation()
+    {
+        var options = CreateOptions();
+        options.MinimumDisplayLength = 1024;
+
+        var document = XDocument.Parse(LinuxAppBundle.GetAppStreamMetadata(options));
+        var displayLength = document.Descendants("display_length").Single();
+
+        Assert.Equal("ge", displayLength.Attribute("compare")?.Value);
+        Assert.Equal("1024", displayLength.Value);
+    }
+
     [Fact]
     public void GetAppStreamMetadata_Authors_UsesDeveloperElement()
     {
