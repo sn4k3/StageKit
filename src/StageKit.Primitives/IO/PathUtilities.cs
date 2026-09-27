@@ -17,6 +17,12 @@ public static partial class PathUtilities
     public static string? DownloadsDirectoryPath => field ??= GetDownloadsDirectory();
 
     /// <summary>
+    /// Gets the string comparison used for file-system paths on the current platform.
+    /// </summary>
+    public static StringComparison PlatformPathComparison =>
+        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
+    /// <summary>
     /// Gets the path to the current user's Downloads directory, or <see langword="null"/> if it cannot be determined.
     /// </summary>
     /// <returns>The path to the Downloads directory, or <see langword="null"/> when unavailable.</returns>
@@ -44,7 +50,11 @@ public static partial class PathUtilities
         {
             try
             {
-                if (SHGetKnownFolderPath(in FolderIdDownloads, 0, IntPtr.Zero, out var ppszPath) == 0 && ppszPath != IntPtr.Zero)
+                if (
+                    SHGetKnownFolderPath(in FolderIdDownloads, 0, IntPtr.Zero, out var ppszPath)
+                        == 0
+                    && ppszPath != IntPtr.Zero
+                )
                 {
                     try
                     {
@@ -69,9 +79,12 @@ public static partial class PathUtilities
             try
             {
                 using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
-                    @"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders");
-                if (key?.GetValue("{374DE290-123F-4565-9164-39C4925E467B}") is string regPath &&
-                    !string.IsNullOrWhiteSpace(regPath))
+                    @"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders"
+                );
+                if (
+                    key?.GetValue("{374DE290-123F-4565-9164-39C4925E467B}") is string regPath
+                    && !string.IsNullOrWhiteSpace(regPath)
+                )
                 {
                     var expanded = Environment.ExpandEnvironmentVariables(regPath);
                     if (!string.IsNullOrWhiteSpace(expanded))
@@ -109,7 +122,9 @@ public static partial class PathUtilities
                             if (trimmed.StartsWith("XDG_DOWNLOAD_DIR=", StringComparison.Ordinal))
                             {
                                 var raw = trimmed["XDG_DOWNLOAD_DIR=".Length..].Trim('"', '\'');
-                                var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                                var home = Environment.GetFolderPath(
+                                    Environment.SpecialFolder.UserProfile
+                                );
                                 var resolved = raw.Replace("$HOME", home).Replace("${HOME}", home);
                                 if (!string.IsNullOrWhiteSpace(resolved))
                                 {
@@ -150,14 +165,8 @@ public static partial class PathUtilities
         in Guid rfid,
         uint dwFlags,
         IntPtr hToken,
-        out IntPtr ppszPath);
-
-    /// <summary>
-    /// Gets the string comparison used for file-system paths on the current platform.
-    /// </summary>
-    public static StringComparison PlatformPathComparison => OperatingSystem.IsWindows()
-        ? StringComparison.OrdinalIgnoreCase
-        : StringComparison.Ordinal;
+        out IntPtr ppszPath
+    );
 
     /// <summary>
     /// Determines whether a path is equal to or contained under the specified root path.
@@ -174,13 +183,15 @@ public static partial class PathUtilities
 
         var fullPath = Path.GetFullPath(path);
         var fullRoot = Path.GetFullPath(rootPath);
-        var rootWithSeparator = fullRoot.EndsWith(Path.DirectorySeparatorChar) ||
-                                fullRoot.EndsWith(Path.AltDirectorySeparatorChar)
-            ? fullRoot
-            : fullRoot + Path.DirectorySeparatorChar;
+        var rootWithSeparator =
+            fullRoot.EndsWith(Path.DirectorySeparatorChar)
+            || fullRoot.EndsWith(Path.AltDirectorySeparatorChar)
+                ? fullRoot
+                : fullRoot + Path.DirectorySeparatorChar;
 
-        var isWithinRoot = string.Equals(fullPath, fullRoot, PlatformPathComparison) ||
-                           fullPath.StartsWith(rootWithSeparator, PlatformPathComparison);
+        var isWithinRoot =
+            string.Equals(fullPath, fullRoot, PlatformPathComparison)
+            || fullPath.StartsWith(rootWithSeparator, PlatformPathComparison);
 
         return isWithinRoot && !ContainsReparsePoint(fullPath, fullRoot);
     }
@@ -205,23 +216,29 @@ public static partial class PathUtilities
     private static bool ContainsReparsePoint(string fullPath, string fullRoot)
     {
         var relativePath = Path.GetRelativePath(fullRoot, fullPath);
-        if (relativePath == ".") return false;
+        if (relativePath == ".")
+            return false;
 
         var currentPath = fullRoot;
         try
         {
             var rootInfo = new DirectoryInfo(currentPath);
-            if (rootInfo.Exists && rootInfo.Attributes.HasFlag(FileAttributes.ReparsePoint)) return true;
+            if (rootInfo.Exists && rootInfo.Attributes.HasFlag(FileAttributes.ReparsePoint))
+                return true;
         }
-        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or NotSupportedException)
+        catch (Exception ex)
+            when (ex is UnauthorizedAccessException or IOException or NotSupportedException)
         {
             // Failing closed avoids treating an uninspectable root as safe.
             return true;
         }
 
-        foreach (var segment in relativePath.Split(
-                     [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
-                     StringSplitOptions.RemoveEmptyEntries))
+        foreach (
+            var segment in relativePath.Split(
+                [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                StringSplitOptions.RemoveEmptyEntries
+            )
+        )
         {
             currentPath = Path.Combine(currentPath, segment);
 
@@ -230,14 +247,17 @@ public static partial class PathUtilities
                 var directoryInfo = new DirectoryInfo(currentPath);
                 if (directoryInfo.Exists)
                 {
-                    if (directoryInfo.Attributes.HasFlag(FileAttributes.ReparsePoint)) return true;
+                    if (directoryInfo.Attributes.HasFlag(FileAttributes.ReparsePoint))
+                        return true;
                     continue;
                 }
 
                 var fileInfo = new FileInfo(currentPath);
-                if (fileInfo.Exists && fileInfo.Attributes.HasFlag(FileAttributes.ReparsePoint)) return true;
+                if (fileInfo.Exists && fileInfo.Attributes.HasFlag(FileAttributes.ReparsePoint))
+                    return true;
             }
-            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or NotSupportedException)
+            catch (Exception ex)
+                when (ex is UnauthorizedAccessException or IOException or NotSupportedException)
             {
                 // Failing closed avoids treating an uninspectable path as safe.
                 return true;
@@ -254,9 +274,7 @@ public static partial class PathUtilities
     /// <returns>True if the path contains a directory separator character; otherwise, false.</returns>
     public static bool ContainsDirectorySeparator(string path)
     {
-        return path.IndexOfAny(
-            Path.DirectorySeparatorChar,
-            Path.AltDirectorySeparatorChar) >= 0;
+        return path.IndexOfAny(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) >= 0;
     }
 
     /// <summary>
@@ -265,7 +283,10 @@ public static partial class PathUtilities
     /// <param name="directoryPath">The directory path to validate.</param>
     /// <param name="fullDirectoryPath">The full directory path if valid.</param>
     /// <returns>True if the directory path is valid; otherwise, false.</returns>
-    public static bool TryGetValidFullDirectoryPath(string directoryPath, out string fullDirectoryPath)
+    public static bool TryGetValidFullDirectoryPath(
+        string directoryPath,
+        out string fullDirectoryPath
+    )
     {
         fullDirectoryPath = string.Empty;
 
@@ -279,12 +300,18 @@ public static partial class PathUtilities
             var invalidFileNameChars = Path.GetInvalidFileNameChars();
             var segments = pathWithoutRoot.Split(
                 [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
-                StringSplitOptions.RemoveEmptyEntries);
+                StringSplitOptions.RemoveEmptyEntries
+            );
 
             return segments.All(segment => segment.IndexOfAny(invalidFileNameChars) < 0);
         }
-        catch (Exception ex) when (ex is ArgumentException or IOException or NotSupportedException
-                                       or PathTooLongException)
+        catch (Exception ex)
+            when (ex
+                    is ArgumentException
+                        or IOException
+                        or NotSupportedException
+                        or PathTooLongException
+            )
         {
             return false;
         }
@@ -296,15 +323,22 @@ public static partial class PathUtilities
     /// <param name="directoryPath">The directory path to check.</param>
     /// <param name="fullDirectoryPath">The full directory path if valid.</param>
     /// <returns>True if the directory path is writable or can be created; otherwise, false.</returns>
-    public static bool IsWritableOrCreatableDirectory(string directoryPath, out string fullDirectoryPath)
+    public static bool IsWritableOrCreatableDirectory(
+        string directoryPath,
+        out string fullDirectoryPath
+    )
     {
         fullDirectoryPath = string.Empty;
-        if (!TryGetValidFullDirectoryPath(directoryPath, out fullDirectoryPath)) return false;
-        if (File.Exists(fullDirectoryPath)) return false;
-        if (Directory.Exists(fullDirectoryPath)) return IsWritableDirectory(fullDirectoryPath);
+        if (!TryGetValidFullDirectoryPath(directoryPath, out fullDirectoryPath))
+            return false;
+        if (File.Exists(fullDirectoryPath))
+            return false;
+        if (Directory.Exists(fullDirectoryPath))
+            return IsWritableDirectory(fullDirectoryPath);
 
         var parent = Directory.GetParent(fullDirectoryPath);
-        while (parent is not null && !Directory.Exists(parent.FullName)) parent = parent.Parent;
+        while (parent is not null && !Directory.Exists(parent.FullName))
+            parent = parent.Parent;
 
         return parent is not null && IsWritableDirectory(parent.FullName);
     }
@@ -318,20 +352,29 @@ public static partial class PathUtilities
     {
         try
         {
-            var probePath = Path.Combine(directoryPath, $".stagekit-write-test-{Guid.NewGuid():N}.tmp");
+            var probePath = Path.Combine(
+                directoryPath,
+                $".stagekit-write-test-{Guid.NewGuid():N}.tmp"
+            );
             using var probe = new FileStream(
                 probePath,
                 FileMode.CreateNew,
                 FileAccess.Write,
                 FileShare.None,
                 1,
-                FileOptions.DeleteOnClose);
+                FileOptions.DeleteOnClose
+            );
 
             probe.WriteByte(0);
             return true;
         }
-        catch (Exception ex) when (ex is ArgumentException or IOException or NotSupportedException
-                                       or UnauthorizedAccessException)
+        catch (Exception ex)
+            when (ex
+                    is ArgumentException
+                        or IOException
+                        or NotSupportedException
+                        or UnauthorizedAccessException
+            )
         {
             return false;
         }
@@ -345,20 +388,44 @@ public static partial class PathUtilities
     /// <returns>True if the paths are the same; otherwise, false.</returns>
     public static bool IsSamePath(string? path1, string? path2)
     {
-        if (path1 is null && path2 is null) return true;
-        if (path1 is null || path2 is null) return false;
+        if (path1 is null && path2 is null)
+            return true;
+        if (path1 is null || path2 is null)
+            return false;
 
         try
         {
-            return string.Equals(Path.GetFullPath(path1), Path.GetFullPath(path2),
-                HostSystem.HostStringComparison);
+            return string.Equals(
+                Path.GetFullPath(path1),
+                Path.GetFullPath(path2),
+                HostSystem.HostStringComparison
+            );
         }
-        catch (Exception ex) when (ex is ArgumentException or IOException or NotSupportedException
-                                       or UnauthorizedAccessException)
+        catch (Exception ex)
+            when (ex
+                    is ArgumentException
+                        or IOException
+                        or NotSupportedException
+                        or UnauthorizedAccessException
+            )
         {
             // Ignored
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Redacts the user's home folder in paths with <c>~</c> for display purposes.
+    /// </summary>
+    /// <param name="text">The text containing paths to redact.</param>
+    /// <param name="replacement">The string to replace the user's home folder with.</param>
+    /// <returns>The text with the user's home folder redacted.</returns>
+    public static string RedactUserPath(string text, string replacement = "~")
+    {
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        return string.IsNullOrEmpty(home)
+            ? text
+            : text.Replace(home, replacement, HostSystem.HostStringComparison);
     }
 }

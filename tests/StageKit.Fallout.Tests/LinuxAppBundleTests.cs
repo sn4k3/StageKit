@@ -50,9 +50,12 @@ public class LinuxAppBundleTests
         Assert.Contains("Icon=example-icon", desktopEntry, StringComparison.Ordinal);
         Assert.Contains("Exec=\"Example Tool\" %F", desktopEntry, StringComparison.Ordinal);
         Assert.Contains("Terminal=true", desktopEntry, StringComparison.Ordinal);
-        Assert.Contains("SingleMainWindow=true", desktopEntry, StringComparison.Ordinal);
-        Assert.Contains("MimeType=x-scheme-handler/stagekit;x-scheme-handler/custom;", desktopEntry,
-            StringComparison.Ordinal);
+        Assert.DoesNotContain("SingleMainWindow=", desktopEntry, StringComparison.Ordinal);
+        Assert.Contains(
+            "MimeType=x-scheme-handler/stagekit;x-scheme-handler/custom;",
+            desktopEntry,
+            StringComparison.Ordinal
+        );
         Assert.Contains("StartupWMClass=stagekit-main", desktopEntry, StringComparison.Ordinal);
         Assert.Contains("StartupNotify=true", desktopEntry, StringComparison.Ordinal);
         Assert.Contains("PrefersNonDefaultGPU=true", desktopEntry, StringComparison.Ordinal);
@@ -75,16 +78,17 @@ public class LinuxAppBundleTests
     {
         var options = CreateOptions();
         options.ExtraDesktopEntry = """
-                                    StartupNotify=true
-                                    X-GNOME-UsesNotifications=true
-                                    """;
+            StartupNotify=true
+            X-GNOME-UsesNotifications=true
+            """;
 
         var desktopEntry = LinuxAppBundle.GetDesktopEntry(options);
 
         Assert.Contains(
-            "SingleMainWindow=true\nStartupNotify=true\nX-GNOME-UsesNotifications=true",
+            "Terminal=false\nStartupNotify=true\nX-GNOME-UsesNotifications=true",
             desktopEntry,
-            StringComparison.Ordinal);
+            StringComparison.Ordinal
+        );
     }
 
     [Fact]
@@ -92,9 +96,9 @@ public class LinuxAppBundleTests
     {
         var options = CreateOptions();
         options.AppRunScriptBeforeExec = """
-                                         export EXAMPLE_MODE="portable"
-                                         echo "Starting ${HERE}"
-                                         """;
+            export EXAMPLE_MODE="portable"
+            echo "Starting ${HERE}"
+            """;
 
         var script = LinuxAppBundle.GetAppRunScript(options);
         var customCodeIndex = script.IndexOf("export EXAMPLE_MODE", StringComparison.Ordinal);
@@ -105,7 +109,8 @@ public class LinuxAppBundleTests
         Assert.Contains(
             "export EXAMPLE_MODE=\"portable\"\necho \"Starting ${HERE}\"\n\nexec",
             script,
-            StringComparison.Ordinal);
+            StringComparison.Ordinal
+        );
     }
 
     [Fact]
@@ -116,7 +121,10 @@ public class LinuxAppBundleTests
 
         var document = XDocument.Parse(LinuxAppBundle.GetAppStreamMetadata(options));
 
-        Assert.Equal("oars-1.1", document.Descendants("content_rating").Single().Attribute("type")?.Value);
+        Assert.Equal(
+            "oars-1.1",
+            document.Descendants("content_rating").Single().Attribute("type")?.Value
+        );
     }
 
     [Fact]
@@ -124,7 +132,10 @@ public class LinuxAppBundleTests
     {
         var document = XDocument.Parse(LinuxAppBundle.GetAppStreamMetadata(CreateOptions()));
 
-        Assert.Equal("oars-1.0", document.Descendants("content_rating").Single().Attribute("type")?.Value);
+        Assert.Equal(
+            "oars-1.0",
+            document.Descendants("content_rating").Single().Attribute("type")?.Value
+        );
     }
 
     [Fact]
@@ -143,12 +154,13 @@ public class LinuxAppBundleTests
     {
         var options = CreateOptions();
         options.ProductName = "Example & Tool";
-        options.Summary = "A summary that spans\nmultiple lines and remains concise for an application store listing.";
+        options.Summary =
+            "A summary that spans\nmultiple lines and remains concise for an application store listing.";
         options.Description = "Creates <portable> bundles & metadata.";
         options.ScreenshotUrls =
         [
             "https://example.com/screens/main.png?size=large&theme=dark",
-            "https://example.com/screens/options.png"
+            "https://example.com/screens/options.png",
         ];
         options.UpdateContact = "maintainer@example.com";
 
@@ -156,17 +168,31 @@ public class LinuxAppBundleTests
         var document = XDocument.Parse(metadata);
         var screenshotElements = document.Descendants("screenshot").ToArray();
 
-        Assert.StartsWith("<?xml version=\"1.0\" encoding=\"UTF-8\"?>", metadata, StringComparison.Ordinal);
+        Assert.StartsWith(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+            metadata,
+            StringComparison.Ordinal
+        );
         Assert.Equal("Example & Tool", document.Root?.Element("name")?.Value);
-        Assert.Equal("Creates <portable> bundles & metadata.",
-            document.Descendants("description").Single().Element("p")?.Value);
-        Assert.Equal("maintainer@example.com", document.Descendants("update_contact").Single().Value);
+        Assert.Equal(
+            "Creates <portable> bundles & metadata.",
+            document.Descendants("description").Single().Element("p")?.Value
+        );
+        Assert.Equal(
+            "maintainer@example.com",
+            document.Descendants("update_contact").Single().Value
+        );
         Assert.Equal(2, screenshotElements.Length);
         Assert.Equal("default", screenshotElements[0].Attribute("type")?.Value);
-        Assert.Equal("https://example.com/screens/main.png?size=large&theme=dark",
-            screenshotElements[0].Element("image")?.Value);
+        Assert.Equal(
+            "https://example.com/screens/main.png?size=large&theme=dark",
+            screenshotElements[0].Element("image")?.Value
+        );
         Assert.Null(screenshotElements[1].Attribute("type"));
-        Assert.Equal("https://example.com/screens/options.png", screenshotElements[1].Element("image")?.Value);
+        Assert.Equal(
+            "https://example.com/screens/options.png",
+            screenshotElements[1].Element("image")?.Value
+        );
         Assert.DoesNotContain('\n', document.Descendants("summary").Single().Value);
         Assert.True(document.Descendants("summary").Single().Value.Length <= 78);
         Assert.False(document.Descendants("summary").Single().Value.EndsWith('.'));
@@ -215,7 +241,11 @@ public class LinuxAppBundleTests
 
         var manifest = LinuxAppBundle.GetFlatpakManifest(options);
 
-        Assert.Contains("  - '--talk-name=org.freedesktop.Flatpak'", manifest, StringComparison.Ordinal);
+        Assert.Contains(
+            "  - '--talk-name=org.freedesktop.Flatpak'",
+            manifest,
+            StringComparison.Ordinal
+        );
     }
 
     [Fact]
@@ -235,7 +265,11 @@ public class LinuxAppBundleTests
     {
         var manifest = LinuxAppBundle.GetFlatpakManifest(CreateOptions());
 
-        Assert.DoesNotContain("--talk-name=org.freedesktop.Flatpak", manifest, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "--talk-name=org.freedesktop.Flatpak",
+            manifest,
+            StringComparison.Ordinal
+        );
     }
 
     [Fact]
@@ -254,7 +288,8 @@ public class LinuxAppBundleTests
     public void GetDesktopEntry_MissingRequiredValue_ThrowsArgumentException(
         string productName,
         string applicationId,
-        string executableName)
+        string executableName
+    )
     {
         var options = CreateOptions();
         options.ProductName = productName;
@@ -268,7 +303,9 @@ public class LinuxAppBundleTests
     public void GetDesktopEntry_WithFileAssociations_ProducesMimeTypeAndExecArgument()
     {
         var options = CreateOptions();
-        options.FileAssociations.Add(new FileAssociation([".sl1", "*.sl1s"], "StageKit Model", "application/x-sl1"));
+        options.FileAssociations.Add(
+            new FileAssociation([".sl1", "*.sl1s"], "StageKit Model", "application/x-sl1")
+        );
         options.FileAssociations.Add(new FileAssociation(".zip", "ZIP Archive", "application/zip"));
 
         var desktopEntry = LinuxAppBundle.GetDesktopEntry(options);
@@ -283,7 +320,9 @@ public class LinuxAppBundleTests
     public void GetAppStreamMetadata_WithFileAssociations_ProducesMediaTypeElements()
     {
         var options = CreateOptions();
-        options.FileAssociations.Add(new FileAssociation(".sl1", "StageKit Model", "application/x-sl1"));
+        options.FileAssociations.Add(
+            new FileAssociation(".sl1", "StageKit Model", "application/x-sl1")
+        );
 
         var metadata = LinuxAppBundle.GetAppStreamMetadata(options);
         var document = XDocument.Parse(metadata);
@@ -306,7 +345,7 @@ public class LinuxAppBundleTests
             License = "MIT",
             RepositoryUrl = "https://example.com/project",
             DeveloperId = "org.example",
-            Authors = "Example Authors"
+            Authors = "Example Authors",
         };
     }
 }

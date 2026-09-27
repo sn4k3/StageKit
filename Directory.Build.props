@@ -1,76 +1,101 @@
 <Project>
-    <PropertyGroup>
-        <!-- Project -->
-        <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-        <LangVersion>latest</LangVersion>
-        <Nullable>enable</Nullable>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-        <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
+  <PropertyGroup>
+    <!-- Project -->
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
 
-        <!-- Metadata -->
-        <RepositoryName Condition="'$(RepositoryName)' == '' And $([System.IO.Directory]::GetFiles('$(MSBuildThisFileDirectory)', '*.sln').Length) &gt; 0">$([System.IO.Path]::GetFileNameWithoutExtension($([System.IO.Directory]::GetFiles('$(MSBuildThisFileDirectory)', '*.sln')[0])))</RepositoryName>
-        <RepositoryName Condition="'$(RepositoryName)' == '' And $([System.IO.Directory]::GetFiles('$(MSBuildThisFileDirectory)', '*.slnx').Length) &gt; 0">$([System.IO.Path]::GetFileNameWithoutExtension($([System.IO.Directory]::GetFiles('$(MSBuildThisFileDirectory)', '*.slnx')[0])))</RepositoryName>
-        <RepositoryName Condition="'$(RepositoryName)' == ''">$([System.IO.Path]::GetFileNameWithoutExtension($(MSBuildThisFileDirectory)))</RepositoryName>
+    <!-- Metadata -->
+    <RepositoryName
+      Condition="'$(RepositoryName)' == '' And $([System.IO.Directory]::GetFiles('$(MSBuildThisFileDirectory)', '*.sln').Length) &gt; 0"
+      >$([System.IO.Path]::GetFileNameWithoutExtension($([System.IO.Directory]::GetFiles('$(MSBuildThisFileDirectory)', '*.sln')[0])))
+        </RepositoryName>
+    <RepositoryName
+      Condition="'$(RepositoryName)' == '' And $([System.IO.Directory]::GetFiles('$(MSBuildThisFileDirectory)', '*.slnx').Length) &gt; 0"
+      >$([System.IO.Path]::GetFileNameWithoutExtension($([System.IO.Directory]::GetFiles('$(MSBuildThisFileDirectory)', '*.slnx')[0])))
+        </RepositoryName>
+    <RepositoryName Condition="'$(RepositoryName)' == ''"
+      >$([System.IO.Path]::GetFileNameWithoutExtension($(MSBuildThisFileDirectory)))
+        </RepositoryName>
 
-        <Company>PTRTECH</Company>
-        <CompanyRDNS>pt.ptrtech</CompanyRDNS>
-        <Authors>Tiago Conceição</Authors>
-        <Copyright>Copyright 2026-$([System.DateTime]::Now.ToString(`yyyy`)) © PTRTECH</Copyright>
-        <Description>StageKit repository project.</Description>
-        <Version>0.4.0</Version>
+    <Company>PTRTECH</Company>
+    <CompanyRDNS>pt.ptrtech</CompanyRDNS>
+    <Authors>Tiago Conceição</Authors>
+    <Copyright>Copyright 2026-$([System.DateTime]::Now.ToString(`yyyy`)) © PTRTECH</Copyright>
+    <Description>StageKit repository project.</Description>
+    <Version>0.4.1</Version>
 
-        <!-- Package -->
-        <ApplicationIcon>$(MSBuildThisFileDirectory)media\$(RepositoryName).ico</ApplicationIcon>
-        <PackageIcon>$(RepositoryName)_128.png</PackageIcon>
-        <PackageReadmeFile>README.md</PackageReadmeFile>
-        <PackageLicenseExpression>MIT</PackageLicenseExpression>
-        <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-        <EnablePackageValidation>true</EnablePackageValidation>
-        <RepositoryType>Git</RepositoryType>
-        <PublishRepositoryUrl>true</PublishRepositoryUrl>
-        <RepositoryUrl>https://github.com/sn4k3/StageKit</RepositoryUrl>
-        <PackageProjectUrl>$(RepositoryUrl)</PackageProjectUrl>
-        <PackageReleaseNotes>$(RepositoryUrl)/releases</PackageReleaseNotes>
-        <PackageTags>stagekit;application-toolkit;settings;autosave;backup;support-bundle;retention;single-instance;crash-reporting;exception-handling</PackageTags>
-        <EmbedUntrackedSources>true</EmbedUntrackedSources>
-        <IncludeSymbols>true</IncludeSymbols>
-        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <!-- Package -->
+    <ApplicationIcon>$(MSBuildThisFileDirectory)media\$(RepositoryName).ico</ApplicationIcon>
+    <PackageIcon>$(RepositoryName)_128.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <EnablePackageValidation>true</EnablePackageValidation>
+    <RepositoryType>Git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <RepositoryUrl>https://github.com/sn4k3/StageKit</RepositoryUrl>
+    <PackageProjectUrl>$(RepositoryUrl)</PackageProjectUrl>
+    <PackageReleaseNotes>$(RepositoryUrl)/releases</PackageReleaseNotes>
+    <PackageTags>stagekit;application-toolkit;settings;autosave;backup;support-bundle;retention;single-instance;crash-reporting;exception-handling</PackageTags>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
 
-        <!-- Set the path map and artifacts path. -->
-        <PathMap>$(MSBuildProjectDirectory)=$(MSBuildProjectName)</PathMap>
-        <ArtifactsPath>$(MSBuildThisFileDirectory)artifacts</ArtifactsPath>
-        <CommonPublishDir>$(ArtifactsPath)\publish</CommonPublishDir>
+    <!-- Set the path map and artifacts path. -->
+    <PathMap>$(MSBuildProjectDirectory)=$(MSBuildProjectName)</PathMap>
+    <ArtifactsPath>$(MSBuildThisFileDirectory)artifacts</ArtifactsPath>
+    <CommonPublishDir>$(ArtifactsPath)\publish</CommonPublishDir>
 
-        <!-- Enable Build Acceleration in Visual Studio. -->
-        <AccelerateBuildsInVisualStudio>true</AccelerateBuildsInVisualStudio>
+    <!-- Enable Build Acceleration in Visual Studio. -->
+    <AccelerateBuildsInVisualStudio>true</AccelerateBuildsInVisualStudio>
 
-        <!-- Sign -->
-        <SignAssembly>True</SignAssembly>
-        <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)$(RepositoryName).snk</AssemblyOriginatorKeyFile>
+    <!-- Sign -->
+    <SignAssembly>True</SignAssembly>
+    <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)$(RepositoryName).snk</AssemblyOriginatorKeyFile>
 
-        <!-- No pack under Debug -->
-        <IsPackable Condition="'$(Configuration)' == 'Debug'">false</IsPackable>
+    <!-- No pack under Debug -->
+    <IsPackable Condition="'$(Configuration)' == 'Debug'">false</IsPackable>
 
-        <!-- ContinuousIntegrationBuild -->
-        <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
-        <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
-    </PropertyGroup>
+    <!-- ContinuousIntegrationBuild -->
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'"
+      >true
+        </ContinuousIntegrationBuild>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
 
-    <ItemGroup>
-        <None Include="$(MSBuildThisFileDirectory)media\$(RepositoryName)_128.png" Pack="true" PackagePath="" Visible="false"/>
-    </ItemGroup>
+  <ItemGroup>
+    <None
+      Include="$(MSBuildThisFileDirectory)media\$(RepositoryName)_128.png"
+      Pack="true"
+      PackagePath=""
+      Visible="false"
+    />
+  </ItemGroup>
 
-    <Choose>
-        <When Condition="Exists('$(MSBuildProjectDirectory)\README.md')">
-            <ItemGroup>
-                <None Include="$(MSBuildProjectDirectory)\README.md" Pack="true" PackagePath="" Visible="true"/>
-            </ItemGroup>
-        </When>
-        <When Condition="Exists('$(MSBuildThisFileDirectory)README.md')">
-            <ItemGroup>
-                <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="" Visible="true"/>
-            </ItemGroup>
-        </When>
-    </Choose>
+  <Choose>
+    <When Condition="Exists('$(MSBuildProjectDirectory)\README.md')">
+      <ItemGroup>
+        <None
+          Include="$(MSBuildProjectDirectory)\README.md"
+          Pack="true"
+          PackagePath=""
+          Visible="true"
+        />
+      </ItemGroup>
+    </When>
+    <When Condition="Exists('$(MSBuildThisFileDirectory)README.md')">
+      <ItemGroup>
+        <None
+          Include="$(MSBuildThisFileDirectory)README.md"
+          Pack="true"
+          PackagePath=""
+          Visible="true"
+        />
+      </ItemGroup>
+    </When>
+  </Choose>
 </Project>

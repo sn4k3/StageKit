@@ -108,6 +108,7 @@ public class LinuxAppBundleOptions
 
     /// <summary>
     /// Gets a value that indicates whether the application uses one main window.
+    /// Retained for compatibility; the generated desktop entry does not include this key.
     /// </summary>
     public bool SingleMainWindow { get; set; } = true;
 

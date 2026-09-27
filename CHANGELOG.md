@@ -1,23 +1,32 @@
+# v0.4.1 (/09/2026)
+
+- Add `PathUtilities.RedactUserPath` to redact the user's home directory from a path string
+- Omit `SingleMainWindow` from `.desktop` file metadata to prevent AppImageHub CI error: file contains key
+  "SingleMainWindow" in group "Desktop Entry", but keys extending the format should start with "X-"
+
 # v0.4.0 (13/09/2026)
 
-- Add `HostSystem.IsDarkMode` and `HostSystem.IsHighContrast` for detecting operating-system dark theme and accessibility
-  high-contrast modes across Windows (registry and `SystemParametersInfoW`), macOS (`defaults`), and Linux (`gsettings` and
-  desktop environments)
+- Add `HostSystem.IsDarkMode` and `HostSystem.IsHighContrast` for detecting operating-system dark theme and
+  accessibility high-contrast modes across Windows (registry and `SystemParametersInfoW`), macOS (`defaults`), and Linux
+  (`gsettings` and desktop environments)
 - Add `PathUtilities.DownloadsDirectoryPath`, `PathUtilities.GetDownloadsDirectory()`, and
-  `PathUtilities.TryGetDownloadsDirectory(...)` to resolve the current user's standard Downloads directory across Windows
-  (native `SHGetKnownFolderPath` with `FOLDERID_Downloads` and user-shell-folder fallbacks), Linux (`XDG_DOWNLOAD_DIR`),
-  and macOS/Unix
+  `PathUtilities.TryGetDownloadsDirectory(...)` to resolve the current user's standard Downloads directory across
+  Windows (native `SHGetKnownFolderPath` with `FOLDERID_Downloads` and user-shell-folder fallbacks), Linux
+  (`XDG_DOWNLOAD_DIR`), and macOS/Unix
 - Add `HostSystem.PreventSleep(bool keepDisplayOn = false)` returning an `IDisposable` token to inhibit system sleep and
-  optionally keep displays active across Windows (`SetThreadExecutionState`), macOS (`caffeinate`), and Linux (`systemd-inhibit`)
-- Add `HostPowerStatus`, `HostSystem.IsOnBatteryPower`, `HostSystem.BatteryChargePercentage`, `HostSystem.GetPowerStatus()`,
-  and `HostSystem.TryGetPowerStatus(...)` for cross-platform battery level, AC/battery power state, and charging detection
-- Add `HostSystem.OpenTerminal(...)` and `HostSystem.OpenInTerminal(...)` (and asynchronous variants) to open interactive
-  host terminal windows and run commands across Windows (preferring Windows Terminal `wt.exe` with `cmd.exe` fallback),
-  macOS (`Terminal.app` via `open` and AppleScript), and Linux (`x-terminal-emulator`, `gnome-terminal`, `konsole`,
+  optionally keep displays active across Windows (`SetThreadExecutionState`), macOS (`caffeinate`), and Linux
+  (`systemd-inhibit`)
+- Add `HostPowerStatus`, `HostSystem.IsOnBatteryPower`, `HostSystem.BatteryChargePercentage`,
+  `HostSystem.GetPowerStatus()`, and `HostSystem.TryGetPowerStatus(...)` for cross-platform battery level, AC/battery
+  power state, and charging detection
+- Add `HostSystem.OpenTerminal(...)` and `HostSystem.OpenInTerminal(...)` (and asynchronous variants) to open
+  interactive host terminal windows and run commands across Windows (preferring Windows Terminal `wt.exe` with `cmd.exe`
+  fallback), macOS (`Terminal.app` via `open` and AppleScript), and Linux (`x-terminal-emulator`, `gnome-terminal`,
+  `konsole`,
   `xfce4-terminal`, `xterm`)
 - Add `HostDiskStatus`, `HostSystem.GetAvailableFreeSpace(...)`, `HostSystem.TryGetAvailableFreeSpace(...)`,
-  `HostSystem.GetDiskStatus(...)`, and `HostSystem.TryGetDiskStatus(...)` to query drive capacity, free disk space,
-  file system format, and drive type across Windows (`GetDiskFreeSpaceExW` and `DriveInfo`) and Unix mount points
+  `HostSystem.GetDiskStatus(...)`, and `HostSystem.TryGetDiskStatus(...)` to query drive capacity, free disk space, file
+  system format, and drive type across Windows (`GetDiskFreeSpaceExW` and `DriveInfo`) and Unix mount points
 - Use strongly typed `InstallerScope` (`PerMachineOrUser`, `PerUser`, `PerMachine`) and `PathRegistration` (`None`,
   `Register`, `UserDefaultNo`, `UserDefaultYes`) enums on `WindowsInstallerOptions` instead of raw string configuration
 - Add `HostSystem.OpenUrl` URI overloads and generic synchronous/asynchronous and `Open` helpers for directories, files,
@@ -28,8 +37,8 @@
   AppStream mediatype metadata in Linux desktop application bundles
 - Add `WindowsInstallerOptions` to Fallout to configure Windows installer options (including
   `ContextMenuOpenWithFileAssociations` as a `HashSet<FileAssociation>`, `SignToolPath`, Authenticode signing,
-  `InstallerScope` and `PathRegistration` enums, shortcut toggles `DefaultDesktopShortcut` and `DefaultStartMenuShortcut`, and
-  single-file payload) alongside WiX installer context menu registration
+  `InstallerScope` and `PathRegistration` enums, shortcut toggles `DefaultDesktopShortcut` and
+  `DefaultStartMenuShortcut`, and single-file payload) alongside WiX installer context menu registration
 - Enforce a configurable macOS minimum runtime version in the generated installation script, defaulting to macOS 13.0
 - Emit current AppStream developer metadata, including a configurable developer ID, for Linux application bundles
 - Normalize AppStream summaries by removing trailing periods
