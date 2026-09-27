@@ -7,12 +7,6 @@
 - Omit `SingleMainWindow` from `.desktop` file metadata to prevent AppImageHub CI error: file contains key
   "SingleMainWindow" in group "Desktop Entry", but keys extending the format should start with "X-"
 
-# v0.4.1 (/09/2026)
-
-- Add `PathUtilities.RedactUserPath` to redact the user's home directory from a path string
-- Omit `SingleMainWindow` from `.desktop` file metadata to prevent AppImageHub CI error: file contains key
-  "SingleMainWindow" in group "Desktop Entry", but keys extending the format should start with "X-"
-
 # v0.4.0 (13/09/2026)
 
 - Add `HostSystem.IsDarkMode` and `HostSystem.IsHighContrast` for detecting operating-system dark theme and
