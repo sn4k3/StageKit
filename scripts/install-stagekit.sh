@@ -498,7 +498,6 @@ install_selected_package() {
 }
 
 parse_arguments "$@"
-show_header
 if command_exists curl; then
   DOWNLOAD_TOOL='curl'
 elif command_exists wget; then

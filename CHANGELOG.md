@@ -1,3 +1,12 @@
+# v0.4.1 (16/09/2026)
+
+- Make `LinuxAppBundleOptions.MinimumDisplayLength` non-nullable and omit the AppStream display-length recommendation
+  when its value is zero or negative
+- Stop generated install and uninstall script runs from printing help headers unless help is explicitly requested
+- Add `PathUtilities.RedactUserPath` to redact the user's home directory from a path string
+- Omit `SingleMainWindow` from `.desktop` file metadata to prevent AppImageHub CI error: file contains key
+  "SingleMainWindow" in group "Desktop Entry", but keys extending the format should start with "X-"
+
 # v0.4.1 (/09/2026)
 
 - Add `PathUtilities.RedactUserPath` to redact the user's home directory from a path string

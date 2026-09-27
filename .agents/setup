@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export DOTNET_CLI_TELEMETRY_OPTOUT=1
+export DOTNET_NOLOGO=1
+
+dotnet_dir="$HOME/.dotnet"
+
+if [[ -x "$dotnet_dir/dotnet" ]]; then
+    export DOTNET_ROOT="$dotnet_dir"
+    export PATH="$DOTNET_ROOT:$PATH"
+fi
+
+if ! command -v dotnet >/dev/null 2>&1 ||
+    ! grep -q '^10\.' <<< "$(dotnet --list-sdks 2>/dev/null)"; then
+    echo "Installing .NET 10 SDK..."
+    install_script="$(mktemp)"
+    trap 'rm -f "$install_script"' EXIT
+    curl -fsSL https://dot.net/v1/dotnet-install.sh -o "$install_script"
+    bash "$install_script" --channel 10.0 --install-dir "$dotnet_dir" --no-path
+    export DOTNET_ROOT="$dotnet_dir"
+    export PATH="$DOTNET_ROOT:$PATH"
+fi
+
+if [[ -x "$dotnet_dir/dotnet" ]]; then
+    profile_marker="# StageKit .NET SDK"
+    if ! grep -Fqx "$profile_marker" "$HOME/.bash_profile" 2>/dev/null; then
+        cat >> "$HOME/.bash_profile" <<'EOF'
+
+# StageKit .NET SDK
+if [[ -x "$HOME/.dotnet/dotnet" ]]; then
+    export DOTNET_ROOT="$HOME/.dotnet"
+    export PATH="$DOTNET_ROOT:$PATH"
+fi
+EOF
+    fi
+fi
+
+echo "Restoring .NET tools and solution packages..."
+dotnet tool restore
+dotnet restore StageKit.slnx -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true

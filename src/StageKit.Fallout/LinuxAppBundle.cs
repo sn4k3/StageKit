@@ -29,11 +29,8 @@ public static partial class LinuxAppBundle
         return GetDesktopEntry(options, null, null);
     }
 
-    internal static string GetDesktopEntry(
-        LinuxAppBundleOptions options,
-        string? executableName,
-        string? iconName
-    )
+    internal static string GetDesktopEntry(LinuxAppBundleOptions options, string? executableName,
+        string? iconName)
     {
         ValidateOptions(options);
         executableName ??= GetExecutableName(options);
@@ -59,16 +56,17 @@ public static partial class LinuxAppBundle
             : string.Empty;
 
         var desktopEntry = $$"""
-            [Desktop Entry]
-            Type=Application
-            Name={{EscapeDesktopValue(options.ProductName)}}
-            Comment={{EscapeDesktopValue(options.Summary)}}
-            Categories={{FormatDesktopList(options.Categories, nameof(options.Categories))}}
-            Keywords={{FormatDesktopList(options.Keywords, nameof(options.Keywords))}}
-            Icon={{EscapeDesktopValue(iconName)}}
-            Exec="{{EscapeDesktopExecDoubleQuoted(executableName)}}"{{execArgs}}{{mimeTypeLine}}
-            Terminal={{options.Terminal.ToString().ToLowerInvariant()}}{{startupWMClassLine}}{{startupNotifyLine}}{{prefersNonDefaultGpuLine}}
-            """;
+                             [Desktop Entry]
+                             Type=Application
+                             Name={{EscapeDesktopValue(options.ProductName)}}
+                             Comment={{EscapeDesktopValue(options.Summary)}}
+                             Categories={{FormatDesktopList(options.Categories, nameof(options.Categories))}}
+                             Keywords={{FormatDesktopList(options.Keywords, nameof(options.Keywords))}}
+                             Icon={{EscapeDesktopValue(iconName)}}
+                             Exec="{{EscapeDesktopExecDoubleQuoted(executableName)}}"{{execArgs}}{{mimeTypeLine}}
+                             Terminal={{options.Terminal.ToString().ToLowerInvariant()}}
+                             SingleMainWindow={{options.SingleMainWindow.ToString().ToLowerInvariant()}}{{startupWMClassLine}}{{startupNotifyLine}}{{prefersNonDefaultGpuLine}}
+                             """;
 
         return AppendCustomBlock(desktopEntry, options.ExtraDesktopEntry).ReplaceLineEndings("\n");
     }
@@ -89,13 +87,13 @@ public static partial class LinuxAppBundle
             : $"{options.AppRunScriptBeforeExec}\n\n";
 
         return $$"""
-            #!/usr/bin/env bash
+                 #!/usr/bin/env bash
 
-            HERE="$(dirname "$(readlink -f "${0}")")"
-            export PATH="${HERE}/usr/bin/:${PATH}"
+                 HERE="$(dirname "$(readlink -f "${0}")")"
+                 export PATH="${HERE}/usr/bin/:${PATH}"
 
-            {{customCode}}exec "{{executableName}}" "$@"
-            """.ReplaceLineEndings("\n");
+                 {{customCode}}exec "{{executableName}}" "$@"
+                 """.ReplaceLineEndings("\n");
     }
 
     /// <summary>
@@ -122,24 +120,15 @@ public static partial class LinuxAppBundle
             new XElement("content_rating", new XAttribute("type", options.ContentRatingType)),
             new XElement("summary", NormalizeSummary(options.Summary)),
             new XElement("description", new XElement("p", options.Description)),
-            new XElement(
-                "categories",
-                options.Categories.Select(category => new XElement("category", category))
-            ),
-            new XElement(
-                "supports",
-                options.Controls.Select(control => new XElement("control", control))
-            )
-        );
+            new XElement("categories", options.Categories.Select(category => new XElement("category", category))),
+            new XElement("supports", options.Controls.Select(control => new XElement("control", control))));
 
         if (options.MinimumDisplayLength is not null)
         {
             if (options.MinimumDisplayLength <= 0)
             {
-                throw new ArgumentException(
-                    "The minimum display length must be greater than zero.",
-                    nameof(options.MinimumDisplayLength)
-                );
+                throw new ArgumentException("The minimum display length must be greater than zero.",
+                    nameof(options.MinimumDisplayLength));
             }
 
             component.Add(
@@ -148,19 +137,11 @@ public static partial class LinuxAppBundle
                     new XElement(
                         "display_length",
                         new XAttribute("compare", "ge"),
-                        options.MinimumDisplayLength.Value
-                    )
-                )
-            );
+                        options.MinimumDisplayLength.Value)));
         }
 
-        component.Add(
-            new XElement(
-                "launchable",
-                new XAttribute("type", "desktop-id"),
-                $"{options.ApplicationId}.desktop"
-            )
-        );
+        component.Add(new XElement("launchable", new XAttribute("type", "desktop-id"),
+            $"{options.ApplicationId}.desktop"));
 
         var screenshots = CreateScreenshots(options.ScreenshotUrls);
         if (screenshots is not null)
@@ -170,12 +151,8 @@ public static partial class LinuxAppBundle
 
         component.Add(
             new XElement("url", new XAttribute("type", "homepage"), options.RepositoryUrl),
-            new XElement(
-                "developer",
-                new XAttribute("id", options.DeveloperId),
-                new XElement("name", options.Authors)
-            )
-        );
+            new XElement("developer", new XAttribute("id", options.DeveloperId),
+                new XElement("name", options.Authors)));
 
         if (!string.IsNullOrWhiteSpace(options.UpdateContact))
         {
@@ -213,46 +190,40 @@ public static partial class LinuxAppBundle
         var sourceDirectory = options.ProductName;
         var executablePath = $"/app/bin/app-sources/{executableName}";
         IEnumerable<string> flatpakFinishArguments = options.FlatpakFinishArguments;
-        if (
-            options.FlatpakAllowHostCommandExecution
-            && !options.FlatpakFinishArguments.Contains(
-                FlatpakHostCommandPermission,
-                StringComparer.Ordinal
-            )
-        )
+        if (options.FlatpakAllowHostCommandExecution &&
+            !options.FlatpakFinishArguments.Contains(FlatpakHostCommandPermission, StringComparer.Ordinal))
         {
             flatpakFinishArguments = flatpakFinishArguments.Append(FlatpakHostCommandPermission);
         }
 
         var finishArguments = string.Join(
             Environment.NewLine,
-            flatpakFinishArguments.Select(argument => $"  - {argument.SingleQuoteYaml()}")
-        );
+            flatpakFinishArguments.Select(argument => $"  - {argument.SingleQuoteYaml()}"));
 
         return $$"""
-            app-id: {{options.ApplicationId.SingleQuoteYaml()}}
-            runtime: {{options.FlatpakRuntime.SingleQuoteYaml()}}
-            runtime-version: {{options.FlatpakRuntimeVersion.SingleQuoteYaml()}}
-            sdk: {{options.FlatpakSdk.SingleQuoteYaml()}}
-            command: {{executableName.SingleQuoteYaml()}}
-            finish-args:
-            {{finishArguments}}
+                 app-id: {{options.ApplicationId.SingleQuoteYaml()}}
+                 runtime: {{options.FlatpakRuntime.SingleQuoteYaml()}}
+                 runtime-version: {{options.FlatpakRuntimeVersion.SingleQuoteYaml()}}
+                 sdk: {{options.FlatpakSdk.SingleQuoteYaml()}}
+                 command: {{executableName.SingleQuoteYaml()}}
+                 finish-args:
+                 {{finishArguments}}
 
-            modules:
-              - name: {{options.ProductName.SingleQuoteYaml()}}
-                buildsystem: simple
-                build-commands:
-                  - {{"mkdir -p /app/bin".SingleQuoteYaml()}}
-                  - {{"mkdir -p /app/share".SingleQuoteYaml()}}
-                  - {{"mv ./app-sources /app/bin/app-sources".SingleQuoteYaml()}}
-                  - {{$"chmod +x {executablePath.QuoteShell()}".SingleQuoteYaml()}}
-                  - {{$"ln -s {executablePath.QuoteShell()} {$"/app/bin/{executableName}".QuoteShell()}".SingleQuoteYaml()}}
-                  - {{"if [ -d /app/bin/app-sources/share ]; then mv /app/bin/app-sources/share/* /app/share/; fi".SingleQuoteYaml()}}
-                sources:
-                  - type: dir
-                    path: {{sourceDirectory.SingleQuoteYaml()}}
-                    dest: app-sources
-            """.ReplaceLineEndings("\n");
+                 modules:
+                   - name: {{options.ProductName.SingleQuoteYaml()}}
+                     buildsystem: simple
+                     build-commands:
+                       - {{"mkdir -p /app/bin".SingleQuoteYaml()}}
+                       - {{"mkdir -p /app/share".SingleQuoteYaml()}}
+                       - {{"mv ./app-sources /app/bin/app-sources".SingleQuoteYaml()}}
+                       - {{$"chmod +x {executablePath.QuoteShell()}".SingleQuoteYaml()}}
+                       - {{$"ln -s {executablePath.QuoteShell()} {$"/app/bin/{executableName}".QuoteShell()}".SingleQuoteYaml()}}
+                       - {{"if [ -d /app/bin/app-sources/share ]; then mv /app/bin/app-sources/share/* /app/share/; fi".SingleQuoteYaml()}}
+                     sources:
+                       - type: dir
+                         path: {{sourceDirectory.SingleQuoteYaml()}}
+                         dest: app-sources
+                 """.ReplaceLineEndings("\n");
     }
 
     private static XElement? CreateScreenshots(IEnumerable<string> screenshotUrls)
@@ -263,15 +234,11 @@ public static partial class LinuxAppBundle
         var index = 0;
         foreach (var screenshotUrl in screenshotUrls)
         {
-            if (
-                !Uri.TryCreate(screenshotUrl, UriKind.Absolute, out var uri)
-                || uri.Scheme is not ("http" or "https")
-            )
+            if (!Uri.TryCreate(screenshotUrl, UriKind.Absolute, out var uri) ||
+                uri.Scheme is not ("http" or "https"))
             {
-                throw new ArgumentException(
-                    $"Screenshot URL at index {index} must be an absolute HTTP or HTTPS URL.",
-                    nameof(screenshotUrls)
-                );
+                throw new ArgumentException($"Screenshot URL at index {index} must be an absolute HTTP or HTTPS URL.",
+                    nameof(screenshotUrls));
             }
 
             var screenshot = new XElement("screenshot", new XElement("image", screenshotUrl));
@@ -410,7 +377,7 @@ public static partial class LinuxAppBundle
             "glb" => "model/gltf-binary",
             "3mf" => "model/3mf",
 
-            _ => $"application/x-{clean}",
+            _ => $"application/x-{clean}"
         };
     }
 
@@ -440,10 +407,9 @@ public static partial class LinuxAppBundle
         ArgumentNullException.ThrowIfNull(values);
         if (values.Any(string.IsNullOrWhiteSpace))
         {
-            throw new ArgumentException(
-                "List items cannot be null, empty, or white space.",
-                parameterName
-            );
+        if (options.MinimumDisplayLength > 0)
+                        options.MinimumDisplayLength)));
+            throw new ArgumentException("List items cannot be null, empty, or white space.", parameterName);
         }
     }
 
