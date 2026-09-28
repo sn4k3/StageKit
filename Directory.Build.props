@@ -90,4 +90,6 @@
       </ItemGroup>
     </When>
   </Choose>
+
+  <Import Project="$(MSBuildThisFileDirectory)/SyncArtifacts.props" />
 </Project>
