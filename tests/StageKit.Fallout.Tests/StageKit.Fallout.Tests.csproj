@@ -11,11 +11,13 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="xunit.v3" Version="4.0.1" />
+        <PackageReference Include="xunit.v3" Version="4.0.1"/>
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\StageKit.Fallout\StageKit.Fallout.csproj"/>
+        <AssemblyMetadata Include="RepositoryRoot"
+                          Value="$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', '..', '..'))"/>
     </ItemGroup>
 
 </Project>
