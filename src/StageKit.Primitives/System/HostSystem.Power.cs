@@ -15,6 +15,13 @@ public static partial class HostSystem
         AwayModeRequired = 0x00000040
     }
 
+    private static readonly object _sleepLock = new();
+    private static Thread? _sleepThread;
+    private static int _sleepRequests;
+    private static int _displayRequests;
+    private static int _sleepVersion;
+    private static int _appliedSleepVersion;
+
     /// <summary>
     /// Prevents the operating system from entering sleep or idle power-saving modes while the returned token is alive.
     /// </summary>
@@ -23,7 +30,7 @@ public static partial class HostSystem
     /// </param>
     /// <returns>An <see cref="IDisposable"/> token that restores the normal system power state when disposed.</returns>
     /// <remarks>
-    /// On Windows, sets thread execution state flags (<c>ES_SYSTEM_REQUIRED</c> and optionally <c>ES_DISPLAY_REQUIRED</c>).
+    /// On Windows, a dedicated thread holds the combined execution state flags until all requesting tokens are disposed.
     /// On macOS, runs a background <c>caffeinate</c> process until disposed.
     /// On Linux, invokes <c>systemd-inhibit</c> if available.
     /// </remarks>
@@ -33,12 +40,8 @@ public static partial class HostSystem
         {
             try
             {
-                var flags = ExecutionState.Continuous | ExecutionState.SystemRequired;
-                if (keepDisplayOn)
-                    flags |= ExecutionState.DisplayRequired;
-
-                SetThreadExecutionState(flags);
-                return new SleepPreventionToken();
+                UpdateWindowsSleepRequests(keepDisplayOn, add: true);
+                return new SleepPreventionToken(windowsRequest: true, keepDisplayOn: keepDisplayOn);
             }
             catch
             {
@@ -86,6 +89,83 @@ public static partial class HostSystem
         }
 
         return new SleepPreventionToken();
+    }
+
+    private static void UpdateWindowsSleepRequests(bool keepDisplayOn, bool add)
+    {
+        lock (_sleepLock)
+        {
+            _sleepRequests += add ? 1 : -1;
+            if (keepDisplayOn)
+                _displayRequests += add ? 1 : -1;
+
+            if (add && _sleepThread is null)
+            {
+                var thread = new Thread(RunWindowsSleepThread)
+                {
+                    IsBackground = true,
+                    Name = "StageKit sleep prevention"
+                };
+                try
+                {
+                    thread.Start();
+                    _sleepThread = thread;
+                }
+                catch
+                {
+                    _sleepRequests--;
+                    if (keepDisplayOn)
+                        _displayRequests--;
+                    throw;
+                }
+            }
+
+            var version = ++_sleepVersion;
+            Monitor.PulseAll(_sleepLock);
+            while (_appliedSleepVersion < version)
+                Monitor.Wait(_sleepLock);
+        }
+    }
+
+    private static void RunWindowsSleepThread()
+    {
+        while (true)
+        {
+            ExecutionState flags;
+            int version;
+            lock (_sleepLock)
+            {
+                while (_appliedSleepVersion == _sleepVersion)
+                    Monitor.Wait(_sleepLock);
+
+                version = _sleepVersion;
+                flags = ExecutionState.Continuous;
+                if (_sleepRequests > 0)
+                    flags |= ExecutionState.SystemRequired;
+                if (_displayRequests > 0)
+                    flags |= ExecutionState.DisplayRequired;
+            }
+
+            try
+            {
+                SetThreadExecutionState(flags);
+            }
+            catch
+            {
+                // Best effort; wake callers even if the native request fails.
+            }
+
+            lock (_sleepLock)
+            {
+                _appliedSleepVersion = version;
+                Monitor.PulseAll(_sleepLock);
+                if (_sleepRequests == 0 && _sleepVersion == version)
+                {
+                    _sleepThread = null;
+                    return;
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -290,19 +370,27 @@ public static partial class HostSystem
     private sealed class SleepPreventionToken : DisposableObject
     {
         private readonly Process? _process;
+        private readonly bool _windowsRequest;
+        private readonly bool _keepDisplayOn;
 
-        public SleepPreventionToken(Process? process = null)
+        public SleepPreventionToken(
+            Process? process = null,
+            bool windowsRequest = false,
+            bool keepDisplayOn = false
+        )
         {
             _process = process;
+            _windowsRequest = windowsRequest;
+            _keepDisplayOn = keepDisplayOn;
         }
 
         protected override void DisposeManaged()
         {
-            if (OperatingSystem.IsWindows())
+            if (_windowsRequest)
             {
                 try
                 {
-                    SetThreadExecutionState(ExecutionState.Continuous);
+                    UpdateWindowsSleepRequests(_keepDisplayOn, add: false);
                 }
                 catch
                 {

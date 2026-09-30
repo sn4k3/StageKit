@@ -26,7 +26,8 @@ public static class DateTimeExtensions
         public int Age(DateTime laterDate)
         {
             var age = laterDate.Year - dateTime.Year;
-            if (laterDate.Date < dateTime.Date.AddYears(age)) age--;
+            if (laterDate.Date < dateTime.Date.AddYears(age))
+                age--;
             return Math.Max(0, age);
         }
     }
@@ -39,7 +40,12 @@ public static class DateTimeExtensions
     /// <returns>A formatted duration string.</returns>
     public static string ToTimeString(this TimeSpan timeSpan, bool showSeconds = true)
     {
-        if (timeSpan.Ticks < 0) return "-" + (-timeSpan).ToTimeString(showSeconds);
+        if (timeSpan == TimeSpan.MinValue)
+        {
+            return "-" + TimeSpan.MaxValue.ToTimeString(showSeconds);
+        }
+        if (timeSpan.Ticks < 0)
+            return "-" + (-timeSpan).ToTimeString(showSeconds);
 
         var totalSeconds = timeSpan.TotalSeconds;
         var roundedSeconds = (long)Math.Round(totalSeconds, MidpointRounding.AwayFromZero);
@@ -55,9 +61,15 @@ public static class DateTimeExtensions
         {
             < 60 => $"{roundedSeconds}s",
             < 3600 => showSeconds ? timeSpan.ToString(@"mm\mss\s") : timeSpan.ToString(@"mm\m"),
-            < 86400 => showSeconds ? timeSpan.ToString(@"hh\hmm\mss\s") : timeSpan.ToString(@"hh\hmm\m"),
-            < 172800 => showSeconds ? timeSpan.ToString(@"d'day 'hh\hmm\mss\s") : timeSpan.ToString(@"d'day 'hh\hmm\m"),
-            _ => showSeconds ? timeSpan.ToString(@"d'days 'hh\hmm\mss\s") : timeSpan.ToString(@"d'days 'hh\hmm\m"),
+            < 86400 => showSeconds
+                ? timeSpan.ToString(@"hh\hmm\mss\s")
+                : timeSpan.ToString(@"hh\hmm\m"),
+            < 172800 => showSeconds
+                ? timeSpan.ToString(@"d'day 'hh\hmm\mss\s")
+                : timeSpan.ToString(@"d'day 'hh\hmm\m"),
+            _ => showSeconds
+                ? timeSpan.ToString(@"d'days 'hh\hmm\mss\s")
+                : timeSpan.ToString(@"d'days 'hh\hmm\m"),
         };
     }
 }

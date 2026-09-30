@@ -1,11 +1,51 @@
 using System.Diagnostics;
 using System.Globalization;
+using StageKit.Primitives.Extensions;
 using StageKit.Primitives.System;
 
 namespace StageKit.Updatum;
 
 internal static class UpdatumInstallScript
 {
+    internal static void WriteWindowsValues(
+        TextWriter writer,
+        string scriptFilePath,
+        IReadOnlyList<KeyValuePair<string, string?>> values)
+    {
+        ArgumentNullException.ThrowIfNull(writer);
+        ArgumentNullException.ThrowIfNull(values);
+        if (scriptFilePath.Contains('"') || scriptFilePath.Contains('%'))
+            throw new ArgumentException("The script data path cannot contain quotes or percent signs.", nameof(scriptFilePath));
+
+        writer.WriteLine("setlocal disabledelayedexpansion");
+        foreach (var (name, value) in values)
+        {
+            if (name.Length == 0 || name.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '_'))
+                throw new ArgumentException("Invalid batch variable name.", nameof(values));
+            if (value?.IndexOfAny(['\r', '\n', '\0']) >= 0)
+                throw new ArgumentException("Batch data values cannot contain line breaks or NUL.", nameof(values));
+
+            // The prefix preserves empty values through FOR /F and is removed after loading.
+            File.WriteAllText($"{scriptFilePath}.data-{name}", "x" + value, new System.Text.UTF8Encoding(false));
+            writer.WriteLine($"for /f \"usebackq delims=\" %%A in (\"%~f0.data-{name}\") do set \"{name}=%%A\"");
+        }
+
+        writer.WriteLine("setlocal enabledelayedexpansion");
+        foreach (var (name, _) in values)
+            writer.WriteLine($"set \"{name}=!{name}:~1!\"");
+    }
+
+    internal static void WriteBashUpdaterMessage(TextWriter writer, string? assemblyName, Version currentVersion, string tag)
+    {
+        writer.WriteLine($"echo {($"{assemblyName} v{currentVersion} -> {tag} updater script").QuoteBashAnsiCString()}");
+    }
+
+    internal static void WriteWindowsInstallerExecution(TextWriter writer)
+    {
+        writer.WriteLine("start \"\" /WAIT \"!FILEPATH!\" !INSTALLER_ARGUMENTS!");
+        writer.WriteLine("if not \"!errorlevel!\"==\"0\" goto :ScriptFailed");
+    }
+
     internal static ProcessStartInfo CreateMacOSRelaunchProcessStartInfo(
         int currentProcessId,
         string appBundlePath,
@@ -21,7 +61,8 @@ internal static class UpdatumInstallScript
         scriptWriter.WriteLine("  /bin/sleep 0.1");
         scriptWriter.WriteLine("done");
         scriptWriter.WriteLine();
-        WriteMacOSAppBundleLaunch(scriptWriter, "$2", "$3");
+        scriptWriter.WriteLine("RUN_ARGUMENTS=(\"${@:5}\")");
+        WriteMacOSAppBundleLaunch(scriptWriter, "$2", "RUN_ARGUMENTS");
 
         var logFilePath = Path.Combine(
             Path.GetTempPath(),
@@ -36,8 +77,8 @@ internal static class UpdatumInstallScript
                 "stagekit-updatum-relaunch",
                 currentProcessId.ToString(CultureInfo.InvariantCulture),
                 appBundlePath,
-                runArguments ?? string.Empty,
-                logFilePath
+                logFilePath,
+                .. UpdatumManager.SplitRunArguments(runArguments)
             ]);
         startInfo.CreateNoWindow = true;
         return startInfo;
@@ -57,8 +98,8 @@ internal static class UpdatumInstallScript
         writer.WriteLine("  exit 1");
         writer.WriteLine("fi");
         writer.WriteLine($"echo \"- Launching application bundle: {appBundlePathExpression}\"");
-        writer.WriteLine($"if [[ -n \"{runArgumentsExpression}\" ]]; then");
-        writer.WriteLine($"  /usr/bin/open -n -W \"{appBundlePathExpression}\" --args {runArgumentsExpression} &");
+        writer.WriteLine($"if [[ ${{#{runArgumentsExpression}[@]}} -gt 0 ]]; then");
+        writer.WriteLine($"  /usr/bin/open -n -W \"{appBundlePathExpression}\" --args \"${{{runArgumentsExpression}[@]}}\" &");
         writer.WriteLine("else");
         writer.WriteLine($"  /usr/bin/open -n -W \"{appBundlePathExpression}\" &");
         writer.WriteLine("fi");
@@ -81,35 +122,35 @@ internal static class UpdatumInstallScript
     public static void WriteWindowsFileReplacement(TextWriter writer)
     {
         writer.WriteLine("echo - Staging replacement file");
-        writer.WriteLine("if exist \"%STAGED_FILEPATH%\" exit /b 1");
-        writer.WriteLine("if exist \"%BACKUP_FILEPATH%\" exit /b 1");
-        writer.WriteLine("copy /Y \"%SOURCE_FILEPATH%\" \"%STAGED_FILEPATH%\" >nul");
-        writer.WriteLine("if errorlevel 1 exit /b 1");
-        writer.WriteLine("if not exist \"%STAGED_FILEPATH%\" exit /b 1");
+        writer.WriteLine("if exist \"!STAGED_FILEPATH!\" goto :ScriptFailed");
+        writer.WriteLine("if exist \"!BACKUP_FILEPATH!\" goto :ScriptFailed");
+        writer.WriteLine("copy /Y \"!SOURCE_FILEPATH!\" \"!STAGED_FILEPATH!\" >nul");
+        writer.WriteLine("if errorlevel 1 goto :ScriptFailed");
+        writer.WriteLine("if not exist \"!STAGED_FILEPATH!\" goto :ScriptFailed");
         writer.WriteLine();
-        writer.WriteLine("if not \"%CURRENT_FILEPATH%\"==\"%TARGET_FILEPATH%\" if exist \"%TARGET_FILEPATH%\" (");
+        writer.WriteLine("if not \"!CURRENT_FILEPATH!\"==\"!TARGET_FILEPATH!\" if exist \"!TARGET_FILEPATH!\" (");
         writer.WriteLine("  echo - Error: Target file already exists");
-        writer.WriteLine("  call :DeleteIfSafe \"%STAGED_FILEPATH%\"");
-        writer.WriteLine("  exit /b 1");
+        writer.WriteLine("  call :DeleteIfSafe STAGED_FILEPATH");
+        writer.WriteLine("  goto :ScriptFailed");
         writer.WriteLine(")");
-        writer.WriteLine("if exist \"%CURRENT_FILEPATH%\" (");
-        writer.WriteLine("  move /Y \"%CURRENT_FILEPATH%\" \"%BACKUP_FILEPATH%\" >nul");
+        writer.WriteLine("if exist \"!CURRENT_FILEPATH!\" (");
+        writer.WriteLine("  move /Y \"!CURRENT_FILEPATH!\" \"!BACKUP_FILEPATH!\" >nul");
         writer.WriteLine("  if errorlevel 1 (");
-        writer.WriteLine("    call :DeleteIfSafe \"%STAGED_FILEPATH%\"");
-        writer.WriteLine("    exit /b 1");
+        writer.WriteLine("    call :DeleteIfSafe STAGED_FILEPATH");
+        writer.WriteLine("    goto :ScriptFailed");
         writer.WriteLine("  )");
         writer.WriteLine(")");
-        writer.WriteLine("move /Y \"%STAGED_FILEPATH%\" \"%TARGET_FILEPATH%\" >nul");
+        writer.WriteLine("move /Y \"!STAGED_FILEPATH!\" \"!TARGET_FILEPATH!\" >nul");
         writer.WriteLine("if errorlevel 1 goto RestoreFileBackup");
-        writer.WriteLine("call :DeleteIfSafe \"%BACKUP_FILEPATH%\"");
+        writer.WriteLine("call :DeleteIfSafe BACKUP_FILEPATH");
         writer.WriteLine("goto FileReplacementComplete");
         writer.WriteLine();
         writer.WriteLine(":RestoreFileBackup");
         writer.WriteLine("echo - Replacement failed, restoring previous executable");
-        writer.WriteLine("call :DeleteIfSafe \"%TARGET_FILEPATH%\"");
-        writer.WriteLine("if exist \"%BACKUP_FILEPATH%\" move /Y \"%BACKUP_FILEPATH%\" \"%CURRENT_FILEPATH%\" >nul");
-        writer.WriteLine("call :DeleteIfSafe \"%STAGED_FILEPATH%\"");
-        writer.WriteLine("exit /b 1");
+        writer.WriteLine("call :DeleteIfSafe TARGET_FILEPATH");
+        writer.WriteLine("if exist \"!BACKUP_FILEPATH!\" move /Y \"!BACKUP_FILEPATH!\" \"!CURRENT_FILEPATH!\" >nul");
+        writer.WriteLine("call :DeleteIfSafe STAGED_FILEPATH");
+        writer.WriteLine("goto :ScriptFailed");
         writer.WriteLine();
         writer.WriteLine(":FileReplacementComplete");
     }
@@ -147,36 +188,36 @@ internal static class UpdatumInstallScript
     public static void WriteWindowsDirectoryReplacement(TextWriter writer)
     {
         writer.WriteLine("echo - Staging application directory");
-        writer.WriteLine("if exist \"%STAGED_PATH%\" exit /b 1");
-        writer.WriteLine("if exist \"%BACKUP_PATH%\" exit /b 1");
-        writer.WriteLine("mkdir \"%STAGED_PATH%\"");
-        writer.WriteLine("if errorlevel 1 exit /b 1");
-        writer.WriteLine("if exist \"%DEST_PATH%\" (");
-        writer.WriteLine("  robocopy \"%DEST_PATH%\" \"%STAGED_PATH%\" /E /COPY:DAT /R:3 /W:1 >nul");
+        writer.WriteLine("if exist \"!STAGED_PATH!\" goto :ScriptFailed");
+        writer.WriteLine("if exist \"!BACKUP_PATH!\" goto :ScriptFailed");
+        writer.WriteLine("mkdir \"!STAGED_PATH!\"");
+        writer.WriteLine("if errorlevel 1 goto :ScriptFailed");
+        writer.WriteLine("if exist \"!DEST_PATH!\" (");
+        writer.WriteLine("  robocopy \"!DEST_PATH!\" \"!STAGED_PATH!\" /E /COPY:DAT /R:3 /W:1 >nul");
         writer.WriteLine("  if errorlevel 8 goto DirectoryPreparationFailed");
         writer.WriteLine(")");
-        writer.WriteLine("robocopy \"%SOURCE_PATH%\" \"%STAGED_PATH%\" /E /COPY:DAT /R:3 /W:1 >nul");
+        writer.WriteLine("robocopy \"!SOURCE_PATH!\" \"!STAGED_PATH!\" /E /COPY:DAT /R:3 /W:1 >nul");
         writer.WriteLine("if errorlevel 8 goto DirectoryPreparationFailed");
-        writer.WriteLine("if not exist \"%STAGED_PATH%\" goto DirectoryPreparationFailed");
-        writer.WriteLine("if exist \"%DEST_PATH%\" (");
-        writer.WriteLine("  move /Y \"%DEST_PATH%\" \"%BACKUP_PATH%\" >nul");
+        writer.WriteLine("if not exist \"!STAGED_PATH!\" goto DirectoryPreparationFailed");
+        writer.WriteLine("if exist \"!DEST_PATH!\" (");
+        writer.WriteLine("  move /Y \"!DEST_PATH!\" \"!BACKUP_PATH!\" >nul");
         writer.WriteLine("  if errorlevel 1 goto DirectoryPreparationFailed");
         writer.WriteLine(")");
-        writer.WriteLine("move /Y \"%STAGED_PATH%\" \"%DEST_PATH%\" >nul");
+        writer.WriteLine("move /Y \"!STAGED_PATH!\" \"!DEST_PATH!\" >nul");
         writer.WriteLine("if errorlevel 1 goto RestoreDirectoryBackup");
-        writer.WriteLine("if exist \"%BACKUP_PATH%\" rmdir /S /Q \"%BACKUP_PATH%\"");
+        writer.WriteLine("if exist \"!BACKUP_PATH!\" rmdir /S /Q \"!BACKUP_PATH!\"");
         writer.WriteLine("goto DirectoryReplacementComplete");
         writer.WriteLine();
         writer.WriteLine(":DirectoryPreparationFailed");
-        writer.WriteLine("if exist \"%STAGED_PATH%\" rmdir /S /Q \"%STAGED_PATH%\"");
-        writer.WriteLine("exit /b 1");
+        writer.WriteLine("if exist \"!STAGED_PATH!\" rmdir /S /Q \"!STAGED_PATH!\"");
+        writer.WriteLine("goto :ScriptFailed");
         writer.WriteLine();
         writer.WriteLine(":RestoreDirectoryBackup");
         writer.WriteLine("echo - Replacement failed, restoring previous application directory");
-        writer.WriteLine("if exist \"%DEST_PATH%\" rmdir /S /Q \"%DEST_PATH%\"");
-        writer.WriteLine("if exist \"%BACKUP_PATH%\" move /Y \"%BACKUP_PATH%\" \"%DEST_PATH%\" >nul");
-        writer.WriteLine("if exist \"%STAGED_PATH%\" rmdir /S /Q \"%STAGED_PATH%\"");
-        writer.WriteLine("exit /b 1");
+        writer.WriteLine("if exist \"!DEST_PATH!\" rmdir /S /Q \"!DEST_PATH!\"");
+        writer.WriteLine("if exist \"!BACKUP_PATH!\" move /Y \"!BACKUP_PATH!\" \"!DEST_PATH!\" >nul");
+        writer.WriteLine("if exist \"!STAGED_PATH!\" rmdir /S /Q \"!STAGED_PATH!\"");
+        writer.WriteLine("goto :ScriptFailed");
         writer.WriteLine();
         writer.WriteLine(":DirectoryReplacementComplete");
     }

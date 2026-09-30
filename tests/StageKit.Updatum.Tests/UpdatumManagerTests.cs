@@ -1,8 +1,11 @@
 using System.Net;
+using System.Formats.Tar;
+using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Diagnostics.CodeAnalysis;
 using Octokit;
+using StageKit.Runtime;
 
 namespace StageKit.Updatum.Tests;
 
@@ -373,6 +376,217 @@ public sealed class UpdatumManagerTests
         Assert.Contains(nameof(UpdatumManager.AssetExtensionFilter), notifications);
     }
 
+    [Fact]
+    public void SelectReleasesAhead_UsesHighestEligibleVersionRegardlessOfResponseOrder()
+    {
+        using var manager = CreateManager();
+        var asset = CreateAsset("app.zip", "https://example.test/app.zip", 1);
+        var selected = manager.SelectReleasesAhead(
+        [
+            CreateRelease([asset], "v1.0.0"),
+            CreateRelease([asset], "v3.0.0", draft: true),
+            CreateRelease([asset], "v2.0.0"),
+            CreateRelease([asset], "v4.0.0", prerelease: true),
+            CreateRelease([asset], "v3.0.0")
+        ], new Version(1, 0, 0));
+
+        Assert.Equal(["v3.0.0", "v2.0.0"], selected.Select(release => release.TagName));
+    }
+
+    [Fact]
+    public void GetCompatibleReleaseAsset_ExcludesUnsupportedTarCompression()
+    {
+        using var manager = CreateManager();
+        var release = CreateRelease(
+        [
+            CreateAsset("app.tar.bz2", "https://example.test/app.tar.bz2", 1),
+            CreateAsset("app.tar.xz", "https://example.test/app.tar.xz", 1),
+            CreateAsset("app.tar.gz", "https://example.test/app.tar.gz", 1)
+        ]);
+
+        Assert.Equal("app.tar.gz", manager.GetCompatibleReleaseAsset(release)?.Name);
+        Assert.Null(manager.GetCompatibleReleaseAsset(CreateRelease(release.Assets.Take(2).ToArray())));
+    }
+
+    [Fact]
+    public void GetInstallPackagingTypeForFile_RoutesWindowsSingleFileExeToReplacement()
+    {
+        Assert.Equal(ApplicationPackagingType.DotNetSingleFile,
+            UpdatumManager.GetInstallPackagingTypeForFile("app.exe", ApplicationPackagingType.DotNetSingleFile,
+                UpdatumWindowsExeType.Auto, true));
+        Assert.Equal(ApplicationPackagingType.DotNetSingleFile,
+            UpdatumManager.GetInstallPackagingTypeForFile("app.exe", ApplicationPackagingType.WindowsInstaller,
+                UpdatumWindowsExeType.SingleFileApp, true));
+        Assert.Equal(ApplicationPackagingType.WindowsInstaller,
+            UpdatumManager.GetInstallPackagingTypeForFile("app.exe", ApplicationPackagingType.DotNetSingleFile,
+                UpdatumWindowsExeType.Installer, true));
+    }
+
+    [Fact]
+    public void CreateLinuxRelaunchArguments_PreservesQuotedArguments()
+    {
+        Assert.Equal(["run", "com.example.App", "--name", "A B", "--flag", ""],
+            UpdatumManager.CreateLinuxRelaunchArguments("com.example.App", "--name \"A B\" --flag \"\""));
+    }
+
+    [Fact]
+    public async Task DownloadUpdateAsync_RejectsAssetSizeMismatchEvenWithMatchingHttpLength()
+    {
+        var payload = Encoding.UTF8.GetBytes("short");
+        using var client = new HttpClient(new StubHttpMessageHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(payload) }));
+        using var manager = CreateManager(client);
+        var release = CreateRelease([CreateAsset("app.zip", "https://example.test/app.zip", payload.Length + 1)]);
+
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            manager.DownloadUpdateAsync(release, TestContext.Current.CancellationToken));
+        Assert.Equal(UpdatumState.None, manager.State);
+    }
+
+    [Fact]
+    public async Task InstallUpdateAsync_RejectsChangedFileBeforeInstallCoreRuns()
+    {
+        var filePath = Path.GetTempFileName();
+        try
+        {
+            var expected = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("original")));
+            await File.WriteAllTextAsync(filePath, "changed", TestContext.Current.CancellationToken);
+            using var manager = new BlockingInstallManager();
+            var asset = CreateDownloadedAsset(filePath) with { ExpectedSha256 = expected };
+
+            await Assert.ThrowsAsync<InvalidDataException>(() =>
+                manager.InstallUpdateAsync(asset, false, null, TestContext.Current.CancellationToken));
+            Assert.False(manager.Started.Task.IsCompleted);
+            Assert.Equal(UpdatumState.None, manager.State);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task InstallUpdateAsync_RequiresRecordedDigestWhenConfigured()
+    {
+        var filePath = Path.GetTempFileName();
+        try
+        {
+            using var manager = CreateManager();
+            manager.RequireAssetChecksum = true;
+            await Assert.ThrowsAsync<InvalidDataException>(() =>
+                manager.InstallUpdateAsync(CreateDownloadedAsset(filePath), false, null,
+                    TestContext.Current.CancellationToken));
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task InstallCompletion_WaitsForPostedHandlerBeforeReturning()
+    {
+        var filePath = Path.GetTempFileName();
+        try
+        {
+            using var manager = CreateManager();
+            var context = new QueuedSynchronizationContext();
+            manager.EventSynchronizationContext = context;
+            var invoked = false;
+            manager.InstallUpdateCompleted += (_, _) => invoked = true;
+            var notification = manager.RaiseInstallUpdateCompletedAsync(
+                CreateDownloadedAsset(filePath), true, TestContext.Current.CancellationToken);
+
+            Assert.False(notification.IsCompleted);
+            Assert.False(invoked);
+            context.Drain();
+            await notification;
+            Assert.True(invoked);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+    [Fact]
+    public async Task DownloadUpdateAsync_StopsReadingOversizedChecksumSidecar()
+    {
+        var payload = Encoding.UTF8.GetBytes("update");
+        var checksumStream = new CountingReadStream(new byte[10_000]);
+        using var client = new HttpClient(new StubHttpMessageHandler(request =>
+            request.RequestUri!.AbsolutePath.EndsWith(".sha256", StringComparison.Ordinal)
+                ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(checksumStream) }
+                : new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(payload) }));
+        using var manager = CreateManager(client);
+        manager.RequireAssetChecksum = true;
+        var release = CreateRelease(
+        [
+            CreateAsset("app.zip", "https://example.test/app.zip", payload.Length),
+            CreateAsset("app.zip.sha256", "https://example.test/app.zip.sha256", 10_000)
+        ]);
+
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            manager.DownloadUpdateAsync(release, TestContext.Current.CancellationToken));
+        Assert.InRange(checksumStream.BytesRead, 1, 4097);
+    }
+
+    [Theory]
+    [InlineData(".tar")]
+    [InlineData(".tar.gz")]
+    public void ExtractTarArchive_ExtractsRegularFiles(string suffix)
+    {
+        var directory = Directory.CreateTempSubdirectory("StageKit.Updatum.Tar-").FullName;
+        try
+        {
+            var archivePath = Path.Combine(directory, "update" + suffix);
+            using (var file = File.Create(archivePath))
+            using (Stream tarStream = suffix == ".tar.gz"
+                       ? new GZipStream(file, CompressionLevel.Optimal, leaveOpen: true)
+                       : file)
+            using (var writer = new TarWriter(tarStream))
+            {
+                var entry = new PaxTarEntry(TarEntryType.RegularFile, "app/app.bin")
+                {
+                    DataStream = new MemoryStream(Encoding.UTF8.GetBytes("contents"))
+                };
+                writer.WriteEntry(entry);
+            }
+
+            var extractionPath = Path.Combine(directory, "extracted");
+            UpdatumManager.ExtractTarArchive(archivePath, extractionPath);
+            Assert.Equal("contents", File.ReadAllText(Path.Combine(extractionPath, "app", "app.bin")));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ExtractTarArchive_RejectsTraversal()
+    {
+        var directory = Directory.CreateTempSubdirectory("StageKit.Updatum.Tar-").FullName;
+        try
+        {
+            var archivePath = Path.Combine(directory, "update.tar");
+            using (var file = File.Create(archivePath))
+            using (var writer = new TarWriter(file))
+            {
+                writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "../escape.bin")
+                {
+                    DataStream = new MemoryStream([1, 2, 3])
+                });
+            }
+
+            Assert.Throws<InvalidDataException>(() =>
+                UpdatumManager.ExtractTarArchive(archivePath, Path.Combine(directory, "extracted")));
+            Assert.False(File.Exists(Path.Combine(directory, "escape.bin")));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
     private static TestUpdatumManager CreateManager(HttpClient? httpClient = null)
     {
         return new TestUpdatumManager
@@ -388,7 +602,7 @@ public sealed class UpdatumManagerTests
         return new UpdatumDownloadedAsset(CreateRelease([asset]), asset, filePath);
     }
 
-    private static Release CreateRelease(IReadOnlyList<ReleaseAsset> assets)
+    private static Release CreateRelease(IReadOnlyList<ReleaseAsset> assets, string tag = "v2.0.0", bool draft = false, bool prerelease = false)
     {
         return new Release(
             "https://api.example.test/release",
@@ -397,12 +611,12 @@ public sealed class UpdatumManagerTests
             "https://uploads.example.test/assets",
             1,
             "node",
-            "v2.0.0",
+            tag,
             "main",
             "Version 2.0.0",
             "Changes",
-            false,
-            false,
+            draft,
+            prerelease,
             DateTimeOffset.UtcNow,
             DateTimeOffset.UtcNow,
             null!,
@@ -470,6 +684,24 @@ public sealed class UpdatumManagerTests
         }
     }
 
+    private sealed class CountingReadStream(byte[] data) : MemoryStream(data)
+    {
+        public int BytesRead { get; private set; }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            var read = base.Read(buffer, offset, count);
+            BytesRead = checked((int)Position);
+            return read;
+        }
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            var read = base.Read(buffer.Span);
+            BytesRead = checked((int)Position);
+            return ValueTask.FromResult(read);
+        }
+    }
     private sealed class StubHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> responseFactory)
         : HttpMessageHandler
     {

@@ -25,7 +25,7 @@ public static class SupportBundleExporter
         {
             using var archive = new ZipArchive(stream, ZipArchiveMode.Create, true);
             AddManifest(archive, options);
-            var includeFile = CreateBundleFileFilter(destinationFilePath);
+            var includeFile = CreateBundleFileFilter(destinationFilePath, options.IncludeCrashReports);
 
             if (options.IncludeConfigs)
             {
@@ -86,7 +86,7 @@ public static class SupportBundleExporter
                 using var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
 #endif
                 await AddManifestAsync(archive, options, token).ConfigureAwait(false);
-                var includeFile = CreateBundleFileFilter(destinationFilePath);
+                var includeFile = CreateBundleFileFilter(destinationFilePath, options.IncludeCrashReports);
 
                 if (options.IncludeConfigs)
                 {
@@ -248,12 +248,20 @@ public static class SupportBundleExporter
             cancellationToken).ConfigureAwait(false);
     }
 
-    private static Func<string, bool> CreateBundleFileFilter(string destinationFilePath)
+    private static Func<string, bool> CreateBundleFileFilter(string destinationFilePath, bool includeCrashReports)
     {
         return filePath =>
         {
             var fullFilePath = Path.GetFullPath(filePath);
             if (StringComparer.OrdinalIgnoreCase.Equals(fullFilePath, destinationFilePath))
+            {
+                return false;
+            }
+
+            if (!includeCrashReports &&
+                StringComparer.OrdinalIgnoreCase.Equals(
+                    fullFilePath,
+                    Path.GetFullPath(Path.Combine(ApplicationKit.LogsPath, CrashReportsFile.CrashReportsFileName))))
             {
                 return false;
             }

@@ -202,6 +202,42 @@ public sealed class ApplicationStorageUtilitiesTests
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SupportBundleExporter_Export_RespectsCrashReportSelection(bool includeCrashReports)
+    {
+        var originalProfilePath = ApplicationKit.ProfilePath;
+        var profilePath = CreateTempDirectory();
+        var bundlePath = Path.Combine(CreateTempDirectory(), "support.zip");
+
+        try
+        {
+            ApplicationKit.ProfilePath = profilePath;
+            Directory.CreateDirectory(ApplicationKit.LogsPath);
+            File.WriteAllText(Path.Combine(ApplicationKit.LogsPath, "app.log"), "log");
+            File.WriteAllText(Path.Combine(ApplicationKit.LogsPath, CrashReportsFile.CrashReportsFileName), "reports");
+
+            SupportBundleExporter.Export(new SupportBundleOptions
+            {
+                DestinationFilePath = bundlePath,
+                IncludeConfigs = false,
+                IncludeLogs = true,
+                IncludeCrashReports = includeCrashReports
+            });
+
+            using var archive = ZipFile.OpenRead(bundlePath);
+            Assert.NotNull(archive.GetEntry("logs/app.log"));
+            Assert.Equal(includeCrashReports,
+                archive.GetEntry($"logs/{CrashReportsFile.CrashReportsFileName}") is not null);
+            Assert.Null(archive.GetEntry($"crash-reports/{CrashReportsFile.CrashReportsFileName}"));
+        }
+        finally
+        {
+            ApplicationKit.ProfilePath = originalProfilePath;
+        }
+    }
+
     [Fact]
     public async Task SupportBundleExporter_ExportAsync_IncludesManifestConfigsAndLogs()
     {

@@ -1,11 +1,53 @@
-# v0.4.1 (16/09/2026)
+# v0.4.1 (30/09/2026)
 
 - Make `LinuxAppBundleOptions.MinimumDisplayLength` non-nullable and omit the AppStream display-length recommendation
   when its value is zero or negative
 - Stop generated install and uninstall script runs from printing help headers unless help is explicitly requested
 - Add `PathUtilities.RedactUserPath` to redact the user's home directory from a path string
+- Add `Concurrency.cs` helper class
 - Omit `SingleMainWindow` from `.desktop` file metadata to prevent AppImageHub CI error: file contains key
   "SingleMainWindow" in group "Desktop Entry", but keys extending the format should start with "X-"
+- Fix `RootCollectionFile<T,TO>.Items` never being persisted (read-only property ignored by the shared serializer
+  options), which also lost `CrashReportsFile` reports on restart; files now store an `Items` property and legacy
+  array files still load
+- Fix `ApplicationKit.ApplicationArgs` default value skipping `--crash-report <id>` parsing at startup
+- Fix `UnhandledExceptions` relaunching with the crash-report flag when the report was not persisted, and before panic
+  saves completed; ignored terminating exceptions now still run panic saves and `BeforeForcedExit`
+- Fix one ignored inner exception causing a whole `AggregateException` to be ignored
+- Fix `SupportBundleExporter` including `CrashReports.json` through the logs folder when crash reports are excluded
+- Fix `RootSettingsFile<T>` races: changes made during serialization no longer get lost, stale debounce callbacks are
+  discarded, `DeleteFile` cancels pending saves, `Dispose` waits for an active save, and a corrupt or
+  unsupported-version file whose backup fails is no longer overwritten
+- Fix a malformed `--crash-report` consuming the following argument on relaunch, and
+  `ToTimeString(TimeSpan.MinValue)` overflowing
+- **Breaking:** `EscapeWindowsBatchValue` now throws `ArgumentException` for `"`, `!`, CR/LF and NUL, which cannot be
+  represented safely in `set "NAME=value"`; the previous `^"` escaping allowed command injection
+- **Breaking:** On Windows, the argument-list `ProcessHelper.CreateShellScriptProcessStartInfo` overload rejects
+  arguments containing `"`, `%`, CR/LF or NUL, which `cmd.exe` would re-parse; raw-string arguments are passed verbatim
+- Fix packaging detection (`pkgutil`, `hdiutil`, Linux package ownership) possibly deadlocking on undrained
+  stderr; queries are now bounded
+- Fix AppImage, Flatpak and Snap detection being overridden by .NET single-file detection
+- Fix `HostSystem.PreventSleep` on Windows being thread-affine; a dedicated thread now owns the execution state and
+  overlapping tokens combine correctly
+- Fix the Linux `OpenInTerminal` fallback, Windows disk status on mounted folders (queries the requested path), macOS
+  `LaunchNewInstance` quoting of the bundle path, and `PathUtilities.IsSamePath` with trailing separators
+- Add an opt-in `killOnCancellation` parameter to `ProcessHelper.StartProcessAsync` that kills the process tree and
+  awaits exit on cancellation or timeout
+- Fix Updatum generated update scripts being injectable through release tags, paths and relaunch arguments: Windows
+  scripts now load values from sidecar data files (parse-safe, preserving `!`, `&`, `"` and `%`), and Bash scripts
+  use ANSI-C quoting
+- Fix `UpdatumManager.InstallUpdateAsync` not re-verifying the downloaded asset's SHA-256 before installing
+- Fix `InstallUpdateCompleted` handlers possibly not running before a forced update exits the process
+- Fix cancelling or timing out a package installer leaving the installer process running while its package was deleted
+- Fix Windows `.exe` updates of a .NET single-file app being routed to the installer path
+- Fix a failed Windows installer being followed by relaunch and success cleanup; the script now exits non-zero and
+  keeps its artifacts
+- Fix update checks assuming GitHub release order is version order; the highest eligible version is now selected
+- Fix truncated downloads being accepted when the response declared a shorter length than the release asset size
+- Enforce the 4 KiB `.sha256` sidecar limit while streaming instead of after buffering the whole response
+- Add `.tar` and `.tar.gz` update archive installation; `.tar.bz2` and `.tar.xz` assets are no longer selected for
+  installation
+- Fix Flatpak and Snap relaunches dropping run arguments
 
 # v0.4.0 (13/09/2026)
 

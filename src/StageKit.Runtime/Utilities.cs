@@ -77,31 +77,44 @@ internal static class Utilities
     {
         try
         {
-            using var process = Process.Start(new ProcessStartInfo
-            {
-                FileName = command,
-                ArgumentList =
+            var result = GetBoundedProcessOutput(
+                new ProcessStartInfo
                 {
-                    argument,
-                    file
-                },
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            });
-
-            if (process is null)
-                return false;
-
-            process.WaitForExit();
-
-            return process.ExitCode == 0;
+                    FileName = command,
+                    ArgumentList = { argument, file },
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                }
+            );
+            return result is { ExitCode: 0 };
         }
         catch
         {
             // Package manager doesn't exist, cannot be started, etc.
             return false;
         }
+    }
+
+    internal static (int ExitCode, string Output)? GetBoundedProcessOutput(
+        ProcessStartInfo startInfo
+    )
+    {
+        using var process = Process.Start(startInfo);
+        if (process is null)
+            return null;
+
+        var output = process.StandardOutput.ReadToEndAsync();
+        var error = process.StandardError.ReadToEndAsync();
+        var completion = Task.WhenAll(output, error, process.WaitForExitAsync());
+        if (!completion.Wait(TimeSpan.FromSeconds(5)))
+        {
+            if (!process.HasExited)
+                process.Kill(entireProcessTree: true);
+            return null;
+        }
+
+        return (process.ExitCode, output.Result);
     }
 }

@@ -426,7 +426,7 @@ public static partial class HostSystem
                     : CreateLauncherStartInfo(terminal, "-e", "bash", "-c", shellCmd);
             }
 
-            var fallbackStartInfo = CreateLauncherStartInfo(terminal, "-e", $"bash -c \"{shellCmd}\"");
+            var fallbackStartInfo = CreateLauncherStartInfo(terminal, "-e", "bash", "-c", shellCmd);
             if (resolvedDir is not null)
                 fallbackStartInfo.WorkingDirectory = resolvedDir;
             return fallbackStartInfo;

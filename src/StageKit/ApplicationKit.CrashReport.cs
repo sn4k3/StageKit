@@ -2,6 +2,11 @@
 
 public static partial class ApplicationKit
 {
+    static ApplicationKit()
+    {
+        ParseCrashReportArgs();
+    }
+
     /// <summary>
     /// Gets or sets the command-line argument used to open a crash report instance.
     /// </summary>

@@ -4,6 +4,10 @@ namespace StageKit.Tests;
 
 public sealed class UnhandledExceptionsTests
 {
+    private sealed class RecordingSavable(List<string> calls) : StageKit.Interfaces.ISavable
+    {
+        public void Save() => calls.Add("save");
+    }
     [Fact]
     public void CanIgnoreException_WhenRegisteredBaseTypeMatches_ReturnsTrue()
     {
@@ -14,6 +18,24 @@ public sealed class UnhandledExceptionsTests
             var result = UnhandledExceptions.CanIgnoreException(new DirectoryNotFoundException("missing"));
 
             Assert.True(result);
+        }
+        finally
+        {
+            UnhandledExceptions.IgnoredExceptionList.Remove(typeof(IOException));
+        }
+    }
+
+    [Fact]
+    public void CanIgnoreException_WhenAggregateContainsNonIgnoredException_ReturnsFalse()
+    {
+        try
+        {
+            UnhandledExceptions.IgnoredExceptionList.Add(typeof(IOException));
+            var exception = new AggregateException(
+                new IOException("ignored"),
+                new InvalidOperationException("fatal"));
+
+            Assert.False(UnhandledExceptions.CanIgnoreException(exception));
         }
         finally
         {
@@ -160,6 +182,32 @@ public sealed class UnhandledExceptionsTests
     }
 
     [Fact]
+    public void CurrentDomainOnUnhandledException_WhenIgnoredAndTerminating_SavesBeforeExitEvent()
+    {
+        var exception = new InvalidOperationException("ignored terminating");
+        var calls = new List<string>();
+        var savable = new RecordingSavable(calls);
+        EventHandler handler = (_, _) => calls.Add("exit");
+        try
+        {
+            UnhandledExceptions.IgnoredExceptionMessages.Add(exception.Message);
+            UnhandledExceptions.SettingsFilesToSaveBeforeCrash.Add(savable);
+            UnhandledExceptions.BeforeForcedExit += handler;
+
+            UnhandledExceptions.CurrentDomainOnUnhandledException(
+                null, new UnhandledExceptionEventArgs(exception, true));
+
+            Assert.Equal(["save", "exit"], calls);
+        }
+        finally
+        {
+            UnhandledExceptions.BeforeForcedExit -= handler;
+            UnhandledExceptions.SettingsFilesToSaveBeforeCrash.Remove(savable);
+            UnhandledExceptions.IgnoredExceptionMessages.Remove(exception.Message);
+        }
+    }
+
+    [Fact]
     public void CurrentDomainOnUnhandledException_WhenSubscriberThrows_ContinuesInvokingSubscribers()
     {
         var invocationCount = 0;
@@ -254,7 +302,7 @@ public sealed class UnhandledExceptionsTests
         try
         {
             UnhandledExceptions.UnobservedTaskExceptionIsTerminating = true;
-            UnhandledExceptions.IgnoredExceptionMessages.Add(exception.Message);
+            UnhandledExceptions.IgnoredExceptionMessages.Add(exception.InnerException!.Message);
             UnhandledExceptions.ExceptionThrown += handler;
 
             UnhandledExceptions.TaskSchedulerOnUnobservedTaskException(
@@ -267,7 +315,7 @@ public sealed class UnhandledExceptionsTests
         finally
         {
             UnhandledExceptions.ExceptionThrown -= handler;
-            UnhandledExceptions.IgnoredExceptionMessages.Remove(exception.Message);
+            UnhandledExceptions.IgnoredExceptionMessages.Remove(exception.InnerException!.Message);
             UnhandledExceptions.UnobservedTaskExceptionIsTerminating = originalConfiguration;
         }
     }

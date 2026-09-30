@@ -72,6 +72,69 @@ public sealed class RootSettingsFileAutoSaveTests
     }
 
     [Fact]
+    public void Save_Collection_RoundTripsItemsAndKeepsViewConnected()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        var settings = new NoTrimCollectionSettings { DirectoryPath = directoryPath };
+        settings.EnableSaving();
+
+        try
+        {
+            settings.Add(42);
+            settings.Save();
+
+            var json = File.ReadAllText(settings.FilePath);
+            Assert.Contains("\"Items\"", json);
+            var reloaded = System.Text.Json.JsonSerializer.Deserialize<NoTrimCollectionSettings>(
+                json, ApplicationKit.JsonSerializerOptions);
+
+            Assert.NotNull(reloaded);
+            Assert.Equal([42], reloaded.Items);
+            Assert.Single(reloaded.ItemsView);
+            reloaded.Add(43);
+            Assert.Equal(2, reloaded.ItemsView.Count);
+        }
+        finally
+        {
+            settings.DeleteFile();
+        }
+    }
+
+    [Fact]
+    public void Load_LegacyCollectionArray_RestoresItemsAndView()
+    {
+        var reloaded = System.Text.Json.JsonSerializer.Deserialize<NoTrimCollectionSettings>(
+            "[1,2]", ApplicationKit.JsonSerializerOptions);
+
+        Assert.NotNull(reloaded);
+        Assert.Equal([1, 2], reloaded.Items);
+        Assert.Equal(2, reloaded.ItemsView.Count);
+    }
+
+    [Fact]
+    public void Save_WhenChangedDuringSerialization_RemainsDirty()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        var settings = new SerializationChangeSettings { DirectoryPath = directoryPath };
+        settings.EnableSaving();
+
+        try
+        {
+            settings.Save();
+            Assert.Equal("changed", settings.Name);
+            Assert.True(settings.HasUnsavedChanges);
+
+            settings.Save();
+            Assert.Equal(2, settings.SaveCount);
+            Assert.False(settings.HasUnsavedChanges);
+        }
+        finally
+        {
+            settings.DeleteFile();
+        }
+    }
+
+    [Fact]
     public async Task Save_WhenDebouncedSaveIsPending_CancelsPendingSave()
     {
         var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
@@ -89,6 +152,97 @@ public sealed class RootSettingsFileAutoSaveTests
 
         Assert.Equal(1, settings.SaveCount);
         settings.DeleteFile();
+    }
+
+    [Fact]
+    public async Task DeleteFile_WhenDebouncedSavePending_DoesNotRecreateFile()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        var settings = new DelayedAutoSaveSettings { DirectoryPath = directoryPath, AutoSave = true };
+        settings.EnableSaving();
+        settings.Name = "pending";
+
+        settings.DeleteFile();
+        await Task.Delay(settings.DebounceMilliseconds * 3, TestContext.Current.CancellationToken);
+
+        Assert.False(File.Exists(settings.FilePath));
+        Assert.Equal(0, settings.SaveCount);
+        settings.Dispose();
+    }
+
+    [Fact]
+    public async Task DebouncedSave_WhenRescheduled_DoesNotUseOldDeadline()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        var settings = new DelayedAutoSaveSettings { DirectoryPath = directoryPath };
+        settings.EnableSaving();
+
+        try
+        {
+            settings.DebouncedSave(300);
+            await Task.Delay(150, TestContext.Current.CancellationToken);
+            settings.DebouncedSave(400);
+            await Task.Delay(200, TestContext.Current.CancellationToken);
+
+            Assert.Equal(0, settings.SaveCount);
+            Assert.True(settings.IsDebounceSavePending);
+            Assert.True(await settings.WaitForDebouncedSaveAsync(
+                TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken));
+            Assert.Equal(1, settings.SaveCount);
+        }
+        finally
+        {
+            settings.CancelDebouncedSave();
+            settings.DeleteFile();
+            settings.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task Dispose_WhenDebouncedSavePending_DoesNotSave()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        var settings = new DelayedAutoSaveSettings { DirectoryPath = directoryPath, AutoSave = true };
+        settings.EnableSaving();
+        settings.Name = "pending";
+
+        settings.Dispose();
+        await Task.Delay(settings.DebounceMilliseconds * 3, TestContext.Current.CancellationToken);
+
+        Assert.False(File.Exists(settings.FilePath));
+        Assert.Equal(0, settings.SaveCount);
+    }
+
+    [Fact]
+    public async Task Dispose_DuringSave_WaitsForSaveBeforeSignalingWaiter()
+    {
+        var directoryPath = Path.Combine(Path.GetTempPath(), "StageKit.Tests", Guid.NewGuid().ToString("N"));
+        var settings = new BlockingSaveSettings { DirectoryPath = directoryPath };
+        settings.EnableSaving();
+
+        try
+        {
+            settings.DebouncedSave(200);
+            var waiter = settings.WaitForDebouncedSaveAsync(
+                TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.True(settings.SaveStarted.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+
+            var disposeTask = Task.Run(settings.Dispose, TestContext.Current.CancellationToken);
+            await Task.Delay(100, TestContext.Current.CancellationToken);
+            Assert.False(waiter.IsCompleted);
+
+            settings.ReleaseSave.Set();
+            await disposeTask;
+            Assert.True(await waiter);
+        }
+        finally
+        {
+            settings.ReleaseSave.Set();
+            settings.Dispose();
+            settings.DeleteFile();
+            settings.SaveStarted.Dispose();
+            settings.ReleaseSave.Dispose();
+        }
     }
 
     [Fact]
@@ -654,6 +808,61 @@ public sealed class RootSettingsFileAutoSaveTests
         public NoTrimCollectionSettings()
         {
             FileName = $"{Guid.NewGuid():N}.json";
+        }
+
+        public void EnableSaving()
+        {
+            CanSave = true;
+            MarkLoaded(this);
+        }
+    }
+
+    private sealed class BlockingSaveSettings : RootSettingsFile<BlockingSaveSettings>
+    {
+        public ManualResetEventSlim SaveStarted { get; } = new();
+        public ManualResetEventSlim ReleaseSave { get; } = new();
+
+        protected override void BeforeSave()
+        {
+            SaveStarted.Set();
+            if (!ReleaseSave.Wait(TimeSpan.FromSeconds(10)))
+            {
+                throw new TimeoutException("The test did not release the save.");
+            }
+        }
+
+        public void EnableSaving()
+        {
+            CanSave = true;
+            MarkLoaded(this);
+        }
+    }
+
+    private sealed class SerializationChangeSettings : RootSettingsFile<SerializationChangeSettings>
+    {
+        private string _name = string.Empty;
+        private bool _changed;
+
+        public string Name
+        {
+            get => _name;
+            set => SetProperty(ref _name, value);
+        }
+
+        [System.Text.Json.Serialization.JsonInclude]
+        public string ChangingProperty
+        {
+            get
+            {
+                if (!_changed)
+                {
+                    _changed = true;
+                    Name = "changed";
+                }
+
+                return "value";
+            }
+            set { }
         }
 
         public void EnableSaving()

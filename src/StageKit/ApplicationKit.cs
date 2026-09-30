@@ -69,6 +69,7 @@ public static partial class ApplicationKit
         IgnoreReadOnlyProperties = true,
         Converters =
         {
+            new RootCollectionFileJsonConverterFactory(),
             new JsonStringEnumConverter()
         }
     };

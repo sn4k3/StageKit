@@ -93,76 +93,22 @@ public static partial class StringExtensions
         }
 
         /// <summary>
-        /// Escapes a value for the value portion of a Windows batch <c>set "NAME=value"</c> command with delayed
-        /// expansion enabled.
+        /// Escapes a value for the value portion of a Windows batch <c>set "NAME=value"</c> command, whether delayed
+        /// expansion is enabled or disabled.
         /// </summary>
-        /// <returns>The escaped value. Carriage returns are removed and line feeds are represented as <c>\n</c>.</returns>
+        /// <returns>The escaped value, with percent signs doubled for batch-file parsing.</returns>
+        /// <exception cref="ArgumentException">The value contains a quote, exclamation mark, line break, or null
+        /// character, which cannot be represented safely in this command in both delayed-expansion modes.</exception>
         public string EscapeWindowsBatchValue()
         {
             var source = value ?? string.Empty;
-            var resultLength = 0;
-            var requiresEscaping = false;
-
-            checked
+            foreach (var c in source)
             {
-                foreach (var c in source)
-                {
-                    switch (c)
-                    {
-                        case '\r':
-                            requiresEscaping = true;
-                            break;
-                        case '\n' or '^' or '%' or '!' or '"':
-                            resultLength += 2;
-                            requiresEscaping = true;
-                            break;
-                        default:
-                            resultLength++;
-                            break;
-                    }
-                }
+                if (c is '"' or '!' or '\r' or '\n' or '\0')
+                    throw new ArgumentException("The value cannot be represented safely in a quoted batch set command.", nameof(value));
             }
 
-            if (!requiresEscaping) return source;
-
-            return string.Create(
-                resultLength,
-                source,
-                static (destination, source) =>
-                {
-                    var index = 0;
-                    foreach (var c in source)
-                    {
-                        switch (c)
-                        {
-                            case '\r':
-                                break;
-                            case '\n':
-                                destination[index++] = '\\';
-                                destination[index++] = 'n';
-                                break;
-                            case '^':
-                                destination[index++] = '^';
-                                destination[index++] = '^';
-                                break;
-                            case '%':
-                                destination[index++] = '%';
-                                destination[index++] = '%';
-                                break;
-                            case '!':
-                                destination[index++] = '^';
-                                destination[index++] = '!';
-                                break;
-                            case '"':
-                                destination[index++] = '^';
-                                destination[index++] = '"';
-                                break;
-                            default:
-                                destination[index++] = c;
-                                break;
-                        }
-                    }
-                });
+            return source.Replace("%", "%%", StringComparison.Ordinal);
         }
     }
 

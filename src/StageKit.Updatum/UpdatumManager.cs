@@ -1,7 +1,10 @@
-﻿using System.Buffers;
+﻿#region
+
+using System.Buffers;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Formats.Tar;
 using System.IO.Compression;
 using System.Net.Http.Headers;
 using System.Reflection;
@@ -18,7 +21,11 @@ using StageKit.Primitives.System;
 using StageKit.Runtime;
 using StageKit.Runtime.System;
 using StageKit.Updatum.Extensions;
+using FileMode = System.IO.FileMode;
+using ProductHeaderValue = Octokit.ProductHeaderValue;
 using Timer = System.Timers.Timer;
+
+#endregion
 
 namespace StageKit.Updatum;
 
@@ -250,7 +257,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
     /// Gets the GitHub client used to access releases and release asset metadata through the GitHub API.
     /// </summary>
     public GitHubClient GithubClient { get; } =
-        new(new Octokit.ProductHeaderValue(EntryApplication.AssemblyName ?? nameof(UpdatumManager),
+        new(new ProductHeaderValue(EntryApplication.AssemblyName ?? nameof(UpdatumManager),
             EntryAssemblyVersion.ToString()));
 
     /// <summary>
@@ -395,7 +402,11 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         get;
         private set
         {
-            if (!RaiseAndSetIfChanged(ref field, value)) return;
+            if (!RaiseAndSetIfChanged(ref field, value))
+            {
+                return;
+            }
+
             RaisePropertyChanged(nameof(ReleasesAheadCount));
             RaisePropertyChanged(nameof(LatestRelease));
             RaisePropertyChanged(nameof(LatestReleaseTagVersionStr));
@@ -438,7 +449,11 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         get => _assetRegexPattern;
         set
         {
-            if (!RaiseAndSetIfChanged(ref _assetRegexPattern, value)) return;
+            if (!RaiseAndSetIfChanged(ref _assetRegexPattern, value))
+            {
+                return;
+            }
+
             AssetRegex = string.IsNullOrWhiteSpace(value)
                 ? null
                 : new Regex(value, RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.CultureInvariant,
@@ -458,7 +473,10 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
             if (!string.IsNullOrWhiteSpace(value))
             {
                 value = value.Trim();
-                if (value[0] != '.') value = $".{value}";
+                if (value[0] != '.')
+                {
+                    value = $".{value}";
+                }
             }
 
             RaiseAndSetIfChanged(ref field, value);
@@ -494,7 +512,11 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         get;
         private set
         {
-            if (!RaiseAndSetIfChanged(ref field, value)) return;
+            if (!RaiseAndSetIfChanged(ref field, value))
+            {
+                return;
+            }
+
             RaisePropertyChanged(nameof(DownloadSizeMegabytes));
             RaisePropertyChanged(nameof(DownloadedPercentage));
         }
@@ -508,7 +530,11 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         get;
         private set
         {
-            if (!RaiseAndSetIfChanged(ref field, value)) return;
+            if (!RaiseAndSetIfChanged(ref field, value))
+            {
+                return;
+            }
+
             RaisePropertyChanged(nameof(DownloadedMegabytes));
             RaisePropertyChanged(nameof(DownloadedPercentage));
         }
@@ -610,7 +636,11 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         get;
         private set
         {
-            if (!RaiseAndSetIfChanged(ref field, value)) return;
+            if (!RaiseAndSetIfChanged(ref field, value))
+            {
+                return;
+            }
+
             RaisePropertyChanged(nameof(IsBusy));
         }
     }
@@ -650,7 +680,10 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
     public UpdatumManager(string? repositoryUrl, Version? currentVersion = null,
         Credentials? gitHubCredentials = null) : this()
     {
-        if (string.IsNullOrWhiteSpace(repositoryUrl)) repositoryUrl = EntryApplication.AssemblyRepositoryUrl;
+        if (string.IsNullOrWhiteSpace(repositoryUrl))
+        {
+            repositoryUrl = EntryApplication.AssemblyRepositoryUrl;
+        }
 
         if (string.IsNullOrWhiteSpace(repositoryUrl))
         {
@@ -680,8 +713,16 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                 nameof(repositoryUrl));
         }
 
-        if (currentVersion is not null) CurrentVersion = currentVersion;
-        if (gitHubCredentials is not null) GithubClient.Credentials = gitHubCredentials;
+        if (currentVersion is not null)
+        {
+            CurrentVersion = currentVersion;
+        }
+
+        if (gitHubCredentials is not null)
+        {
+            GithubClient.Credentials = gitHubCredentials;
+        }
+
         Owner = match.Groups[1].Value;
         Repository = match.Groups[2].Value;
     }
@@ -697,8 +738,16 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
     public UpdatumManager(string owner, string repository, Version? currentVersion = null,
         Credentials? gitHubCredentials = null) : this()
     {
-        if (currentVersion is not null) CurrentVersion = currentVersion;
-        if (gitHubCredentials is not null) GithubClient.Credentials = gitHubCredentials;
+        if (currentVersion is not null)
+        {
+            CurrentVersion = currentVersion;
+        }
+
+        if (gitHubCredentials is not null)
+        {
+            GithubClient.Credentials = gitHubCredentials;
+        }
+
         Owner = owner;
         Repository = repository;
     }
@@ -727,7 +776,10 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         using var linkedCancellationSource =
             CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _disposeCancellationSource.Token);
         var operationCancellationToken = linkedCancellationSource.Token;
-        if (!await _operationGate.WaitAsync(0, operationCancellationToken).ConfigureAwait(false)) return false;
+        if (!await _operationGate.WaitAsync(0, operationCancellationToken).ConfigureAwait(false))
+        {
+            return false;
+        }
 
         var timerState = _autoUpdateCheckTimer is not null && _autoUpdateCheckTimer.Enabled;
 
@@ -738,7 +790,10 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
             CheckForUpdateCount++;
 
             // Stop the timer while checking to prevent overlapping elapsed callbacks.
-            if (timerState) AutoUpdateCheckTimer.Stop();
+            if (timerState)
+            {
+                AutoUpdateCheckTimer.Stop();
+            }
 
             if (FetchOnlyLatestRelease)
             {
@@ -752,28 +807,11 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                     .WaitAsync(operationCancellationToken).ConfigureAwait(false);
             }
 
-            var releasesAheadList = new List<Release>(Releases.Count);
-
-            foreach (var release in Releases)
+            ReleasesAhead = SelectReleasesAhead(Releases, baseVersion);
+            if (IsUpdateAvailable)
             {
-                if (release.Draft // Skip draft releases
-                    || release.PublishedAt is null // Skip not published releases
-                    || release.Assets.Count == 0 // Skip releases without assets
-                    || (!AllowPreReleases && release.Prerelease)) // Skip pre-releases if not allowed
-                    continue;
-
-                var tagVersion = release.GetTagVersion();
-
-                if (tagVersion is null) continue;
-                if (tagVersion.CompareTo(baseVersion) <= 0)
-                    break; // If the release version is less than or equal to the current version, break it.
-                if (GetCompatibleReleaseAsset(release) is null) continue; // Skip releases without matching assets
-
-                releasesAheadList.Add(release);
+                RaiseEvent(UpdateFound);
             }
-
-            ReleasesAhead = releasesAheadList;
-            if (IsUpdateAvailable) RaiseEvent(UpdateFound);
         }
         finally
         {
@@ -788,6 +826,29 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         }
 
         return IsUpdateAvailable;
+    }
+
+    internal IReadOnlyList<Release> SelectReleasesAhead(IEnumerable<Release> releases, Version baseVersion)
+    {
+        var eligible = new List<(Release Release, Version Version)>();
+        foreach (var release in releases)
+        {
+            if (release.Draft || release.PublishedAt is null || release.Assets.Count == 0 ||
+                !AllowPreReleases && release.Prerelease)
+            {
+                continue;
+            }
+
+            var version = release.GetTagVersion();
+            if (version is null || version.CompareTo(baseVersion) <= 0 || GetCompatibleReleaseAsset(release) is null)
+            {
+                continue;
+            }
+
+            eligible.Add((release, version));
+        }
+
+        return eligible.OrderByDescending(item => item.Version).Select(item => item.Release).ToArray();
     }
 
     /// <summary>
@@ -808,7 +869,10 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
     /// <returns>The formatted changelog, or <see langword="null"/> when no update is available.</returns>
     public string? GetChangelog(int maxReleases = -1, bool reverseDisplayOrder = false)
     {
-        if (!IsUpdateAvailable) return null;
+        if (!IsUpdateAvailable)
+        {
+            return null;
+        }
 
         var sb = new StringBuilder();
 
@@ -819,7 +883,10 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         foreach (var release in list)
         {
             count++;
-            if (maxReleases > 0 && count > maxReleases) break;
+            if (maxReleases > 0 && count > maxReleases)
+            {
+                break;
+            }
 
             sb.AppendLine($"## {release.Name}");
             sb.AppendLine();
@@ -863,11 +930,15 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
     ///       when running from the corresponding package type<br/>
     ///     - Otherwise, defaults to <c>.zip</c><br/>
     ///   - If none of the above matches, it will fall back to the first matching asset
+    /// Archives using .tar and .tar.gz can be installed; .tar.bz2 and .tar.xz are excluded from selection.
     /// </remarks>
     /// <returns>The <see cref="ReleaseAsset"/> for the current system and app type, if not found, return <c>null</c>.</returns>
     public ReleaseAsset? GetCompatibleReleaseAsset(Release release)
     {
-        if (release.Assets.Count == 0) return null;
+        if (release.Assets.Count == 0)
+        {
+            return null;
+        }
 
         var checksumAssetNames = release.Assets
             .Select(asset => $"{asset.Name}{AssetChecksumSuffix}")
@@ -875,15 +946,36 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         var candidateAssets = new List<ReleaseAsset>();
         foreach (var asset in release.Assets)
         {
-            if (checksumAssetNames.Contains(asset.Name)) continue;
-            if (AssetRegex is not null && !AssetRegex.IsMatch(asset.Name)) continue;
+            if (checksumAssetNames.Contains(asset.Name) ||
+                asset.Name.EndsWith(".tar.bz2", StringComparison.OrdinalIgnoreCase) ||
+                asset.Name.EndsWith(".tar.xz", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (AssetRegex is not null && !AssetRegex.IsMatch(asset.Name))
+            {
+                continue;
+            }
+
             if (!string.IsNullOrWhiteSpace(AssetExtensionFilter) &&
-                !asset.Name.EndsWith(AssetExtensionFilter, StringComparison.OrdinalIgnoreCase)) continue;
+                !asset.Name.EndsWith(AssetExtensionFilter, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             candidateAssets.Add(asset);
         }
 
-        if (candidateAssets.Count == 0) return null;
-        if (candidateAssets.Count == 1) return candidateAssets[0];
+        if (candidateAssets.Count == 0)
+        {
+            return null;
+        }
+
+        if (candidateAssets.Count == 1)
+        {
+            return candidateAssets[0];
+        }
 
         // Multiple assets found, no extension filter is set, perform extra guess check.
         // Try to infer the best asset based on the EntryApplication bundle.
@@ -893,7 +985,10 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
             {
                 var preferredAsset =
                     candidateAssets.FirstOrDefault(asset => AssetNameMatchesExtension(asset.Name, extension));
-                if (preferredAsset is not null) return preferredAsset;
+                if (preferredAsset is not null)
+                {
+                    return preferredAsset;
+                }
             }
         }
 
@@ -979,7 +1074,10 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         using var linkedCancellationSource =
             CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _disposeCancellationSource.Token);
         var operationCancellationToken = linkedCancellationSource.Token;
-        if (!await _operationGate.WaitAsync(0, operationCancellationToken).ConfigureAwait(false)) return null;
+        if (!await _operationGate.WaitAsync(0, operationCancellationToken).ConfigureAwait(false))
+        {
+            return null;
+        }
 
         string? temporaryDirectoryPath = null;
         UpdatumDownloadedAsset? download = null;
@@ -994,7 +1092,10 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
             ArgumentNullException.ThrowIfNull(release);
 
             var asset = GetCompatibleReleaseAsset(release);
-            if (asset is null) return null;
+            if (asset is null)
+            {
+                return null;
+            }
 
             ValidateAssetFileName(asset.Name);
             temporaryDirectoryPath = CreateDownloadWorkspace(
@@ -1050,10 +1151,10 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                 await fileStream.CommitAsync(operationCancellationToken).ConfigureAwait(false);
             }
 
-            if (totalBytes > 0 && totalRead != totalBytes)
+            if (totalBytes > 0 && totalRead != totalBytes || asset.Size > 0 && totalRead != asset.Size)
             {
                 throw new InvalidDataException(
-                    $"Downloaded asset length was {totalRead} bytes; expected {totalBytes} bytes.");
+                    $"Downloaded asset length was {totalRead} bytes; expected HTTP length {totalBytes} and asset size {asset.Size} bytes.");
             }
 
             DownloadedBytes = totalRead;
@@ -1064,6 +1165,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
             download = new UpdatumDownloadedAsset(release, asset, targetPath)
             {
                 Sha256 = sha256,
+                ExpectedSha256 = sha256,
                 IsSignatureVerified = isSignatureVerified,
                 TemporaryDirectoryPath = temporaryDirectoryPath
             };
@@ -1081,7 +1183,11 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
             _operationGate.Release();
         }
 
-        if (download is not null) RaiseEvent(DownloadCompleted, download);
+        if (download is not null)
+        {
+            RaiseEvent(DownloadCompleted, download);
+        }
+
         return download;
     }
 
@@ -1090,7 +1196,10 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         var request = new HttpRequestMessage(HttpMethod.Get, asset.BrowserDownloadUrl);
 
         // Browser download URLs cannot authenticate downloads from private repositories.
-        if (GithubClient.Credentials.AuthenticationType == AuthenticationType.Anonymous) return request;
+        if (GithubClient.Credentials.AuthenticationType == AuthenticationType.Anonymous)
+        {
+            return request;
+        }
 
         request.RequestUri = GetTrustedGitHubApiUri(asset.Url);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/octet-stream"));
@@ -1165,12 +1274,27 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
             .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
-        var checksumText = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-        if (checksumText.Length > 4096)
+        await using var checksumStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        var checksumBytes = new byte[4097];
+        var checksumLength = 0;
+        while (checksumLength < checksumBytes.Length)
+        {
+            var read = await checksumStream.ReadAsync(checksumBytes.AsMemory(checksumLength), cancellationToken)
+                .ConfigureAwait(false);
+            if (read == 0)
+            {
+                break;
+            }
+
+            checksumLength += read;
+        }
+
+        if (checksumLength > 4096)
         {
             throw new InvalidDataException($"Checksum asset '{checksumAsset.Name}' is unexpectedly large.");
         }
 
+        var checksumText = Encoding.UTF8.GetString(checksumBytes, 0, checksumLength);
         var match = Sha256Regex().Match(checksumText);
         if (!match.Success)
         {
@@ -1222,7 +1346,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         byte[] expectedHash,
         CancellationToken cancellationToken)
     {
-        await using var fileStream = new FileStream(targetPath, System.IO.FileMode.Open, FileAccess.Read,
+        await using var fileStream = new FileStream(targetPath, FileMode.Open, FileAccess.Read,
             FileShare.Read, DefaultBufferSize, FileOptions.Asynchronous | FileOptions.SequentialScan);
         var actualHash = await SHA256.HashDataAsync(fileStream, cancellationToken).ConfigureAwait(false);
         if (!CryptographicOperations.FixedTimeEquals(expectedHash, actualHash))
@@ -1273,11 +1397,17 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
 
     private static void DeleteTemporaryWorkspace(string? temporaryDirectoryPath)
     {
-        if (string.IsNullOrWhiteSpace(temporaryDirectoryPath)) return;
+        if (string.IsNullOrWhiteSpace(temporaryDirectoryPath))
+        {
+            return;
+        }
 
         try
         {
-            if (Directory.Exists(temporaryDirectoryPath)) Directory.Delete(temporaryDirectoryPath, true);
+            if (Directory.Exists(temporaryDirectoryPath))
+            {
+                Directory.Delete(temporaryDirectoryPath, true);
+            }
         }
         catch
         {
@@ -1376,12 +1506,17 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
 
     internal static void EnsurePackageInstallationSucceeded(string packageType, int exitCode)
     {
-        if (exitCode == 0) return;
+        if (exitCode == 0)
+        {
+            return;
+        }
 
         if (ProcessHelper.IsExitCodeElevationDenied(exitCode))
+        {
             throw new IOException(
                 $"{packageType} installation requires administrator privileges that were not granted " +
                 $"(error code: {exitCode}).");
+        }
 
         throw new IOException($"{packageType} installation failed with error code: {exitCode}.");
     }
@@ -1412,6 +1547,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
             startInfo,
             true,
             PackageInstallTimeoutMilliseconds,
+            true,
             cancellationToken);
     }
 
@@ -1429,6 +1565,72 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                      : info.IsSupportedOnCurrentPlatform)) &&
                 info.Extensions.Any(extension => AssetNameMatchesExtension(filePath, extension)))
             ?.PackagingType;
+    }
+
+    internal static void ExtractTarArchive(string archiveFilePath, string destinationDirectory)
+    {
+        var root = Path.GetFullPath(destinationDirectory);
+        Directory.CreateDirectory(root);
+        var prefix = Path.TrimEndingDirectorySeparator(root) + Path.DirectorySeparatorChar;
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        using var archiveStream = File.OpenRead(archiveFilePath);
+        using Stream tarStream = archiveFilePath.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase)
+            ? new GZipStream(archiveStream, CompressionMode.Decompress)
+            : archiveStream;
+        using var reader = new TarReader(tarStream);
+        TarEntry? entry;
+        while ((entry = reader.GetNextEntry()) is not null)
+        {
+            if (Path.IsPathRooted(entry.Name))
+            {
+                throw new InvalidDataException($"Tar entry '{entry.Name}' escapes the extraction directory.");
+            }
+
+            var entryPath = Path.GetFullPath(Path.Combine(root, entry.Name));
+            if (!entryPath.StartsWith(prefix, comparison) && !entryPath.Equals(root, comparison))
+            {
+                throw new InvalidDataException($"Tar entry '{entry.Name}' escapes the extraction directory.");
+            }
+
+            if (entry.EntryType is TarEntryType.Directory)
+            {
+                Directory.CreateDirectory(entryPath);
+            }
+            else if (entry.EntryType is TarEntryType.RegularFile or TarEntryType.V7RegularFile)
+            {
+                if (entryPath.Equals(root, comparison))
+                {
+                    throw new InvalidDataException("Tar file entry cannot replace the extraction directory.");
+                }
+
+                var parentPath = Path.GetDirectoryName(entryPath)
+                                 ?? throw new InvalidDataException("Tar entry has no parent directory.");
+                Directory.CreateDirectory(parentPath);
+                using var output = new FileStream(entryPath, FileMode.CreateNew, FileAccess.Write);
+                entry.DataStream?.CopyTo(output);
+            }
+            else
+            {
+                throw new InvalidDataException($"Unsupported tar entry type for '{entry.Name}'.");
+            }
+        }
+    }
+
+    internal static ApplicationPackagingType? GetInstallPackagingTypeForFile(
+        string filePath,
+        ApplicationPackagingType currentPackagingType,
+        UpdatumWindowsExeType exeType,
+        bool isWindows)
+    {
+        if (isWindows && filePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) &&
+            (currentPackagingType is ApplicationPackagingType.DotNetSingleFile &&
+             exeType is UpdatumWindowsExeType.Auto ||
+             exeType is UpdatumWindowsExeType.SingleFileApp))
+        {
+            return ApplicationPackagingType.DotNetSingleFile;
+        }
+
+        return GetPackagingTypeForFile(filePath, isWindows ? OSPlatform.Windows : null);
     }
 
     internal static string ResolveExtractedMacOSAppBundlePath(string extractionRoot)
@@ -1453,17 +1655,25 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
     {
         if (command.Executable == "flatpak" && EntryApplication.IsLinuxFlatpak)
         {
-            if (HostSystem.TryFindExecutable("flatpak-spawn", out _)) return command.Executable;
+            if (HostSystem.TryFindExecutable("flatpak-spawn", out _))
+            {
+                return command.Executable;
+            }
 
             throw new FileNotFoundException(
                 "Flatpak host installation requires the 'flatpak-spawn' executable.",
                 "flatpak-spawn");
         }
 
-        if (HostSystem.TryFindExecutable(command.Executable, out var executablePath)) return executablePath;
+        if (HostSystem.TryFindExecutable(command.Executable, out var executablePath))
+        {
+            return executablePath;
+        }
 
         if (command.Executable == "apt-get" && HostSystem.TryFindExecutable("apt", out executablePath))
+        {
             return executablePath;
+        }
 
         throw new FileNotFoundException(
             $"{command.PackageType} installation requires the '{command.Executable}' executable.",
@@ -1475,7 +1685,9 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         CancellationToken cancellationToken)
     {
         if (!EntryApplication.IsLinuxFlatpak || string.IsNullOrWhiteSpace(EntryApplication.LinuxFlatpakId))
+        {
             return FlatpakInstallationScope.User;
+        }
 
         var applicationId = EntryApplication.LinuxFlatpakId;
         var userExitCode = await ProcessHelper.StartHostProcessAsync(
@@ -1485,7 +1697,10 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                 waitTimeout: 30_000,
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
-        if (userExitCode == 0) return FlatpakInstallationScope.User;
+        if (userExitCode == 0)
+        {
+            return FlatpakInstallationScope.User;
+        }
 
         var systemExitCode = await ProcessHelper.StartHostProcessAsync(
                 flatpakExecutable,
@@ -1494,7 +1709,10 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                 waitTimeout: 30_000,
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
-        if (systemExitCode == 0) return FlatpakInstallationScope.System;
+        if (systemExitCode == 0)
+        {
+            return FlatpakInstallationScope.System;
+        }
 
         throw new IOException(
             $"The current Flatpak installation '{applicationId}' was not found in the user or system installation.");
@@ -1508,11 +1726,11 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
             var applicationId = EntryApplication.LinuxFlatpakId ?? Path.GetFileNameWithoutExtension(filePath);
             if (EntryApplication.IsLinuxFlatpak)
             {
-                ProcessHelper.StartHostProcess("flatpak", ["run", applicationId]);
+                ProcessHelper.StartHostProcess("flatpak", CreateLinuxRelaunchArguments(applicationId, runArguments));
             }
             else if (HostSystem.TryFindExecutable("flatpak", out var flatpakExecutable))
             {
-                ProcessHelper.StartHostProcess(flatpakExecutable, ["run", applicationId]);
+                ProcessHelper.StartHostProcess(flatpakExecutable, CreateLinuxRelaunchArguments(applicationId, runArguments));
             }
 
             return;
@@ -1522,12 +1740,78 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         {
             var snapName = EntryApplication.LinuxSnapId ?? Path.GetFileNameWithoutExtension(filePath);
             if (HostSystem.TryFindExecutable("snap", out var snapExecutable))
-                ProcessHelper.StartProcess(snapExecutable, ["run", snapName]);
+            {
+                ProcessHelper.StartProcess(snapExecutable, CreateLinuxRelaunchArguments(snapName, runArguments));
+            }
+
             return;
         }
 
         if (!string.IsNullOrWhiteSpace(EntryApplication.ExecutablePath))
+        {
             ProcessHelper.StartProcess(EntryApplication.ExecutablePath, runArguments);
+        }
+    }
+
+    internal static string[] CreateLinuxRelaunchArguments(string applicationId, string? runArguments)
+    {
+        return ["run", applicationId, .. SplitRunArguments(runArguments)];
+    }
+
+    internal static string[] SplitRunArguments(string? commandLine)
+    {
+        if (string.IsNullOrWhiteSpace(commandLine))
+        {
+            return [];
+        }
+
+        var arguments = new List<string>();
+        var current = new StringBuilder();
+        var quote = '\0';
+        var started = false;
+        for (var index = 0; index < commandLine.Length; index++)
+        {
+            var character = commandLine[index];
+            if (character == '\\' && index + 1 < commandLine.Length &&
+                (char.IsWhiteSpace(commandLine[index + 1]) || commandLine[index + 1] is '\\' or '"' or '\''))
+            {
+                current.Append(commandLine[++index]);
+                started = true;
+            }
+            else if (character is '"' or '\'' && (quote == '\0' || quote == character))
+            {
+                quote = quote == '\0' ? character : '\0';
+                started = true;
+            }
+            else if (char.IsWhiteSpace(character) && quote == '\0')
+            {
+                if (!started)
+                {
+                    continue;
+                }
+
+                arguments.Add(current.ToString());
+                current.Clear();
+                started = false;
+            }
+            else
+            {
+                current.Append(character);
+                started = true;
+            }
+        }
+
+        if (quote != '\0')
+        {
+            throw new ArgumentException("Run arguments contain an unmatched quote.", nameof(commandLine));
+        }
+
+        if (started)
+        {
+            arguments.Add(current.ToString());
+        }
+
+        return [.. arguments];
     }
 
     /// <summary>
@@ -1558,7 +1842,10 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         CancellationToken cancellationToken = default)
     {
         var download = await DownloadUpdateAsync(release, cancellationToken).ConfigureAwait(false);
-        if (download is null) return false;
+        if (download is null)
+        {
+            return false;
+        }
 
         var installStarted = false;
         try
@@ -1569,7 +1856,10 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         }
         finally
         {
-            if (!installStarted) download.SafeDeleteFile();
+            if (!installStarted)
+            {
+                download.SafeDeleteFile();
+            }
         }
     }
 
@@ -1595,6 +1885,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
     /// <exception cref="FileNotFoundException">Thrown if the file specified by downloadedAsset does not exist.</exception>
     /// <exception cref="NotSupportedException">Thrown if the update file type is not supported on the current operating system.</exception>
     /// <exception cref="IOException">Thrown if a native package installer fails, including denied or unsuccessful elevation.</exception>
+    /// <exception cref="InvalidDataException">Thrown if a required checksum is missing or the downloaded file changed.</exception>
     /// <exception cref="InvalidOperationException">Thrown when an unexpected value is encountered for a configuration property.</exception>
     public Task<bool> InstallUpdateAsync(UpdatumDownloadedAsset downloadedAsset, bool forceTerminate = true,
         string? runArguments = null)
@@ -1617,16 +1908,38 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(downloadedAsset);
-        if (!downloadedAsset.FileExists) throw new FileNotFoundException("File not found", downloadedAsset.FilePath);
+        if (!downloadedAsset.FileExists)
+        {
+            throw new FileNotFoundException("File not found", downloadedAsset.FilePath);
+        }
+
         ThrowIfDisposed();
         using var linkedCancellationSource =
             CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _disposeCancellationSource.Token);
         var operationCancellationToken = linkedCancellationSource.Token;
-        if (!await _operationGate.WaitAsync(0, operationCancellationToken).ConfigureAwait(false)) return false;
+        if (!await _operationGate.WaitAsync(0, operationCancellationToken).ConfigureAwait(false))
+        {
+            return false;
+        }
 
         try
         {
             State = UpdatumState.InstallingUpdate;
+            var expectedSha256 = downloadedAsset.ExpectedSha256;
+            if (RequireAssetChecksum && expectedSha256 is null)
+            {
+                throw new InvalidDataException("The downloaded asset has no recorded SHA-256 checksum.");
+            }
+
+            if (expectedSha256 is not null)
+            {
+                await using var stream = File.OpenRead(downloadedAsset.FilePath);
+                var actualHash = await SHA256.HashDataAsync(stream, operationCancellationToken).ConfigureAwait(false);
+                if (!CryptographicOperations.FixedTimeEquals(Convert.FromHexString(expectedSha256), actualHash))
+                {
+                    throw new InvalidDataException("The downloaded asset changed after checksum verification.");
+                }
+            }
             return await InstallUpdateCoreAsync(downloadedAsset, forceTerminate, runArguments,
                 operationCancellationToken).ConfigureAwait(false);
         }
@@ -1653,10 +1966,35 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         var currentVersion = EntryApplication.AssemblyVersion ?? CurrentVersion;
         var newVersionStr = downloadedAsset.TagVersionStr;
 
+        string? activeScriptFilePath = null;
+        const string windowsValuesMarker = "REM StageKit.Updatum.WindowsValues";
+        var windowsValues = new List<KeyValuePair<string, string?>>();
+        void WriteWindowsValue(string name, string? value)
+        {
+            windowsValues.Add(new KeyValuePair<string, string?>(name, value));
+        }
+
+        void CompleteWindowsScript(string scriptFilePath)
+        {
+            using var valueWriter = new StringWriter { NewLine = "\n" };
+            UpdatumInstallScript.WriteWindowsValues(valueWriter, scriptFilePath, windowsValues);
+            var script = File.ReadAllText(scriptFilePath);
+            if (!script.Contains(windowsValuesMarker, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException("The Windows script is missing its value loader.");
+            }
+
+            File.WriteAllText(scriptFilePath,
+                script.Replace(windowsValuesMarker, valueWriter.ToString().TrimEnd('\r', '\n'), StringComparison.Ordinal),
+                new UTF8Encoding(false));
+        }
+
         ShellScriptFile CreateScriptFile(out string scriptFilePath)
         {
             var script = new ShellScriptFile(deleteOnDispose: false);
             scriptFilePath = script.FilePath;
+            activeScriptFilePath = scriptFilePath;
+            windowsValues.Clear();
             return script;
         }
 
@@ -1665,51 +2003,42 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         // *************
         void WriteWindowsScriptHeader(TextWriter writer)
         {
-            writer.WriteLine("setlocal enabledelayedexpansion");
-            writer.WriteLine();
-            writer.WriteLine(
-                $"REM Autogenerated by {nameof(UpdatumManager)} v{LibraryVersion.ToString(3)} [{DateTime.Now}]");
-            writer.WriteLine($"REM {EntryApplication.AssemblyName} upgrade script");
-            writer.WriteLine(
-                $"echo \"{EntryApplication.AssemblyName} v{EntryApplication.AssemblyVersionString} -> {newVersionStr} updater script\"");
-            writer.WriteLine("set \"DIR=%~dp0\"");
-            writer.WriteLine("cd /d \"%DIR%\"");
+            writer.WriteLine("setlocal disabledelayedexpansion");
+            writer.WriteLine("chcp 65001 >nul");
+            writer.WriteLine("cd /d \"%~dp0\"");
+            writer.WriteLine(windowsValuesMarker);
             writer.WriteLine();
 
-            // Set EntryApplication variables
-            writer.WriteLine($"REM {nameof(EntryApplication)} variables");
-            var info = EntryApplication.GetApplicationInfoDict();
-            foreach (var kp in info)
+            foreach (var pair in EntryApplication.GetApplicationInfoDict())
             {
-                writer.WriteLine($"set \"{kp.Key}={kp.Value.EscapeWindowsBatchValue()}\"");
+                WriteWindowsValue(pair.Key, pair.Value);
             }
 
-            writer.WriteLine();
-
-            // Set variables
-            writer.WriteLine("REM Variables");
-            writer.WriteLine($"set \"oldVersion={EntryApplication.AssemblyVersionString.EscapeWindowsBatchValue()}\"");
-            writer.WriteLine($"set \"newVersion={newVersionStr.EscapeWindowsBatchValue()}\"");
-            writer.WriteLine($"set \"DOWNLOAD_FILEPATH={downloadedAsset.FilePath.EscapeWindowsBatchValue()}\"");
-            writer.WriteLine(
-                $"set \"DOWNLOAD_WORKSPACE_PATH={downloadedAsset.TemporaryDirectoryPath.EscapeWindowsBatchValue()}\"");
-            writer.WriteLine($"set \"INSTALL_WORKSPACE_PATH={installWorkspacePath.EscapeWindowsBatchValue()}\"");
-            writer.WriteLine($"set \"FILEPATH={filePath.EscapeWindowsBatchValue()}\"");
-            writer.WriteLine($"set \"RUN_AFTER_UPGRADE={runArguments != NoRunAfterUpgradeToken}\"");
-            writer.WriteLine($"set \"RUN_ARGUMENTS={runArguments.EscapeWindowsBatchValue()}\"");
+            WriteWindowsValue("oldVersion", EntryApplication.AssemblyVersionString);
+            WriteWindowsValue("newVersion", newVersionStr);
+            WriteWindowsValue("DOWNLOAD_FILEPATH", downloadedAsset.FilePath);
+            WriteWindowsValue("DOWNLOAD_WORKSPACE_PATH", downloadedAsset.TemporaryDirectoryPath);
+            WriteWindowsValue("INSTALL_WORKSPACE_PATH", installWorkspacePath);
+            WriteWindowsValue("FILEPATH", filePath);
+            WriteWindowsValue("RUN_AFTER_UPGRADE",
+                (runArguments != NoRunAfterUpgradeToken).ToString());
+            WriteWindowsValue("RUN_ARGUMENTS", runArguments);
+            WriteWindowsValue("INSTALLER_ARGUMENTS", InstallUpdateWindowsInstallerArguments);
+            WriteWindowsValue("DOTNET_HOST_PATH", Environment.ProcessPath);
+            WriteWindowsValue("ASSEMBLY_EXE_NAME", $"{EntryApplication.AssemblyName}.exe");
+            writer.WriteLine("echo(!AssemblyName! v!oldVersion! ^> !newVersion! updater script");
             writer.WriteLine();
         }
-
         void WriteWindowsScriptFileValidation(TextWriter writer)
         {
             // Downloaded file path verification
-            writer.WriteLine("if not exist \"%DOWNLOAD_FILEPATH%\" (");
+            writer.WriteLine("if not exist \"!DOWNLOAD_FILEPATH!\" (");
             writer.WriteLine("  echo - Error: The expected downloaded file does not exist");
-            writer.WriteLine("  exit /b 1");
+            writer.WriteLine("  goto :ScriptFailed");
             writer.WriteLine(')');
-            writer.WriteLine("if not exist \"%FILEPATH%\" (");
+            writer.WriteLine("if not exist \"!FILEPATH!\" (");
             writer.WriteLine("  echo - Error: The expected filepath does not exist");
-            writer.WriteLine("  exit /b 1");
+            writer.WriteLine("  goto :ScriptFailed");
             writer.WriteLine(')');
             writer.WriteLine();
         }
@@ -1725,7 +2054,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
             }
             else if (!string.IsNullOrWhiteSpace(EntryApplication.ProcessName))
             {
-                killCommands.Add($"taskkill /IM \"%{nameof(EntryApplication.ProcessName)}%\" /T >nul 2>&1");
+                killCommands.Add($"taskkill /IM \"!{nameof(EntryApplication.ProcessName)}!\" /T >nul 2>&1");
             }
 
             if (!string.IsNullOrWhiteSpace(EntryApplication.AssemblyName))
@@ -1733,7 +2062,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                 var name = $"{EntryApplication.AssemblyName}.exe";
                 if (killCommands.Count == 0 || EntryApplication.ProcessName != name)
                 {
-                    killCommands.Add($"taskkill /IM \"{name}\" /T >nul 2>&1");
+                    killCommands.Add($"taskkill /IM \"!ASSEMBLY_EXE_NAME!\" /T >nul 2>&1");
                 }
             }
 
@@ -1778,16 +2107,17 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         void WriteWindowsScriptEnd(TextWriter writer)
         {
             writer.WriteLine("echo - Removing temp source files");
-            writer.WriteLine("call :DeleteIfSafe \"%DOWNLOAD_FILEPATH%\"");
-            writer.WriteLine("call :DeleteIfSafe \"%FILEPATH%\"");
+            writer.WriteLine("del /F /Q \"%~f0.data-*\" >nul 2>&1");
+            writer.WriteLine("call :DeleteIfSafe DOWNLOAD_FILEPATH");
+            writer.WriteLine("call :DeleteIfSafe FILEPATH");
             writer.WriteLine(
-                "if defined INSTALL_WORKSPACE_PATH if exist \"%INSTALL_WORKSPACE_PATH%\" rmdir /S /Q \"%INSTALL_WORKSPACE_PATH%\"");
+                "if defined INSTALL_WORKSPACE_PATH if exist \"!INSTALL_WORKSPACE_PATH!\" rmdir /S /Q \"!INSTALL_WORKSPACE_PATH!\"");
             writer.WriteLine(
-                "if defined DOWNLOAD_WORKSPACE_PATH if exist \"%DOWNLOAD_WORKSPACE_PATH%\" rmdir /S /Q \"%DOWNLOAD_WORKSPACE_PATH%\"");
+                "if defined DOWNLOAD_WORKSPACE_PATH if exist \"!DOWNLOAD_WORKSPACE_PATH!\" rmdir /S /Q \"!DOWNLOAD_WORKSPACE_PATH!\"");
             writer.WriteLine();
 
 
-            writer.WriteLine($"if \"%{nameof(EntryApplication.AssemblyConfiguration)}%\"==\"Release\" (");
+            writer.WriteLine($"if \"!{nameof(EntryApplication.AssemblyConfiguration)}!\"==\"Release\" (");
             writer.WriteLine("  start \"\" /b cmd /c \"timeout /t 1 >nul & del /F /Q \"\"%~f0\"\" >nul 2>&1\"");
             writer.WriteLine(")");
             writer.WriteLine();
@@ -1797,20 +2127,24 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
             writer.WriteLine("REM End of script");
             writer.WriteLine("exit /b 0");
             writer.WriteLine();
+            writer.WriteLine(":ScriptFailed");
+            writer.WriteLine("del /F /Q \"%~f0.data-*\" >nul 2>&1");
+            writer.WriteLine("exit /b 1");
+            writer.WriteLine();
 
             writer.WriteLine("REM ----------------------------------------");
             writer.WriteLine("REM Usage:");
-            writer.WriteLine("REM   call :DeleteIfSafe \"C:\\path\\to\\file.tmp\" \"Removing temp file\"");
+            writer.WriteLine("REM   call :DeleteIfSafe DOWNLOAD_FILEPATH");
             writer.WriteLine("REM Returns:");
             writer.WriteLine("REM   0 = deleted OR not found");
             writer.WriteLine("REM   1 = unsafe path OR failed to delete");
             writer.WriteLine("REM ----------------------------------------");
             writer.WriteLine(":DeleteIfSafe");
-            writer.WriteLine("setlocal EnableExtensions");
-            writer.WriteLine("set \"FILE=%~1\"");
+            writer.WriteLine("setlocal EnableExtensions EnableDelayedExpansion");
+            writer.WriteLine("set \"FILE=!%~1!\"");
             writer.WriteLine("set \"MSG=%~2\"");
             writer.WriteLine();
-            writer.WriteLine("if defined MSG echo(%MSG%");
+            writer.WriteLine("if defined MSG echo(!MSG!");
             writer.WriteLine();
             writer.WriteLine("REM Safety: empty");
             writer.WriteLine("if not defined FILE (");
@@ -1819,33 +2153,33 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
             writer.WriteLine(")");
             writer.WriteLine();
             writer.WriteLine("REM Safety: \"\\\"");
-            writer.WriteLine("if \"%FILE%\"==\"\\\" (");
+            writer.WriteLine("if \"!FILE!\"==\"\\\" (");
             writer.WriteLine("  echo(  [SKIP] Unsafe path: \"\\\"");
             writer.WriteLine("  exit /b 1");
             writer.WriteLine(")");
             writer.WriteLine();
             writer.WriteLine("REM Safety: block drive root like C:\\, D:\\");
-            writer.WriteLine("if \"%FILE:~1,2%\"==\":\\\" if \"%FILE:~3%\"==\"\" (");
-            writer.WriteLine("  echo(  [SKIP] Unsafe path: drive root \"%FILE%\"");
+            writer.WriteLine("if \"!FILE:~1,2!\"==\":\\\" if \"!FILE:~3!\"==\"\" (");
+            writer.WriteLine("  echo(  [SKIP] Unsafe path: drive root \"!FILE!\"");
             writer.WriteLine("  exit /b 1");
             writer.WriteLine(")");
             writer.WriteLine();
             writer.WriteLine("REM Not found = not an error (change to exit /b 1 if you prefer)");
-            writer.WriteLine("if not exist \"%FILE%\" (");
-            writer.WriteLine("  REM echo(  [SKIP] Not found \"%FILE%\"");
+            writer.WriteLine("if not exist \"!FILE!\" (");
+            writer.WriteLine("  REM echo(  [SKIP] Not found \"!FILE!\"");
             writer.WriteLine("  exit /b 0");
             writer.WriteLine(")");
             writer.WriteLine();
-            writer.WriteLine("del /F /Q \"%FILE%\" >nul 2>&1");
+            writer.WriteLine("del /F /Q \"!FILE!\" >nul 2>&1");
             writer.WriteLine(" REM /F - Force deleting of read-only files.");
             writer.WriteLine(" REM /Q - Quiet mode, do not ask if ok to delete on global wildcard.");
             writer.WriteLine();
-            writer.WriteLine("if exist \"%FILE%\" (");
-            writer.WriteLine("  echo(  [FAIL] Could not delete \"%FILE%\"");
+            writer.WriteLine("if exist \"!FILE!\" (");
+            writer.WriteLine("  echo(  [FAIL] Could not delete \"!FILE!\"");
             writer.WriteLine("  exit /b 1");
             writer.WriteLine(")");
             writer.WriteLine();
-            writer.WriteLine("echo(  [OK] Deleted \"%FILE%\"");
+            writer.WriteLine("echo(  [OK] Deleted \"!FILE!\"");
             writer.WriteLine("exit /b 0");
             writer.WriteLine("REM End of :DeleteIfSafe subroutine");
         }
@@ -1857,9 +2191,8 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         {
             writer.WriteLine(
                 $"# Autogenerated by {nameof(UpdatumManager)} v{LibraryVersion.ToString(3)} [{DateTime.Now}]");
-            writer.WriteLine($"# {EntryApplication.AssemblyName} upgrade script");
-            writer.WriteLine(
-                $"echo \"{EntryApplication.AssemblyName} v{currentVersion} -> {newVersionStr} updater script\"");
+            writer.WriteLine("# Application upgrade script");
+            UpdatumInstallScript.WriteBashUpdaterMessage(writer, EntryApplication.AssemblyName, currentVersion, newVersionStr);
             writer.WriteLine("cd \"$(dirname \"$0\")\"");
             writer.WriteLine();
 
@@ -1884,7 +2217,8 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
             writer.WriteLine($"FILEPATH={filePath.QuoteBashAnsiCString()}");
             writer.WriteLine(
                 $"RUN_AFTER_UPGRADE={(runArguments != NoRunAfterUpgradeToken).ToString().QuoteBashAnsiCString()}");
-            writer.WriteLine($"RUN_ARGUMENTS={runArguments.QuoteBashAnsiCString()}");
+            writer.WriteLine($"RUN_ARGUMENTS=({string.Join(" ", SplitRunArguments(runArguments).Select(argument => argument.QuoteBashAnsiCString()))})");
+            writer.WriteLine($"DOTNET_HOST_PATH={Environment.ProcessPath.QuoteBashAnsiCString()}");
             writer.WriteLine();
 
             // Functions
@@ -1968,7 +2302,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
 
             if (!string.IsNullOrWhiteSpace(EntryApplication.AssemblyLocation))
             {
-                killCommands.Add($"-f \"dotnet.+{Regex.Escape(Path.GetFileName(EntryApplication.AssemblyLocation))}\"");
+                killCommands.Add($"-f \"dotnet.+{Regex.Escape(Path.GetFileName(EntryApplication.AssemblyLocation)).EscapeBashDoubleQuoted()}\"");
             }
 
             if (killCommands.Count > 0)
@@ -2038,30 +2372,58 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                 // This can be a portable, app or single file executable //
                 // If single file extract it and use it instead          //
                 ///////////////////////////////////////////////////////////
-                if (fileExtension.Equals(".zip", StringComparison.OrdinalIgnoreCase))
+                var isZipArchive = fileExtension.Equals(".zip", StringComparison.OrdinalIgnoreCase);
+                var isTarArchive = filePath.EndsWith(".tar", StringComparison.OrdinalIgnoreCase) ||
+                    filePath.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase);
+                if (isZipArchive || isTarArchive)
                 {
-                    using var archive = ZipFile.OpenRead(filePath);
-
-                    if (archive.Entries.Count == 0) return false; // No entries in the archive
-                    if (archive.Entries.Count == 1 && archive.Entries[0].IsFile())
+                    var extractDirectoryPath = Path.Combine(installWorkspacePath, $"extracted-{Guid.NewGuid():N}");
+                    string? extractedSingleFile = null;
+                    if (isZipArchive)
                     {
-                        var entry = archive.Entries[0];
-                        filePath = Path.Combine(installWorkspacePath, entry.Name);
-                        entry.ExtractToFile(filePath, false);
+                        using var archive = ZipFile.OpenRead(filePath);
+                        if (archive.Entries.Count == 0)
+                        {
+                            return false;
+                        }
 
-                        // Replace downloaded file with the extracted file and process next checks
+                        if (archive.Entries.Count == 1 && archive.Entries[0].IsFile())
+                        {
+                            var entry = archive.Entries[0];
+                            extractedSingleFile = Path.Combine(installWorkspacePath, entry.Name);
+                            entry.ExtractToFile(extractedSingleFile, false);
+                        }
+                        else
+                        {
+                            Directory.CreateDirectory(extractDirectoryPath);
+                            archive.ExtractToDirectory(extractDirectoryPath, false);
+                        }
+                    }
+                    else
+                    {
+                        Directory.CreateDirectory(extractDirectoryPath);
+                        ExtractTarArchive(filePath, extractDirectoryPath);
+                        var topLevelEntries = Directory.EnumerateFileSystemEntries(extractDirectoryPath).Take(2).ToArray();
+                        if (topLevelEntries.Length == 0)
+                        {
+                            return false;
+                        }
+
+                        if (topLevelEntries.Length == 1 && File.Exists(topLevelEntries[0]))
+                        {
+                            extractedSingleFile = topLevelEntries[0];
+                        }
+                    }
+
+                    if (extractedSingleFile is not null)
+                    {
+                        filePath = extractedSingleFile;
                         fileName = Path.GetFileName(filePath);
                         fileNameNoExt = Path.GetFileNameWithoutExtension(filePath);
                         fileExtension = Path.GetExtension(fileName);
                     }
-                    else // Portable app or macOS application bundle
-                    {
-                        // Extract the archive to a temporary directory
-                        var extractDirectoryPath = Path.Combine(installWorkspacePath, $"extracted-{Guid.NewGuid():N}");
-                        Directory.CreateDirectory(extractDirectoryPath);
-                        archive.ExtractToDirectory(extractDirectoryPath, false);
-
-                        var sourceDirectoryPath = extractDirectoryPath;
+                    else
+                    {                        var sourceDirectoryPath = extractDirectoryPath;
                         var targetDirectoryPath = EntryApplication.BaseDirectory;
                         var currentExecutablePath = EntryApplication.ExecutablePath;
                         var newExecutingFilePath = currentExecutablePath;
@@ -2105,24 +2467,24 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                             {
                                 WriteWindowsScriptHeader(writer);
 
-                                writer.WriteLine(
-                                    $"set \"SOURCE_PATH={sourceDirectoryPath.EscapeWindowsBatchValue()}\"");
-                                writer.WriteLine(
-                                    $"set \"DEST_PATH={targetDirectoryPath.EscapeWindowsBatchValue()}\"");
-                                writer.WriteLine(
-                                    $"set \"STAGED_PATH={stagedDirectoryPath.EscapeWindowsBatchValue()}\"");
-                                writer.WriteLine(
-                                    $"set \"BACKUP_PATH={backupDirectoryPath.EscapeWindowsBatchValue()}\"");
+                                WriteWindowsValue("SOURCE_PATH", sourceDirectoryPath);
+                                WriteWindowsValue("DEST_PATH", targetDirectoryPath);
+                                WriteWindowsValue("STAGED_PATH", stagedDirectoryPath);
+                                WriteWindowsValue("BACKUP_PATH", backupDirectoryPath);
                                 writer.WriteLine();
 
                                 // Source path verification
-                                writer.WriteLine("if not exist \"%SOURCE_PATH%\" (");
+                                writer.WriteLine("if not exist \"!SOURCE_PATH!\" (");
                                 writer.WriteLine("  echo - Error: Source path does not exist");
-                                writer.WriteLine("  exit /b 1");
+                                writer.WriteLine("  goto :ScriptFailed");
                                 writer.WriteLine(')');
                                 writer.WriteLine();
 
-                                if (forceTerminate) WriteWindowsScriptKillInstances(writer);
+                                if (forceTerminate)
+                                {
+                                    WriteWindowsScriptKillInstances(writer);
+                                }
+
                                 UpdatumInstallScript.WriteWindowsDirectoryReplacement(writer);
 
                                 // Replace folder name with the new version name when required
@@ -2138,29 +2500,34 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                                             writer.WriteLine("echo - Directory is able to rename version name");
                                             var newTargetDirectoryPath =
                                                 Path.Combine(parent.FullName, newDirectoryName);
+                                            WriteWindowsValue("NEW_DEST_PATH", newTargetDirectoryPath);
+                                            if (!string.IsNullOrWhiteSpace(newExecutingFilePath))
+                                            {
+                                                newExecutingFilePath =
+                                                    newExecutingFilePath.Replace(di.FullName, newTargetDirectoryPath);
+                                                WriteWindowsValue("NEW_EXECUTABLE_PATH", newExecutingFilePath);
+                                            }
                                             writer.WriteLine(
-                                                $"if exist \"{newTargetDirectoryPath.EscapeWindowsBatchValue()}\" (");
+                                                $"if exist \"!NEW_DEST_PATH!\" (");
                                             writer.WriteLine(
                                                 "  echo - Could not rename directory: target already exists");
                                             writer.WriteLine(") else (");
                                             writer.WriteLine("  echo - Attempt to rename directory");
                                             writer.WriteLine(
-                                                $"  move /Y \"%DEST_PATH%\" \"{newTargetDirectoryPath.EscapeWindowsBatchValue()}\" >nul");
+                                                $"  move /Y \"!DEST_PATH!\" \"!NEW_DEST_PATH!\" >nul");
                                             writer.WriteLine("  if errorlevel 1 (");
                                             writer.WriteLine(
                                                 "    echo - Could not rename directory; continuing with the original path");
                                             writer.WriteLine("  ) else (");
                                             writer.WriteLine(
-                                                $"    set \"{nameof(EntryApplication.BaseDirectory)}={newTargetDirectoryPath.EscapeWindowsBatchValue()}\"");
+                                                $"    set \"{nameof(EntryApplication.BaseDirectory)}=!NEW_DEST_PATH!\"");
                                             writer.WriteLine(
-                                                $"    set \"DEST_PATH=%{nameof(EntryApplication.BaseDirectory)}%\"");
+                                                $"    set \"DEST_PATH=!{nameof(EntryApplication.BaseDirectory)}!\"");
 
                                             if (!string.IsNullOrWhiteSpace(newExecutingFilePath))
                                             {
-                                                newExecutingFilePath =
-                                                    newExecutingFilePath.Replace(di.FullName, newTargetDirectoryPath);
                                                 writer.WriteLine(
-                                                    $"    set \"{nameof(EntryApplication.ExecutablePath)}={newExecutingFilePath.EscapeWindowsBatchValue()}\"");
+                                                    $"    set \"{nameof(EntryApplication.ExecutablePath)}=!NEW_EXECUTABLE_PATH!\"");
                                             }
 
                                             writer.WriteLine("  )");
@@ -2173,15 +2540,15 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                                 WriteWindowsScriptInjectCustomScript(writer);
 
                                 writer.WriteLine(
-                                    $"if not \"%{nameof(EntryApplication.ExecutablePath)}%\"==\"\" if /I \"%RUN_AFTER_UPGRADE%\"==\"True\" (");
+                                    $"if not \"!{nameof(EntryApplication.ExecutablePath)}!\"==\"\" if /I \"!RUN_AFTER_UPGRADE!\"==\"True\" (");
                                 writer.WriteLine($"  echo - Execute the upgraded application");
-                                writer.WriteLine($"  if exist \"%{nameof(EntryApplication.ExecutablePath)}%\" (");
+                                writer.WriteLine($"  if exist \"!{nameof(EntryApplication.ExecutablePath)}!\" (");
                                 writer.WriteLine(EntryApplication.IsRunningFromDotNetProcess
-                                    ? $"    start \"\" \"{Environment.ProcessPath}\" \"%{nameof(EntryApplication.ExecutablePath)}%\" %RUN_ARGUMENTS%"
-                                    : $"    start \"\" \"%{nameof(EntryApplication.ExecutablePath)}%\" %RUN_ARGUMENTS%");
+                                    ? $"    start \"\" \"!DOTNET_HOST_PATH!\" \"!{nameof(EntryApplication.ExecutablePath)}!\" !RUN_ARGUMENTS!"
+                                    : $"    start \"\" \"!{nameof(EntryApplication.ExecutablePath)}!\" !RUN_ARGUMENTS!");
                                 writer.WriteLine("  ) else (");
                                 writer.WriteLine(
-                                    $"    echo File not found: %{nameof(EntryApplication.ExecutablePath)}%, not executing!");
+                                    $"    echo File not found: !{nameof(EntryApplication.ExecutablePath)}!, not executing!");
                                 writer.WriteLine("  )");
                                 writer.WriteLine(") else (");
                                 writer.WriteLine(
@@ -2193,14 +2560,18 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                                 WriteWindowsScriptEnd(writer);
                             }
 
+                            CompleteWindowsScript(upgradeScriptFilePath);
                             cancellationToken.ThrowIfCancellationRequested();
-                            RaiseEvent(InstallUpdateCompleted, downloadedAsset);
+                            await RaiseInstallUpdateCompletedAsync(downloadedAsset, forceTerminate, cancellationToken).ConfigureAwait(false);
 
                             var startInfo = ProcessHelper.CreateShellScriptProcessStartInfo(upgradeScriptFilePath);
                             startInfo.WorkingDirectory = tmpPath;
                             var result = ProcessHelper.StartProcess(startInfo);
 
-                            if (result != 0) return false;
+                            if (result != 0)
+                            {
+                                return false;
+                            }
 
                             cleanupTransferredToScript = true;
                         }
@@ -2223,7 +2594,10 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                                 writer.WriteLine("fi");
                                 writer.WriteLine();
 
-                                if (forceTerminate) WriteLinuxScriptKillInstances(writer);
+                                if (forceTerminate)
+                                {
+                                    WriteLinuxScriptKillInstances(writer);
+                                }
 
 
                                 if (OperatingSystem.IsMacOS())
@@ -2259,6 +2633,12 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                                             writer.WriteLine("echo \"- Directory is able to rename version name\"");
                                             var newTargetDirectoryPath =
                                                 Path.Combine(parent.FullName, newDirectoryName);
+                                            if (!string.IsNullOrWhiteSpace(newExecutingFilePath))
+                                            {
+                                                newExecutingFilePath =
+                                                    newExecutingFilePath.Replace(di.FullName, newTargetDirectoryPath);
+                                            }
+
                                             writer.WriteLine(
                                                 $"NEW_DEST_PATH={newTargetDirectoryPath.QuoteBashAnsiCString()}");
                                             writer.WriteLine("if [[ -e \"$NEW_DEST_PATH\" ]]; then");
@@ -2272,8 +2652,6 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
 
                                             if (!string.IsNullOrWhiteSpace(newExecutingFilePath))
                                             {
-                                                newExecutingFilePath =
-                                                    newExecutingFilePath.Replace(di.FullName, newTargetDirectoryPath);
                                                 writer.WriteLine(
                                                     $"  {nameof(EntryApplication.ExecutablePath)}={newExecutingFilePath.QuoteBashAnsiCString()}");
                                             }
@@ -2298,7 +2676,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                                     UpdatumInstallScript.WriteMacOSAppBundleLaunch(
                                         writer,
                                         $"${nameof(EntryApplication.ExecutablePath)}",
-                                        "$RUN_ARGUMENTS");
+                                        "RUN_ARGUMENTS");
                                 }
                                 else
                                 {
@@ -2308,7 +2686,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                                     if (EntryApplication.IsRunningFromDotNetProcess)
                                     {
                                         writer.WriteLine(
-                                            $"    nohup \"{Environment.ProcessPath}\" \"${nameof(EntryApplication.ExecutablePath)}\" $RUN_ARGUMENTS >/dev/null 2>&1 &");
+                                            $"    nohup \"$DOTNET_HOST_PATH\" \"${nameof(EntryApplication.ExecutablePath)}\" \"${{RUN_ARGUMENTS[@]}}\" >/dev/null 2>&1 &");
                                     }
                                     else
                                     {
@@ -2316,7 +2694,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                                         writer.WriteLine(
                                             $"    chmod +x \"${nameof(EntryApplication.ExecutablePath)}\"");
                                         writer.WriteLine(
-                                            $"    nohup \"${nameof(EntryApplication.ExecutablePath)}\" $RUN_ARGUMENTS >/dev/null 2>&1 &");
+                                            $"    nohup \"${nameof(EntryApplication.ExecutablePath)}\" \"${{RUN_ARGUMENTS[@]}}\" >/dev/null 2>&1 &");
                                     }
 
                                     writer.WriteLine("    sleep 1"); // Let the process start
@@ -2341,23 +2719,32 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                             }
 
                             cancellationToken.ThrowIfCancellationRequested();
-                            RaiseEvent(InstallUpdateCompleted, downloadedAsset);
+                            await RaiseInstallUpdateCompletedAsync(downloadedAsset, forceTerminate, cancellationToken).ConfigureAwait(false);
 
                             // Execute the script
                             var startInfo = ProcessHelper.CreateShellScriptProcessStartInfo(upgradeScriptFilePath);
                             startInfo.WorkingDirectory = tmpPath;
                             var result = ProcessHelper.StartProcess(startInfo);
 
-                            if (result != 0) return false;
+                            if (result != 0)
+                            {
+                                return false;
+                            }
+
                             cleanupTransferredToScript = true;
                         }
 
-                        if (forceTerminate) Environment.Exit(0);
+                        if (forceTerminate)
+                        {
+                            Environment.Exit(0);
+                        }
+
                         return true;
                     }
                 }
 
-                var inferredPackageType = GetPackagingTypeForFile(filePath);
+                var inferredPackageType = GetInstallPackagingTypeForFile(
+                    filePath, EntryApplication.PackagingType, InstallUpdateWindowsExeType, OperatingSystem.IsWindows());
 
                 ////////////////////////
                 // Windows Installers //
@@ -2387,6 +2774,13 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                         }
                     }
 
+                    if (EntryApplication.PackagingType is ApplicationPackagingType.DotNetSingleFile &&
+                        InstallUpdateWindowsExeType is UpdatumWindowsExeType.Auto ||
+                        InstallUpdateWindowsExeType is UpdatumWindowsExeType.SingleFileApp)
+                    {
+                        isWindowsInstaller = false;
+                    }
+
                     if (isWindowsInstaller)
                     {
                         string upgradeScriptFilePath;
@@ -2394,23 +2788,26 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                         {
                             WriteWindowsScriptHeader(writer);
                             WriteWindowsScriptFileValidation(writer);
-                            if (forceTerminate) WriteWindowsScriptKillInstances(writer);
+                            if (forceTerminate)
+                            {
+                                WriteWindowsScriptKillInstances(writer);
+                            }
+
                             WriteWindowsScriptInjectCustomScript(writer);
 
                             writer.WriteLine("echo - Calling the installer");
-                            writer.WriteLine(
-                                $"start \"\" /WAIT \"%FILEPATH%\" {InstallUpdateWindowsInstallerArguments}");
+                            UpdatumInstallScript.WriteWindowsInstallerExecution(writer);
                             writer.WriteLine(" REM /WAIT - Start application and wait for it to terminate.");
                             writer.WriteLine();
 
-                            writer.WriteLine("if /I \"%RUN_AFTER_UPGRADE%\"==\"True\" (");
+                            writer.WriteLine("if /I \"!RUN_AFTER_UPGRADE!\"==\"True\" (");
                             writer.WriteLine("  echo - Execute the upgraded application");
-                            writer.WriteLine($"  if exist \"%{nameof(EntryApplication.ExecutablePath)}%\" (");
+                            writer.WriteLine($"  if exist \"!{nameof(EntryApplication.ExecutablePath)}!\" (");
                             writer.WriteLine(
-                                $"    start \"\" \"%{nameof(EntryApplication.ExecutablePath)}%\" %RUN_ARGUMENTS%");
+                                $"    start \"\" \"!{nameof(EntryApplication.ExecutablePath)}!\" !RUN_ARGUMENTS!");
                             writer.WriteLine("  ) else (");
                             writer.WriteLine(
-                                $"    echo - File not found: \"%{nameof(EntryApplication.ExecutablePath)}%\", not executing!");
+                                $"    echo - File not found: \"!{nameof(EntryApplication.ExecutablePath)}!\", not executing!");
                             writer.WriteLine("  )");
                             writer.WriteLine(") else (");
                             writer.WriteLine(
@@ -2422,17 +2819,26 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                             WriteWindowsScriptEnd(writer);
                         }
 
+                        CompleteWindowsScript(upgradeScriptFilePath);
                         cancellationToken.ThrowIfCancellationRequested();
-                        RaiseEvent(InstallUpdateCompleted, downloadedAsset);
+                        await RaiseInstallUpdateCompletedAsync(downloadedAsset, forceTerminate, cancellationToken).ConfigureAwait(false);
 
                         var startInfo = ProcessHelper.CreateShellScriptProcessStartInfo(upgradeScriptFilePath);
                         startInfo.WorkingDirectory = tmpPath;
                         var result = ProcessHelper.StartProcess(startInfo);
 
-                        if (result != 0) return false;
+                        if (result != 0)
+                        {
+                            return false;
+                        }
+
                         cleanupTransferredToScript = true;
 
-                        if (forceTerminate) Environment.Exit(0); // Exit the application to install
+                        if (forceTerminate)
+                        {
+                            Environment.Exit(0); // Exit the application to install
+                        }
+
                         return true;
                     }
                 }
@@ -2443,7 +2849,9 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                 if (inferredPackageType is ApplicationPackagingType.MacOSPkg or ApplicationPackagingType.MacOSDmg)
                 {
                     if (!OperatingSystem.IsMacOS())
+                    {
                         throw new NotSupportedException($"The package '{fileName}' is only supported on macOS.");
+                    }
 
                     var isPkgPackage = inferredPackageType is ApplicationPackagingType.MacOSPkg;
 
@@ -2458,12 +2866,21 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
 
                     // Mount and resolve the target before anything with side effects, so a privilege-escalation
                     // retry never runs the custom script twice.
-                    if (!isPkgPackage) UpdatumInstallScript.WriteMacOSDmgPreparation(writer);
+                    if (!isPkgPackage)
+                    {
+                        UpdatumInstallScript.WriteMacOSDmgPreparation(writer);
+                    }
 
                     WriteLinuxScriptInjectCustomScript(writer);
 
-                    if (isPkgPackage) UpdatumInstallScript.WriteMacOSPkgInstallation(writer);
-                    else UpdatumInstallScript.WriteMacOSDmgInstallation(writer);
+                    if (isPkgPackage)
+                    {
+                        UpdatumInstallScript.WriteMacOSPkgInstallation(writer);
+                    }
+                    else
+                    {
+                        UpdatumInstallScript.WriteMacOSDmgInstallation(writer);
+                    }
 
                     writer.Flush();
                     cancellationToken.ThrowIfCancellationRequested();
@@ -2491,7 +2908,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                     EnsurePackageInstallationSucceeded(isPkgPackage ? "macOS PKG" : "macOS DMG", exitCode);
 
                     cancellationToken.ThrowIfCancellationRequested();
-                    RaiseEvent(InstallUpdateCompleted, downloadedAsset);
+                    await RaiseInstallUpdateCompletedAsync(downloadedAsset, forceTerminate, cancellationToken).ConfigureAwait(false);
                     if (runArguments != NoRunAfterUpgradeToken)
                     {
                         if (forceTerminate)
@@ -2508,7 +2925,9 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                                 appBundlePath,
                                 runArguments);
                             if (ProcessHelper.StartProcess(relaunchStartInfo) != 0)
+                            {
                                 throw new IOException("The macOS application relaunch helper could not be started.");
+                            }
                         }
                         else
                         {
@@ -2540,7 +2959,9 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                     or ApplicationPackagingType.LinuxArchPackage)
                 {
                     if (!OperatingSystem.IsLinux())
+                    {
                         throw new NotSupportedException($"The package '{fileName}' is only supported on Linux.");
+                    }
 
                     var flatpakInstallationScope = FlatpakInstallationScope.User;
                     string? resolvedFlatpakExecutable = null;
@@ -2563,32 +2984,33 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                         flatpakInstallationScope);
                     var installerExecutable = resolvedFlatpakExecutable
                                               ?? ResolvePackageInstallerExecutable(installCommand);
-                    var exitCode = inferredPackageType is ApplicationPackagingType.LinuxFlatpak
-                        ? await ProcessHelper.StartHostProcessAsync(
-                                installerExecutable,
-                                installCommand.Arguments,
-                                installCommand.RequiresElevation,
-                                true,
-                                PackageInstallTimeoutMilliseconds,
-                                cancellationToken)
-                            .ConfigureAwait(false)
-                        : await ProcessHelper.StartProcessAsync(
-                                installerExecutable,
-                                installCommand.Arguments,
-                                installCommand.RequiresElevation,
-                                true,
-                                PackageInstallTimeoutMilliseconds,
-                                cancellationToken)
-                            .ConfigureAwait(false);
-
+                    var installerStartInfo = inferredPackageType is ApplicationPackagingType.LinuxFlatpak
+                        ? ProcessHelper.CreateHostProcessStartInfo(
+                            installerExecutable, installCommand.Arguments, installCommand.RequiresElevation)
+                        : ProcessHelper.CreateProcessStartInfo(
+                            installerExecutable, installCommand.Arguments, installCommand.RequiresElevation);
+                    var exitCode = await ProcessHelper.StartProcessAsync(
+                            installerStartInfo,
+                            waitForCompletion: true,
+                            waitTimeout: PackageInstallTimeoutMilliseconds,
+                            cancellationToken: cancellationToken,
+                            killOnCancellation: true)
+                        .ConfigureAwait(false);
                     EnsurePackageInstallationSucceeded(installCommand.PackageType, exitCode);
 
                     cancellationToken.ThrowIfCancellationRequested();
-                    RaiseEvent(InstallUpdateCompleted, downloadedAsset);
-                    if (runArguments != NoRunAfterUpgradeToken) StartUpdatedLinuxPackage(filePath, runArguments);
+                    await RaiseInstallUpdateCompletedAsync(downloadedAsset, forceTerminate, cancellationToken).ConfigureAwait(false);
+                    if (runArguments != NoRunAfterUpgradeToken)
+                    {
+                        StartUpdatedLinuxPackage(filePath, runArguments);
+                    }
 
                     downloadedAsset.SafeDeleteFile();
-                    if (forceTerminate) Environment.Exit(0);
+                    if (forceTerminate)
+                    {
+                        Environment.Exit(0);
+                    }
+
                     return true;
                 }
 
@@ -2602,14 +3024,22 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                     if (inferredPackageType is ApplicationPackagingType.DotNetSingleFile &&
                         OperatingSystem.IsWindows() &&
                         !filePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                    {
                         throw new NotSupportedException(
                             "An extensionless single-file update is only supported on Unix systems.");
+                    }
+
                     if (inferredPackageType is ApplicationPackagingType.DotNetSingleFile &&
                         filePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) && !OperatingSystem.IsWindows())
+                    {
                         throw new NotSupportedException(
                             "A Windows single-file update is only supported on Windows.");
+                    }
+
                     if (inferredPackageType is ApplicationPackagingType.LinuxAppImage && !OperatingSystem.IsLinux())
+                    {
                         throw new NotSupportedException("An AppImage update is only supported on Linux.");
+                    }
 
 
                     var currentExecutablePath = EntryApplication.ExecutablePath;
@@ -2674,10 +3104,18 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                     switch (InstallUpdateSingleFileExecutableNameStrategy)
                     {
                         case UpdatumSingleFileExecutableNameStrategy.EntryApplicationName:
-                            if (!SetTargetNameFromCurrentExecutableName()) SetTargetNameWithCustomName();
+                            if (!SetTargetNameFromCurrentExecutableName())
+                            {
+                                SetTargetNameWithCustomName();
+                            }
+
                             break;
                         case UpdatumSingleFileExecutableNameStrategy.CustomName:
-                            if (!SetTargetNameWithCustomName()) SetTargetNameFromCurrentExecutableName();
+                            if (!SetTargetNameWithCustomName())
+                            {
+                                SetTargetNameFromCurrentExecutableName();
+                            }
+
                             break;
                         case UpdatumSingleFileExecutableNameStrategy.DownloadName:
                             // Default behavior, already filled as, do nothing
@@ -2736,31 +3174,35 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                         using (var writer = CreateScriptFile(out upgradeScriptFilePath))
                         {
                             WriteWindowsScriptHeader(writer);
-                            writer.WriteLine($"set \"SOURCE_FILEPATH={filePath.EscapeWindowsBatchValue()}\"");
-                            writer.WriteLine($"set \"CURRENT_FILEPATH={currentFilePath.EscapeWindowsBatchValue()}\"");
-                            writer.WriteLine($"set \"TARGET_FILEPATH={targetFilePath.EscapeWindowsBatchValue()}\"");
-                            writer.WriteLine($"set \"STAGED_FILEPATH={stagedFilePath.EscapeWindowsBatchValue()}\"");
-                            writer.WriteLine($"set \"BACKUP_FILEPATH={backupFilePath.EscapeWindowsBatchValue()}\"");
+                            WriteWindowsValue("SOURCE_FILEPATH", filePath);
+                            WriteWindowsValue("CURRENT_FILEPATH", currentFilePath);
+                            WriteWindowsValue("TARGET_FILEPATH", targetFilePath);
+                            WriteWindowsValue("STAGED_FILEPATH", stagedFilePath);
+                            WriteWindowsValue("BACKUP_FILEPATH", backupFilePath);
                             writer.WriteLine();
 
                             // Source path verification
-                            writer.WriteLine("if not exist \"%SOURCE_FILEPATH%\" (");
+                            writer.WriteLine("if not exist \"!SOURCE_FILEPATH!\" (");
                             writer.WriteLine("  echo - Error: Source file does not exist");
-                            writer.WriteLine("  exit /b 1");
+                            writer.WriteLine("  goto :ScriptFailed");
                             writer.WriteLine(')');
                             writer.WriteLine();
 
-                            if (forceTerminate) WriteWindowsScriptKillInstances(writer);
+                            if (forceTerminate)
+                            {
+                                WriteWindowsScriptKillInstances(writer);
+                            }
+
                             WriteWindowsScriptInjectCustomScript(writer);
                             UpdatumInstallScript.WriteWindowsFileReplacement(writer);
                             writer.WriteLine();
 
-                            writer.WriteLine($"if /I \"%RUN_AFTER_UPGRADE%\"==\"True\" (");
+                            writer.WriteLine($"if /I \"!RUN_AFTER_UPGRADE!\"==\"True\" (");
                             writer.WriteLine($"  echo - Execute the upgraded application");
-                            writer.WriteLine($"  if exist \"%TARGET_FILEPATH%\" (");
-                            writer.WriteLine($"    start \"\" \"%TARGET_FILEPATH%\" %RUN_ARGUMENTS%");
+                            writer.WriteLine($"  if exist \"!TARGET_FILEPATH!\" (");
+                            writer.WriteLine($"    start \"\" \"!TARGET_FILEPATH!\" !RUN_ARGUMENTS!");
                             writer.WriteLine($"  ) else (");
-                            writer.WriteLine($"    echo - File not found: \"%TARGET_FILEPATH%\", not executing!");
+                            writer.WriteLine($"    echo - File not found: \"!TARGET_FILEPATH!\", not executing!");
                             writer.WriteLine($"  )");
                             writer.WriteLine($") else (");
                             writer.WriteLine($"  echo - Skip execution of application (RUN_AFTER_UPGRADE is not true)");
@@ -2771,19 +3213,26 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                             WriteWindowsScriptEnd(writer);
                         }
 
+                        CompleteWindowsScript(upgradeScriptFilePath);
                         cancellationToken.ThrowIfCancellationRequested();
-                        RaiseEvent(InstallUpdateCompleted, downloadedAsset);
+                        await RaiseInstallUpdateCompletedAsync(downloadedAsset, forceTerminate, cancellationToken).ConfigureAwait(false);
 
                         var startInfo = ProcessHelper.CreateShellScriptProcessStartInfo(upgradeScriptFilePath);
                         startInfo.WorkingDirectory = tmpPath;
                         var result = ProcessHelper.StartProcess(startInfo);
 
-                        if (result != 0) return false;
+                        if (result != 0)
+                        {
+                            return false;
+                        }
 
                         cleanupTransferredToScript = true;
 
 
-                        if (forceTerminate) Environment.Exit(0); // Exit the application to install
+                        if (forceTerminate)
+                        {
+                            Environment.Exit(0); // Exit the application to install
+                        }
 
                         return true;
                     }
@@ -2807,7 +3256,11 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                             writer.WriteLine("fi");
                             writer.WriteLine();
 
-                            if (forceTerminate) WriteLinuxScriptKillInstances(writer);
+                            if (forceTerminate)
+                            {
+                                WriteLinuxScriptKillInstances(writer);
+                            }
+
                             WriteLinuxScriptInjectCustomScript(writer);
                             writer.WriteLine("mkdir -p \"$(dirname \"$TARGET_FILEPATH\")\"");
                             UpdatumInstallScript.WriteUnixFileReplacement(writer);
@@ -2832,7 +3285,7 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                             writer.WriteLine("if [[ \"${RUN_AFTER_UPGRADE:-False}\" = \"True\" ]]; then");
                             writer.WriteLine("  if [[ -f \"$TARGET_FILEPATH\" ]]; then");
                             writer.WriteLine("    echo \"- Execute the upgraded application\"");
-                            writer.WriteLine($"    nohup \"$TARGET_FILEPATH\" $RUN_ARGUMENTS >/dev/null 2>&1 &");
+                            writer.WriteLine($"    nohup \"$TARGET_FILEPATH\" \"${{RUN_ARGUMENTS[@]}}\" >/dev/null 2>&1 &");
                             writer.WriteLine("    sleep 1"); // Let the process start
                             writer.WriteLine("    if ps -p $! >/dev/null; then");
                             writer.WriteLine("      echo \"- Success: Application running (PID: $!)\"");
@@ -2852,17 +3305,23 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
                         }
 
                         cancellationToken.ThrowIfCancellationRequested();
-                        RaiseEvent(InstallUpdateCompleted, downloadedAsset);
+                        await RaiseInstallUpdateCompletedAsync(downloadedAsset, forceTerminate, cancellationToken).ConfigureAwait(false);
 
                         var startInfo = ProcessHelper.CreateShellScriptProcessStartInfo(upgradeScriptFilePath);
                         startInfo.WorkingDirectory = tmpPath;
                         var result = ProcessHelper.StartProcess(startInfo);
 
-                        if (result != 0) return false;
+                        if (result != 0)
+                        {
+                            return false;
+                        }
 
                         cleanupTransferredToScript = true;
 
-                        if (forceTerminate) Environment.Exit(0); // Exit the application to install
+                        if (forceTerminate)
+                        {
+                            Environment.Exit(0); // Exit the application to install
+                        }
 
                         return true;
                     }
@@ -2873,7 +3332,21 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
             }
             finally
             {
-                if (!cleanupTransferredToScript) DeleteTemporaryWorkspace(installWorkspacePath);
+                if (!cleanupTransferredToScript)
+                {
+                    if (activeScriptFilePath is not null)
+                    {
+                        foreach (var dataFilePath in Directory.EnumerateFiles(
+                                     Path.GetDirectoryName(activeScriptFilePath)!,
+                                     Path.GetFileName(activeScriptFilePath) + ".data-*"))
+                        {
+                            File.Delete(dataFilePath);
+                        }
+
+                        File.Delete(activeScriptFilePath);
+                    }
+                    DeleteTemporaryWorkspace(installWorkspacePath);
+                }
             }
         }, cancellationToken);
     }
@@ -2973,7 +3446,11 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
     /// <returns></returns>
     protected bool RaiseAndSetIfChanged<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {
-        if (EqualityComparer<T>.Default.Equals(field, value)) return false;
+        if (EqualityComparer<T>.Default.Equals(field, value))
+        {
+            return false;
+        }
+
         field = value;
         RaisePropertyChanged(propertyName);
         return true;
@@ -3008,13 +3485,55 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
         }
     }
 
+    internal async Task RaiseInstallUpdateCompletedAsync(
+        UpdatumDownloadedAsset asset,
+        bool waitForHandlers,
+        CancellationToken cancellationToken)
+    {
+        var handler = InstallUpdateCompleted;
+        if (handler is null)
+        {
+            return;
+        }
+
+        if (!waitForHandlers)
+        {
+            RaiseEvent(handler, asset);
+            return;
+        }
+
+        var context = EventSynchronizationContext;
+        if (context is null || context == SynchronizationContext.Current)
+        {
+            handler(this, asset);
+            return;
+        }
+
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        context.Post(_ =>
+        {
+            try
+            {
+                handler(this, asset);
+                completion.TrySetResult();
+            }
+            catch (Exception exception)
+            {
+                completion.TrySetException(exception);
+            }
+        }, null);
+        await completion.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken).ConfigureAwait(false);
+    }
     /// <summary>
     /// Raises an event on the <see cref="EventSynchronizationContext"/> if set, otherwise on the current thread.
     /// </summary>
     /// <param name="handler">The event handler to invoke.</param>
     private void RaiseEvent(EventHandler? handler)
     {
-        if (handler is null) return;
+        if (handler is null)
+        {
+            return;
+        }
 
         if (EventSynchronizationContext is not null)
         {
@@ -3034,7 +3553,10 @@ public partial class UpdatumManager : DisposableObject, INotifyPropertyChanged
     /// <param name="args">The event arguments.</param>
     private void RaiseEvent<T>(EventHandler<T>? handler, T args)
     {
-        if (handler is null) return;
+        if (handler is null)
+        {
+            return;
+        }
 
         if (EventSynchronizationContext is not null)
         {

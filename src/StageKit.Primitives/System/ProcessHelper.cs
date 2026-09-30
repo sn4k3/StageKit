@@ -1,7 +1,11 @@
+#region
+
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 using StageKit.Primitives.Extensions;
+
+#endregion
 
 namespace StageKit.Primitives.System;
 
@@ -11,8 +15,8 @@ namespace StageKit.Primitives.System;
 public static class ProcessHelper
 {
     private static readonly bool IsFlatpakSandbox = OperatingSystem.IsLinux() &&
-                                                     !string.IsNullOrWhiteSpace(
-                                                         Environment.GetEnvironmentVariable("FLATPAK_ID"));
+                                                    !string.IsNullOrWhiteSpace(
+                                                        Environment.GetEnvironmentVariable("FLATPAK_ID"));
 
     #region Elevation exit codes
 
@@ -66,10 +70,15 @@ public static class ProcessHelper
     /// </remarks>
     public static bool IsExitCodeElevationDenied(int exitCode)
     {
-        if (OperatingSystem.IsWindows()) return exitCode == WindowsElevationCancelledExitCode;
+        if (OperatingSystem.IsWindows())
+        {
+            return exitCode == WindowsElevationCancelledExitCode;
+        }
 
         if (OperatingSystem.IsLinux())
+        {
             return exitCode is LinuxElevationDismissedExitCode or LinuxElevationNotAuthorizedExitCode;
+        }
 
         return false;
     }
@@ -86,7 +95,10 @@ public static class ProcessHelper
     /// </remarks>
     public static bool IsExitCodeElevationDenied(int exitCode, string? standardError)
     {
-        if (IsExitCodeElevationDenied(exitCode)) return true;
+        if (IsExitCodeElevationDenied(exitCode))
+        {
+            return true;
+        }
 
         return OperatingSystem.IsMacOS() &&
                exitCode == MacOSElevationCancelledExitCode &&
@@ -543,10 +555,29 @@ public static class ProcessHelper
     /// </returns>
     /// <exception cref="ArgumentNullException"><paramref name="processStartInfo"/> is <see langword="null"/>.</exception>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> is cancelled.</exception>
-    public static async Task<int> StartProcessAsync(
+    public static Task<int> StartProcessAsync(
         ProcessStartInfo processStartInfo,
         bool waitForCompletion = false,
         int waitTimeout = Timeout.Infinite,
+        CancellationToken cancellationToken = default)
+    {
+        return StartProcessAsync(processStartInfo, waitForCompletion, waitTimeout, false, cancellationToken);
+    }
+
+    /// <summary>
+    /// Starts a process and optionally terminates it if waiting is cancelled or times out.
+    /// </summary>
+    /// <param name="processStartInfo">The process configuration.</param>
+    /// <param name="waitForCompletion">Whether to wait for process exit.</param>
+    /// <param name="waitTimeout">The wait timeout in milliseconds.</param>
+    /// <param name="killOnCancellation">Whether to kill the process tree and await exit after cancellation or timeout.</param>
+    /// <param name="cancellationToken">The cancellation token for the wait.</param>
+    /// <returns>The exit code, zero if not waiting, or <c>-1</c> on startup failure or timeout.</returns>
+    public static async Task<int> StartProcessAsync(
+        ProcessStartInfo processStartInfo,
+        bool waitForCompletion,
+        int waitTimeout,
+        bool killOnCancellation,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(processStartInfo);
@@ -557,6 +588,7 @@ public static class ProcessHelper
                     processStartInfo,
                     waitForCompletion,
                     waitTimeout,
+                    killOnCancellation,
                     cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -1216,7 +1248,8 @@ public static class ProcessHelper
     /// Creates start information that runs a script file through the host command shell with raw script arguments.
     /// </summary>
     /// <param name="scriptFilePath">The path of the script file to run.</param>
-    /// <param name="arguments">The raw arguments to pass to the script.</param>
+    /// <param name="arguments">The raw arguments passed verbatim to <c>cmd.exe</c> on Windows.
+    /// The caller is responsible for escaping them; use the argument-list overload for untrusted values.</param>
     /// <param name="requireElevation">
     /// <see langword="true"/> to request administrator elevation unless the current process is already privileged.
     /// </param>
@@ -1263,6 +1296,8 @@ public static class ProcessHelper
     /// </param>
     /// <returns>A configurable <see cref="ProcessStartInfo"/> instance.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="arguments"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">On Windows, the script path or an argument contains a quote, percent sign,
+    /// carriage return, line feed, or null character, which cannot be represented safely through <c>cmd.exe</c>.</exception>
     public static ProcessStartInfo CreateShellScriptProcessStartInfo(
         string scriptFilePath,
         IEnumerable<string> arguments,
@@ -1286,9 +1321,19 @@ public static class ProcessHelper
 
         var (name, _) = GetShell();
         if (!OperatingSystem.IsWindows())
+        {
             return CreateProcessStartInfo(name, [scriptFilePath, .. arguments], requireElevation, isPrivilegedProcess);
+        }
 
-        var quotedArguments = string.Join(' ', arguments.Select(static argument => argument.QuoteProcessArgument()));
+        ValidateWindowsShellArgument(scriptFilePath, nameof(scriptFilePath));
+        var argumentArray = arguments.ToArray();
+        foreach (var argument in argumentArray)
+        {
+            ValidateWindowsShellArgument(argument, nameof(arguments));
+        }
+
+        var quotedArguments =
+            string.Join(' ', argumentArray.Select(static argument => argument.QuoteProcessArgument()));
         var scriptAndArguments = string.IsNullOrEmpty(quotedArguments)
             ? scriptFilePath.QuoteProcessArgument()
             : string.Concat(scriptFilePath.QuoteProcessArgument(), " ", quotedArguments);
@@ -1299,6 +1344,16 @@ public static class ProcessHelper
             string.Concat("/d /s /c \"", scriptAndArguments, "\""),
             requireElevation,
             isPrivilegedProcess);
+    }
+
+    private static void ValidateWindowsShellArgument(string argument, string parameterName)
+    {
+        ArgumentNullException.ThrowIfNull(argument);
+        if (argument.IndexOfAny(['"', '%', '\r', '\n', '\0']) >= 0)
+        {
+            throw new ArgumentException("The argument cannot be represented safely in a cmd.exe command.",
+                parameterName);
+        }
     }
 
     /// <summary>
@@ -1331,7 +1386,9 @@ public static class ProcessHelper
         bool isPrivilegedProcess)
     {
         if (!requireElevation || isPrivilegedProcess)
+        {
             return new ProcessStartInfo(name, arguments ?? string.Empty);
+        }
 
         if (OperatingSystem.IsWindows())
         {
@@ -1343,7 +1400,9 @@ public static class ProcessHelper
         }
 
         if (OperatingSystem.IsLinux())
+        {
             return new ProcessStartInfo("pkexec", JoinProcessArguments(name, arguments));
+        }
 
         if (OperatingSystem.IsMacOS())
         {
@@ -1417,7 +1476,10 @@ public static class ProcessHelper
         bool isPrivilegedProcess)
     {
         var targetStartInfo = CreateProcessStartInfo(name, arguments, requireElevation, isPrivilegedProcess);
-        if (!isFlatpakSandbox) return targetStartInfo;
+        if (!isFlatpakSandbox)
+        {
+            return targetStartInfo;
+        }
 
         var hostStartInfo = CreateArgumentListProcessStartInfo(
             "flatpak-spawn",
@@ -1440,7 +1502,9 @@ public static class ProcessHelper
         ArgumentNullException.ThrowIfNull(arguments);
 
         if (!requireElevation || isPrivilegedProcess)
+        {
             return CreateArgumentListProcessStartInfo(name, arguments);
+        }
 
         if (OperatingSystem.IsWindows())
         {
@@ -1485,7 +1549,9 @@ public static class ProcessHelper
         using var process = Process.Start(processStartInfo);
 
         if (process is null)
+        {
             return new ProcessOutput(-1, string.Empty, string.Empty);
+        }
 
         var standardOutput = process.StandardOutput.ReadToEndAsync();
         var standardError = process.StandardError.ReadToEndAsync();
@@ -1500,7 +1566,7 @@ public static class ProcessHelper
 
     private static async Task<ProcessOutput> GetProcessOutputCoreAsync(
         ProcessStartInfo processStartInfo,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -1509,7 +1575,9 @@ public static class ProcessHelper
         using var process = Process.Start(processStartInfo);
 
         if (process is null)
+        {
             return new ProcessOutput(-1, string.Empty, string.Empty);
+        }
 
         var standardOutput = process.StandardOutput.ReadToEndAsync(cancellationToken);
         var standardError = process.StandardError.ReadToEndAsync(cancellationToken);
@@ -1538,10 +1606,14 @@ public static class ProcessHelper
         using var process = Process.Start(processStartInfo);
 
         if (process is null)
+        {
             return -1;
+        }
 
         if (!waitForCompletion)
+        {
             return 0;
+        }
 
         return process.WaitForExit(waitTimeout) ? process.ExitCode : -1;
     }
@@ -1550,36 +1622,58 @@ public static class ProcessHelper
         ProcessStartInfo processStartInfo,
         bool waitForCompletion,
         int waitTimeout,
-        CancellationToken cancellationToken)
+        bool killOnCancellation = false,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         using var process = Process.Start(processStartInfo);
-
         if (process is null)
+        {
             return -1;
+        }
 
         if (!waitForCompletion)
-            return 0;
-
-        if (waitTimeout == Timeout.Infinite)
         {
-            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-            return process.ExitCode;
+            return 0;
         }
 
-        using var timeoutCancellationSource = new CancellationTokenSource(waitTimeout);
-        using var linkedCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(
-            cancellationToken,
-            timeoutCancellationSource.Token);
-
+        using var timeoutSource = waitTimeout == Timeout.Infinite ? null : new CancellationTokenSource(waitTimeout);
+        using var linkedSource = timeoutSource is null
+            ? null
+            : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutSource.Token);
         try
         {
-            await process.WaitForExitAsync(linkedCancellationSource.Token).ConfigureAwait(false);
+            await process.WaitForExitAsync(linkedSource?.Token ?? cancellationToken).ConfigureAwait(false);
             return process.ExitCode;
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException)
         {
+            if (killOnCancellation)
+            {
+                try
+                {
+                    if (!process.HasExited)
+                    {
+                        process.Kill(entireProcessTree: true);
+                    }
+                }
+                catch (NotSupportedException)
+                {
+                    if (!process.HasExited)
+                    {
+                        process.Kill();
+                    }
+                }
+
+                await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+
             return -1;
         }
     }
@@ -1657,10 +1751,12 @@ public static class ProcessHelper
         try
         {
             if (!process.HasExited)
+            {
                 process.Kill(true);
+            }
         }
         catch (Exception exception) when (exception is InvalidOperationException or
-                                              global::System.ComponentModel.Win32Exception or
+                                              Win32Exception or
                                               NotSupportedException)
         {
             Debug.WriteLine(exception);

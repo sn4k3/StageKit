@@ -14,12 +14,14 @@ namespace StageKit.Updatum;
 public record UpdatumDownloadedAsset(Release Release, ReleaseAsset ReleaseAsset, string FilePath)
 {
     /// <summary>
-    /// Gets the SHA-256 digest of the downloaded file when it was verified against a checksum release asset.
+    /// Gets the SHA-256 digest of the downloaded file when it was verified against a release digest or checksum asset.
     /// </summary>
     public string? Sha256 { get; init; }
 
+    internal string? ExpectedSha256 { get; init; }
+
     /// <summary>
-    /// Gets a value indicating whether the downloaded file was verified against a SHA-256 checksum release asset.
+    /// Gets a value indicating whether the downloaded file was verified against a SHA-256 release digest or checksum asset.
     /// </summary>
     [MemberNotNullWhen(true, nameof(Sha256))]
     public bool IsChecksumVerified => Sha256 is not null;

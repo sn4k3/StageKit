@@ -49,6 +49,9 @@ public abstract class RootSettingsFile<T> : SubSettings, ISavable, IDisposable w
     /// Indicates whether there are unsaved changes that occurred while a save operation was in progress. If <see cref="CanSave"/> is <see langword="false"/>, changes will set this flag to ensure that a save is attempted after the current save operation completes.
     /// </summary>
     private bool _dirty;
+    private long _changeGeneration;
+    private long _scheduleGeneration;
+    private readonly object _changeLock = new();
 
     /// <summary>
     /// Indicates whether a debounced save operation has been scheduled but has not completed yet.
@@ -140,6 +143,7 @@ public abstract class RootSettingsFile<T> : SubSettings, ISavable, IDisposable w
 
     /// <summary>
     /// Gets a value indicating whether the current state allows the object to be saved.
+    /// Saving stays disabled if an invalid source file could not be backed up, preserving that file.
     /// </summary>
     [JsonIgnore]
     public bool CanSave
@@ -213,13 +217,14 @@ public abstract class RootSettingsFile<T> : SubSettings, ISavable, IDisposable w
         base.OnPropertyChanged(e);
 
         if (!IsLoaded) return;
+        MarkUnsavedChange();
         ScheduleAutoSaveAfterChange();
     }
 
     private void SubSettingsOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (!IsLoaded) return;
-        HasUnsavedChanges = true;
+        MarkUnsavedChange();
         ScheduleAutoSaveAfterChange();
     }
     #endregion
@@ -233,6 +238,7 @@ public abstract class RootSettingsFile<T> : SubSettings, ISavable, IDisposable w
         var filePath = instance.FilePath;
         var loadFromFile = false;
         var hasPostLoadChanges = false;
+        var originalFileMustBePreserved = false;
 
         if (File.Exists(filePath))
         {
@@ -260,7 +266,8 @@ public abstract class RootSettingsFile<T> : SubSettings, ISavable, IDisposable w
                 {
                     loaded.Dispose();
                     loaded = null;
-                    RenameInvalidSettingsFile(filePath, instance.FileName, "unsupported-version");
+                    originalFileMustBePreserved =
+                        !RenameInvalidSettingsFile(filePath, instance.FileName, "unsupported-version");
                 }
                 else
                 {
@@ -284,7 +291,8 @@ public abstract class RootSettingsFile<T> : SubSettings, ISavable, IDisposable w
             {
                 UnhandledExceptions.HandleSafeException(e, $"LoadOrCreate {instance.FileName}");
 
-                RenameInvalidSettingsFile(filePath, instance.FileName, "corrupt");
+                originalFileMustBePreserved =
+                    !RenameInvalidSettingsFile(filePath, instance.FileName, "corrupt");
             }
             finally
             {
@@ -301,7 +309,8 @@ public abstract class RootSettingsFile<T> : SubSettings, ISavable, IDisposable w
         instance.ValidateSettings(validationContext);
         hasPostLoadChanges |= validationContext.HasChanges;
 
-        instance.CanSave = true;
+        instance.CanSave = !originalFileMustBePreserved;
+        if (originalFileMustBePreserved) instance.AutoSave = false;
         instance.OnLoadedCore(loadFromFile);
 
         foreach (var subSettings in instance.SubSettingsCollection)
@@ -323,16 +332,18 @@ public abstract class RootSettingsFile<T> : SubSettings, ISavable, IDisposable w
         return instance;
     }
 
-    private static void RenameInvalidSettingsFile(string filePath, string fileName, string reason)
+    private static bool RenameInvalidSettingsFile(string filePath, string fileName, string reason)
     {
         try
         {
             var backupPath = $"{filePath}.{reason}-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}";
             File.Move(filePath, backupPath);
+            return true;
         }
         catch (Exception moveEx)
         {
             UnhandledExceptions.HandleSafeException(moveEx, $"Backup {reason} {fileName}");
+            return false;
         }
     }
 
@@ -380,7 +391,8 @@ public abstract class RootSettingsFile<T> : SubSettings, ISavable, IDisposable w
     /// Saves the current settings to the configured file location using JSON serialization.
     /// </summary>
     /// <remarks>If the target directory does not exist, it is created automatically. Any exceptions
-    /// encountered during the save operation are handled internally and do not propagate to the caller.</remarks>
+    /// encountered during the save operation are handled internally and do not propagate to the caller.
+    /// Saving remains disabled when an invalid source file could not be backed up, so that source is never overwritten.</remarks>
     public void Save()
     {
         TaskCompletionSource<bool>? completionToSignal = null;
@@ -388,7 +400,7 @@ public abstract class RootSettingsFile<T> : SubSettings, ISavable, IDisposable w
         {
             lock (_saveLock)
             {
-                _saveTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+                CancelSaveTimerCore();
                 if (!CanSave || (!HasUnsavedChanges && FileExists))
                 {
                     _isDebounceSavePending = false;
@@ -403,13 +415,24 @@ public abstract class RootSettingsFile<T> : SubSettings, ISavable, IDisposable w
                 {
                     BeforeSave();
 
+                    var serializedGeneration = Interlocked.Read(ref _changeGeneration);
                     SafeFile.Write(FilePath, stream =>
                     {
                         JsonSerializer.Serialize(stream, this, GetType(), JsonOptions);
                     });
 
                     SaveCount++;
-                    ClearUnsavedChangesCore();
+                    lock (_changeLock)
+                    {
+                        if (_changeGeneration == serializedGeneration)
+                        {
+                            ClearUnsavedChangesCore();
+                        }
+                        else
+                        {
+                            _dirty = AutoSave;
+                        }
+                    }
                     AfterSave();
                 }
                 catch (Exception e)
@@ -424,14 +447,7 @@ public abstract class RootSettingsFile<T> : SubSettings, ISavable, IDisposable w
                     _dirty = false;
                     var delay = DefaultDebounceSaveMilliseconds <= 0 ? 0 : DefaultDebounceSaveMilliseconds;
                     _isDebounceSavePending = true;
-                    if (_saveTimer is null)
-                    {
-                        _saveTimer = new Timer(_ => Save(), null, delay, Timeout.Infinite);
-                    }
-                    else
-                    {
-                        _saveTimer.Change(delay, Timeout.Infinite);
-                    }
+                    ScheduleSaveTimerCore(delay);
                     return;
                 }
 
@@ -482,15 +498,27 @@ public abstract class RootSettingsFile<T> : SubSettings, ISavable, IDisposable w
 
             _isDebounceSavePending = true;
             _saveCompletion ??= new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            if (_saveTimer is null)
-            {
-                _saveTimer = new Timer(_ => Save(), null, debounceMilliseconds, Timeout.Infinite);
-            }
-            else
-            {
-                _saveTimer.Change(debounceMilliseconds, Timeout.Infinite);
-            }
+            ScheduleSaveTimerCore(debounceMilliseconds);
         }
+    }
+
+    private void ScheduleSaveTimerCore(int delay)
+    {
+        var generation = ++_scheduleGeneration;
+        _saveTimer?.Dispose();
+        _saveTimer = new Timer(_ =>
+        {
+            lock (_saveLock)
+            {
+                if (generation == _scheduleGeneration && !IsDisposed) Save();
+            }
+        }, null, delay, Timeout.Infinite);
+    }
+
+    private void CancelSaveTimerCore()
+    {
+        _scheduleGeneration++;
+        _saveTimer?.Change(Timeout.Infinite, Timeout.Infinite);
     }
 
     /// <summary>
@@ -526,6 +554,18 @@ public abstract class RootSettingsFile<T> : SubSettings, ISavable, IDisposable w
 
         using var scope = SuspendAutoSave(saveOnComplete);
         update();
+    }
+
+    /// <summary>
+    /// Records a change made while serialization may be in progress.
+    /// </summary>
+    protected void MarkUnsavedChange()
+    {
+        lock (_changeLock)
+        {
+            _changeGeneration++;
+            HasUnsavedChanges = true;
+        }
     }
 
     /// <summary>
@@ -596,7 +636,7 @@ public abstract class RootSettingsFile<T> : SubSettings, ISavable, IDisposable w
         TaskCompletionSource<bool>? completionToSignal;
         lock (_saveLock)
         {
-            _saveTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            CancelSaveTimerCore();
             _isDebounceSavePending = false;
             completionToSignal = _saveCompletion;
             _saveCompletion = null;
@@ -682,7 +722,8 @@ public abstract class RootSettingsFile<T> : SubSettings, ISavable, IDisposable w
     /// Saves the current settings to the configured file location using JSON serialization.
     /// </summary>
     /// <remarks>If the target directory does not exist, it is created automatically. Any exceptions
-    /// encountered during the save operation are handled internally and do not propagate to the caller.</remarks>
+    /// encountered during the save operation are handled internally and do not propagate to the caller.
+    /// Saving remains disabled when an invalid source file could not be backed up, so that source is never overwritten.</remarks>
     public static void SaveInstance()
     {
         if (!IsInstanceCreated) return;
@@ -694,6 +735,7 @@ public abstract class RootSettingsFile<T> : SubSettings, ISavable, IDisposable w
     /// </summary>
     public void DeleteFile()
     {
+        CancelDebouncedSave();
         try
         {
             if (FileExists)
@@ -721,21 +763,26 @@ public abstract class RootSettingsFile<T> : SubSettings, ISavable, IDisposable w
     /// <param name="disposing"><see langword="true"/> to release managed resources; otherwise, <see langword="false"/>.</param>
     protected virtual void Dispose(bool disposing)
     {
-        if (IsDisposed) return;
-        if (disposing)
+        lock (_saveLock)
         {
-            _saveTimer?.Dispose();
-            _saveTimer = null;
-            _saveCompletion?.TrySetResult(false);
-            _saveCompletion = null;
-            foreach (var subSettings in _trackedSubSettings)
+            if (IsDisposed) return;
+            IsDisposed = true;
+            if (disposing)
             {
-                subSettings.PropertyChanged -= SubSettingsOnPropertyChanged;
-            }
+                CancelSaveTimerCore();
+                _saveTimer?.Dispose();
+                _saveTimer = null;
+                _isDebounceSavePending = false;
+                _saveCompletion?.TrySetResult(false);
+                _saveCompletion = null;
+                foreach (var subSettings in _trackedSubSettings)
+                {
+                    subSettings.PropertyChanged -= SubSettingsOnPropertyChanged;
+                }
 
-            _trackedSubSettings.Clear();
+                _trackedSubSettings.Clear();
+            }
         }
-        IsDisposed = true;
     }
     #endregion
 }

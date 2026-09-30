@@ -396,8 +396,8 @@ public static partial class PathUtilities
         try
         {
             return string.Equals(
-                Path.GetFullPath(path1),
-                Path.GetFullPath(path2),
+                Path.TrimEndingDirectorySeparator(Path.GetFullPath(path1)),
+                Path.TrimEndingDirectorySeparator(Path.GetFullPath(path2)),
                 HostSystem.HostStringComparison
             );
         }

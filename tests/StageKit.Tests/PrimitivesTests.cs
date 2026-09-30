@@ -1,3 +1,5 @@
+#region
+
 using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
@@ -5,6 +7,8 @@ using System.Runtime.InteropServices;
 using StageKit.Primitives;
 using StageKit.Primitives.Extensions;
 using StageKit.Primitives.System;
+
+#endregion
 
 namespace StageKit.Tests;
 
@@ -49,7 +53,9 @@ public sealed class PrimitivesTests
                     .FirstOrDefault() ?? ".EXE";
 
                 if (!executableExtension.StartsWith('.'))
+                {
                     executableExtension = string.Concat('.', executableExtension);
+                }
 
                 var pathWithoutExtension = Path.Combine(directoryPath, "stagekit-tool");
                 var executablePath = string.Concat(pathWithoutExtension, executableExtension);
@@ -307,7 +313,11 @@ public sealed class PrimitivesTests
     {
         var startInfo = new ProcessStartInfo(OperatingSystem.IsWindows() ? "cmd.exe" : "/bin/sh");
         startInfo.ArgumentList.Add(OperatingSystem.IsWindows() ? "/d" : "-c");
-        if (OperatingSystem.IsWindows()) startInfo.ArgumentList.Add("/c");
+        if (OperatingSystem.IsWindows())
+        {
+            startInfo.ArgumentList.Add("/c");
+        }
+
         startInfo.ArgumentList.Add("exit 8");
 
         var exitCode = ProcessHelper.StartProcess(startInfo, waitForCompletion: true);
@@ -325,7 +335,11 @@ public sealed class PrimitivesTests
             : ["-c", "exit 10"];
         var startInfo = new ProcessStartInfo(name);
         startInfo.ArgumentList.Add(OperatingSystem.IsWindows() ? "/d" : "-c");
-        if (OperatingSystem.IsWindows()) startInfo.ArgumentList.Add("/c");
+        if (OperatingSystem.IsWindows())
+        {
+            startInfo.ArgumentList.Add("/c");
+        }
+
         startInfo.ArgumentList.Add("exit 11");
 
         var rawArgumentsExitCode = ProcessHelper.StartProcessWithShellExecute(
@@ -354,7 +368,11 @@ public sealed class PrimitivesTests
             : ["-c", "exit 13"];
         var startInfo = new ProcessStartInfo(name);
         startInfo.ArgumentList.Add(OperatingSystem.IsWindows() ? "/d" : "-c");
-        if (OperatingSystem.IsWindows()) startInfo.ArgumentList.Add("/c");
+        if (OperatingSystem.IsWindows())
+        {
+            startInfo.ArgumentList.Add("/c");
+        }
+
         startInfo.ArgumentList.Add("exit 14");
 
         var rawArgumentsExitCode = await ProcessHelper.StartProcessWithShellExecuteAsync(
@@ -763,7 +781,10 @@ public sealed class PrimitivesTests
     [Fact]
     public void ProcessHelper_CreateHostProcessStartInfo_InsideFlatpak_WrapsElevationOnHost()
     {
-        if (!OperatingSystem.IsLinux()) return;
+        if (!OperatingSystem.IsLinux())
+        {
+            return;
+        }
 
         var startInfo = ProcessHelper.CreateHostProcessStartInfo(
             "tool",
@@ -1004,7 +1025,10 @@ public sealed class PrimitivesTests
         }
         finally
         {
-            if (Directory.Exists(directoryPath)) Directory.Delete(directoryPath, recursive: true);
+            if (Directory.Exists(directoryPath))
+            {
+                Directory.Delete(directoryPath, recursive: true);
+            }
         }
     }
 
@@ -1074,7 +1098,10 @@ public sealed class PrimitivesTests
         }
         finally
         {
-            if (Directory.Exists(rootPath)) Directory.Delete(rootPath, recursive: true);
+            if (Directory.Exists(rootPath))
+            {
+                Directory.Delete(rootPath, recursive: true);
+            }
         }
     }
 
@@ -1114,7 +1141,10 @@ public sealed class PrimitivesTests
         }
         finally
         {
-            if (Directory.Exists(rootPath)) Directory.Delete(rootPath, recursive: true);
+            if (Directory.Exists(rootPath))
+            {
+                Directory.Delete(rootPath, recursive: true);
+            }
         }
     }
 
@@ -1174,11 +1204,25 @@ public sealed class PrimitivesTests
         script.WriteLinesIfUnix("unix-one", "unix-two");
 
         var expected = preamble;
-        if (OperatingSystem.IsWindows()) expected += $"windows-one{newLine}windows-two{newLine}";
-        if (OperatingSystem.IsMacOS()) expected += $"macos-one{newLine}macos-two{newLine}";
-        if (OperatingSystem.IsLinux()) expected += $"linux-one{newLine}linux-two{newLine}";
+        if (OperatingSystem.IsWindows())
+        {
+            expected += $"windows-one{newLine}windows-two{newLine}";
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            expected += $"macos-one{newLine}macos-two{newLine}";
+        }
+
+        if (OperatingSystem.IsLinux())
+        {
+            expected += $"linux-one{newLine}linux-two{newLine}";
+        }
+
         if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || OperatingSystem.IsFreeBSD())
+        {
             expected += $"unix-one{newLine}unix-two{newLine}";
+        }
 
         Assert.Equal(expected, script.GetScript());
     }
@@ -1262,7 +1306,7 @@ public sealed class PrimitivesTests
     [Theory]
     [InlineData("", "")]
     [InlineData("plain", "plain")]
-    [InlineData("a\r\n^%!\"b", "a\\n^^%%^!^\"b")]
+    [InlineData("a^%&|<>b", "a^%%&|<>b")]
     public void EscapeWindowsBatchValue_EscapesSetValueMetacharacters(string value, string expected)
     {
         Assert.Equal(expected, value.EscapeWindowsBatchValue());
@@ -1307,8 +1351,15 @@ public sealed class PrimitivesTests
         }
         finally
         {
-            if (Directory.Exists(rootPath)) Directory.Delete(rootPath, recursive: true);
-            if (Directory.Exists(outsidePath)) Directory.Delete(outsidePath, recursive: true);
+            if (Directory.Exists(rootPath))
+            {
+                Directory.Delete(rootPath, recursive: true);
+            }
+
+            if (Directory.Exists(outsidePath))
+            {
+                Directory.Delete(outsidePath, recursive: true);
+            }
         }
     }
 
@@ -1390,6 +1441,82 @@ public sealed class PrimitivesTests
         return directoryPath;
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProcessHelper_StartProcessAsync_KillOnCancellation_StopsChild(bool cancel)
+    {
+        var directory = Directory.CreateTempSubdirectory("StageKit.ProcessKill-").FullName;
+        var pidPath = Path.Combine(directory, "pid.txt");
+        int? processId = null;
+        try
+        {
+            ProcessStartInfo startInfo;
+            if (OperatingSystem.IsWindows())
+            {
+                startInfo = new ProcessStartInfo("powershell.exe") { CreateNoWindow = true };
+                startInfo.ArgumentList.Add("-NoProfile");
+                startInfo.ArgumentList.Add("-Command");
+                startInfo.ArgumentList.Add($"[IO.File]::WriteAllText('{pidPath.Replace("'", "''")}', $PID.ToString()); Start-Sleep -Seconds 30");
+            }
+            else
+            {
+                startInfo = new ProcessStartInfo("/bin/sh") { CreateNoWindow = true };
+                startInfo.ArgumentList.Add("-c");
+                startInfo.ArgumentList.Add($"echo $$ > '{pidPath.Replace("'", "'\\''")}' ; sleep 30");
+            }
+
+            using var cancellationSource = new CancellationTokenSource();
+            var task = ProcessHelper.StartProcessAsync(startInfo, true, cancel ? Timeout.Infinite : 2000,
+                true, cancellationSource.Token);
+            for (var attempt = 0; attempt < 100 && !File.Exists(pidPath); attempt++)
+            {
+                await Task.Delay(50, TestContext.Current.CancellationToken);
+            }
+
+            Assert.True(File.Exists(pidPath));
+            processId = int.Parse(await File.ReadAllTextAsync(pidPath, TestContext.Current.CancellationToken),
+                CultureInfo.InvariantCulture);
+            if (cancel)
+            {
+                cancellationSource.Cancel();
+            }
+
+            if (cancel)
+            {
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task);
+            }
+            else
+            {
+                Assert.Equal(-1, await task);
+            }
+
+            Assert.False(IsRunning(processId.Value));
+        }
+        finally
+        {
+            if (processId is int id && IsRunning(id))
+            {
+                using var process = Process.GetProcessById(id);
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit(5000);
+            }
+            Directory.Delete(directory, recursive: true);
+        }
+
+        static bool IsRunning(int id)
+        {
+            try
+            {
+                using var process = Process.GetProcessById(id);
+                return !process.HasExited;
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+        }
+    }
     private sealed class ThrowingManagedDisposeObject : DisposableObject
     {
         public bool ManagedDisposeCalled { get; private set; }

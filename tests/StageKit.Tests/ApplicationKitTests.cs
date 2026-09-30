@@ -27,6 +27,21 @@ public sealed class ApplicationKitTests
     }
 
     [Fact]
+    public void GetLaunchArgumentsKeepApplicationArgs_WhenReportIdInvalid_PreservesFollowingOption()
+    {
+        var originalArgs = ApplicationKit.ApplicationArgs;
+        try
+        {
+            ApplicationKit.ApplicationArgs = ["--crash-report", "--other", "value"];
+            Assert.Equal(["--other", "value"], ApplicationKit.GetLaunchArgumentsKeepApplicationArgs());
+        }
+        finally
+        {
+            ApplicationKit.ApplicationArgs = originalArgs;
+        }
+    }
+
+    [Fact]
     public void ApplicationArgs_WhenCrashReportFlagMissing_ClearsFlag()
     {
         var originalArgs = ApplicationKit.ApplicationArgs;

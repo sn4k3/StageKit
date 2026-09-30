@@ -339,8 +339,6 @@ public static class EntryApplication
     /// times.</remarks>
     private static readonly Lazy<ApplicationPackagingType> PackagingTypeLazy = new(() =>
     {
-        if (!string.IsNullOrWhiteSpace(DotNetSingleFileAppPath)) return ApplicationPackagingType.DotNetSingleFile;
-
         if (OperatingSystem.IsLinux())
         {
             if (!string.IsNullOrWhiteSpace(LinuxAppImagePath)) return ApplicationPackagingType.LinuxAppImage;
@@ -368,13 +366,17 @@ public static class EntryApplication
             }
         }
 
-        if (RuntimeManifestPackagingType is { } manifestPackagingType)
+        if (RuntimeManifestPackagingType is { } manifestPackagingType &&
+            manifestPackagingType != ApplicationPackagingType.DotNetSingleFile)
             return manifestPackagingType;
 
         if (OperatingSystem.IsMacOS())
         {
             if (!string.IsNullOrWhiteSpace(MacOSAppBundlePath)) return ApplicationPackagingType.MacOSAppBundle;
         }
+
+        if (RuntimeManifestPackagingType == ApplicationPackagingType.DotNetSingleFile ||
+            !string.IsNullOrWhiteSpace(DotNetSingleFileAppPath)) return ApplicationPackagingType.DotNetSingleFile;
 
         return ApplicationPackagingType.Portable;
     });
@@ -879,29 +881,23 @@ public static class EntryApplication
     {
         try
         {
-            using var process = Process.Start(new ProcessStartInfo
-            {
-                FileName = "/usr/sbin/pkgutil",
-                ArgumentList =
+            var result = Utilities.GetBoundedProcessOutput(
+                new ProcessStartInfo
                 {
-                    "--file-info",
-                    executablePath
-                },
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            });
+                    FileName = "/usr/sbin/pkgutil",
+                    ArgumentList = { "--file-info", executablePath },
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                }
+            );
 
-            if (process is null)
+            if (result is null || result.Value.ExitCode != 0)
                 return false;
 
-            var output = process.StandardOutput.ReadToEnd();
-
-            process.WaitForExit();
-
-            return output
-                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            return result
+                .Value.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries)
                 .Any(x => x.StartsWith("pkgid:", StringComparison.Ordinal));
         }
         catch
@@ -914,30 +910,22 @@ public static class EntryApplication
     {
         try
         {
-            using var process = Process.Start(new ProcessStartInfo
-            {
-                FileName = "/usr/bin/hdiutil",
-                ArgumentList =
+            var result = Utilities.GetBoundedProcessOutput(
+                new ProcessStartInfo
                 {
-                    "info"
-                },
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            });
+                    FileName = "/usr/bin/hdiutil",
+                    ArgumentList = { "info" },
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                }
+            );
 
-            if (process is null)
+            if (result is null || result.Value.ExitCode != 0)
                 return false;
 
-            var output = process.StandardOutput.ReadToEnd();
-
-            process.WaitForExit();
-
-            if (process.ExitCode != 0)
-                return false;
-
-            foreach (var line in output.Split('\n'))
+            foreach (var line in result.Value.Output.Split('\n'))
             {
                 var index = line.IndexOf("/Volumes/", StringComparison.Ordinal);
 
@@ -946,9 +934,7 @@ public static class EntryApplication
 
                 var mountPoint = line[index..].Trim();
 
-                if (executablePath.StartsWith(
-                        mountPoint + "/",
-                        StringComparison.Ordinal))
+                if (executablePath.StartsWith(mountPoint + "/", StringComparison.Ordinal))
                 {
                     return true;
                 }
@@ -1130,7 +1116,8 @@ public static class EntryApplication
     /// <returns>True if able to launch a new instance, otherwise false.</returns>
     public static bool LaunchNewInstance(string? runArguments = null)
     {
-        if (!IsExecutablePathKnown) return false;
+        if (!IsExecutablePathKnown)
+            return false;
 
         try
         {
@@ -1138,19 +1125,30 @@ public static class EntryApplication
             {
                 if (Directory.Exists(ExecutablePath))
                 {
-                    return Utilities.StartProcess("open",
-                               $"\"{ExecutablePath}\"{(runArguments is null ? string.Empty : $" --args {runArguments}")}") ==
-                           0;
+                    var quotedPath =
+                        $"\"{ExecutablePath.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal)}\"";
+                    return Utilities.StartProcess(
+                            "open",
+                            runArguments is null
+                                ? quotedPath
+                                : $"{quotedPath} --args {runArguments}"
+                        ) == 0;
                 }
             }
 
-            if (!File.Exists(ExecutablePath)) return false;
+            if (!File.Exists(ExecutablePath))
+                return false;
 
             int exitCode;
             if (IsRunningFromDotNetProcess)
             {
-                var args = runArguments is null ? $"\"{ExecutablePath}\"" : $"\"{ExecutablePath}\" {runArguments}";
-                exitCode = Utilities.StartProcess(Environment.ProcessPath ?? ProcessNameWithExtension, args);
+                var args = runArguments is null
+                    ? $"\"{ExecutablePath}\""
+                    : $"\"{ExecutablePath}\" {runArguments}";
+                exitCode = Utilities.StartProcess(
+                    Environment.ProcessPath ?? ProcessNameWithExtension,
+                    args
+                );
             }
             else
             {

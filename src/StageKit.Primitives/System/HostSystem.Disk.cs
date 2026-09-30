@@ -98,7 +98,16 @@ public static partial class HostSystem
             if (string.IsNullOrEmpty(root))
                 return false;
 
-            if (GetDiskFreeSpaceEx(root, out var freeBytesAvailable, out var totalBytes, out var totalFreeBytes))
+            var directory = fullPath;
+            while (!Directory.Exists(directory))
+            {
+                var parent = Path.GetDirectoryName(directory);
+                if (parent is null || parent == directory)
+                    return false;
+                directory = parent;
+            }
+
+            if (GetDiskFreeSpaceEx(directory, out var freeBytesAvailable, out var totalBytes, out var totalFreeBytes))
             {
                 string? format = null;
                 var driveType = DriveType.Unknown;

@@ -1,4 +1,4 @@
-﻿using StageKit.Primitives;
+using StageKit.Primitives;
 using StageKit.Runtime;
 
 namespace StageKit;
@@ -12,7 +12,7 @@ public static partial class ApplicationKit
     /// <returns><see langword="true"/> if a new instance was launched; otherwise, <see langword="false"/>.</returns>
     /// <remarks>
     /// Arguments from <see cref="ApplicationArgs"/> are preserved except for the initial executable path and any
-    /// existing <see cref="CrashReportFlag"/> argument with its following crash report identifier.
+    /// existing <see cref="CrashReportFlag"/> argument with a following valid crash report identifier.
     /// </remarks>
     public static bool LaunchNewInstanceKeepApplicationArgs(params string[] runArguments)
     {
@@ -26,7 +26,7 @@ public static partial class ApplicationKit
     /// <returns><see langword="true"/> if a new instance was launched; otherwise, <see langword="false"/>.</returns>
     /// <remarks>
     /// Arguments from <see cref="ApplicationArgs"/> are preserved except for the initial executable path and any
-    /// existing <see cref="CrashReportFlag"/> argument with its following crash report identifier.
+    /// existing <see cref="CrashReportFlag"/> argument with a following valid crash report identifier.
     /// </remarks>
     public static bool LaunchNewInstanceKeepApplicationArgs(IEnumerable<string> runArguments)
     {
@@ -56,7 +56,8 @@ public static partial class ApplicationKit
             if (!string.IsNullOrWhiteSpace(CrashReportFlag) &&
                 string.Equals(argument, CrashReportFlag, StringComparison.InvariantCultureIgnoreCase))
             {
-                if (i + 1 < applicationArgs.Length) i++;
+                if (i + 1 < applicationArgs.Length &&
+                    long.TryParse(applicationArgs[i + 1], out var reportId) && reportId > 0) i++;
                 continue;
             }
 

@@ -12,6 +12,7 @@ namespace StageKit;
 /// </summary>
 /// <typeparam name="T">The concrete settings file type.</typeparam>
 /// <typeparam name="TO">The item type stored in the collection.</typeparam>
+[JsonConverter(typeof(RootCollectionFileJsonConverterFactory))]
 public abstract class RootCollectionFile<T, TO> : RootSettingsFile<T>, IList<TO> where T : RootCollectionFile<T, TO>, new()
 {
     #region Members
@@ -27,6 +28,8 @@ public abstract class RootCollectionFile<T, TO> : RootSettingsFile<T>, IList<TO>
     /// <remarks>
     /// Collection changes trigger debounced saves when saving is enabled.
     /// </remarks>
+    [JsonInclude]
+    [JsonObjectCreationHandling(JsonObjectCreationHandling.Populate)]
     public ObservableList<TO> Items { get; } = [];
 
     /// <summary>
@@ -64,6 +67,12 @@ public abstract class RootCollectionFile<T, TO> : RootSettingsFile<T>, IList<TO>
     /// <inheritdoc />
     protected RootCollectionFile()
     {
+        if (!JsonOptions.Converters.Any(converter => converter is RootCollectionFileJsonConverterFactory))
+        {
+            var options = new System.Text.Json.JsonSerializerOptions(JsonOptions);
+            options.Converters.Insert(0, new RootCollectionFileJsonConverterFactory());
+            JsonOptions = options;
+        }
         ItemsView = SynchronizationContext.Current is { } synchronizationContext
             ? Items.ToNotifyCollectionChanged(new SynchronizationContextCollectionEventDispatcher(synchronizationContext))
             : Items.ToNotifyCollectionChanged();
@@ -96,14 +105,14 @@ public abstract class RootCollectionFile<T, TO> : RootSettingsFile<T>, IList<TO>
 
         if (_isTrimmingBeforeSave) return;
         if (!IsLoaded) return;
-        HasUnsavedChanges = true;
+        MarkUnsavedChange();
         ScheduleAutoSaveAfterChange(DefaultDebounceSaveMilliseconds);
     }
 
     private void TrackItemsOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (!IsLoaded) return;
-        HasUnsavedChanges = true;
+        MarkUnsavedChange();
         ScheduleAutoSaveAfterChange(DefaultDebounceSaveMilliseconds);
     }
 

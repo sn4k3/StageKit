@@ -112,22 +112,22 @@ public static class UnhandledExceptions
     {
         ArgumentNullException.ThrowIfNull(ex);
 
-        foreach (var exception in ex.EnumerateExceptions())
+        if (ex is AggregateException aggregate)
         {
-            var exceptionType = exception.GetType();
-            if (IgnoredExceptionList.Any(ignoredType => ignoredType.IsAssignableFrom(exceptionType)))
-            {
-                return true;
-            }
-
-            if (IgnoredExceptionMessages.Any(msg =>
-                    exception.Message.Contains(msg, StringComparison.OrdinalIgnoreCase)))
-            {
-                return true;
-            }
+            var innerExceptions = aggregate.Flatten().InnerExceptions;
+            return innerExceptions.Count > 0 &&
+                   innerExceptions.All(inner => inner.EnumerateExceptions().Any(IsIgnoredException));
         }
 
-        return false;
+        return ex.EnumerateExceptions().Any(IsIgnoredException);
+    }
+
+    private static bool IsIgnoredException(Exception exception)
+    {
+        var exceptionType = exception.GetType();
+        return IgnoredExceptionList.Any(ignoredType => ignoredType.IsAssignableFrom(exceptionType)) ||
+               IgnoredExceptionMessages.Any(message =>
+                   exception.Message.Contains(message, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -196,6 +196,7 @@ public static class UnhandledExceptions
         if (args.IsIgnored)
         {
             HandleSafeException(ex, "[CurrentDomainUnhandledException:Ignored]");
+            if (args.IsTerminating) RunFatalCleanup();
             return;
         }
 
@@ -302,6 +303,7 @@ public static class UnhandledExceptions
                 Debug.WriteLine(e);
             }
 
+            if (args.IsTerminating) RunFatalCleanup();
             return;
         }
 
@@ -310,6 +312,7 @@ public static class UnhandledExceptions
             RaiseExceptionThrown(args);
         }
 
+        long persistedReportId = 0;
         try
         {
             HandleSafeException(ex, category, LogLevel.Critical);
@@ -326,15 +329,14 @@ public static class UnhandledExceptions
 
                 if (CrashReportsFile.IsEnabled)
                 {
-                    CrashReportsFile.Instance.Add(report);
-                }
-
-                if (!handledExternally && !string.IsNullOrWhiteSpace(ApplicationKit.CrashReportFlag) &&
-                    EntryApplication.IsExecutablePathKnown)
-                {
-                    ApplicationKit.LaunchNewInstanceKeepApplicationArgs(
-                        ApplicationKit.CrashReportFlag,
-                        report.Id.ToString());
+                    var reports = CrashReportsFile.Instance;
+                    var saveCount = reports.SaveCount;
+                    reports.Add(report);
+                    reports.Save();
+                    if (!handledExternally && reports.SaveCount > saveCount)
+                    {
+                        persistedReportId = report.Id;
+                    }
                 }
             }
         }
@@ -343,17 +345,37 @@ public static class UnhandledExceptions
             Debug.WriteLine(e);
         }
 
+        RunFatalCleanup();
+
+        if (persistedReportId > 0 && !string.IsNullOrWhiteSpace(ApplicationKit.CrashReportFlag) &&
+            EntryApplication.IsExecutablePathKnown)
+        {
+            try
+            {
+                ApplicationKit.LaunchNewInstanceKeepApplicationArgs(
+                    ApplicationKit.CrashReportFlag,
+                    persistedReportId.ToString());
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine(e);
+            }
+        }
+
+        Environment.Exit(FatalExitCode);
+    }
+
+    private static void RunFatalCleanup()
+    {
+        PanicSaveSettingsFiles();
         try
         {
-            PanicSaveSettingsFiles();
             BeforeForcedExit?.Invoke(null, EventArgs.Empty);
         }
         catch (Exception e)
         {
             Debug.WriteLine(e);
         }
-
-        Environment.Exit(FatalExitCode);
     }
 
     /// <summary>
