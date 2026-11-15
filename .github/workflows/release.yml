@@ -128,7 +128,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: nuget-packages
-          path: artifacts/packages/*.nupkg
+          path: |
+            artifacts/packages/*.nupkg
+            artifacts/packages/*.snupkg
           if-no-files-found: error
 
       - name: Report dry run
@@ -239,17 +241,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: >-
-          dotnet nuget push artifacts/packages/*.nupkg
+          dotnet nuget push "artifacts/packages/*.nupkg"
           --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
-          --api-key "$GITHUB_TOKEN" --skip-duplicate
+          --api-key "$GITHUB_TOKEN" --skip-duplicate --no-symbols
 
       - name: Publish to NuGet.org
+        # NuGet also pushes the adjacent .snupkg files retained in the artifact.
         env:
           NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
         run: >-
-          dotnet nuget push artifacts/packages/*.nupkg
+          dotnet nuget push "artifacts/packages/*.nupkg"
           --source https://api.nuget.org/v3/index.json
-          --api-key "$NUGET_TOKEN" --skip-duplicate
+          --api-key "$NUGET_TOKEN" --symbol-api-key "$NUGET_TOKEN" --skip-duplicate
 
   create_tag:
     name: Create release tag

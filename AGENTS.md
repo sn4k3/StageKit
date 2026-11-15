@@ -6,15 +6,25 @@ This file gives Codex repo-specific guidance for working on StageKit.
 
 These MCP tools are configured at the user level and available in this repo:
 
-- **rider** — JetBrains MCP Server plugin (SSE, `http://localhost:<port>/sse` — port is whatever Rider's built-in web server picked, shown in Settings → Tools → MCP Server; update with `claude mcp remove rider -s user && claude mcp add rider -s user -t sse http://localhost:<port>/sse` if it changes). Exposes the currently open Rider instance: run/debug configurations, refactorings, project structure, live diagnostics. Only works while StageKit is open in Rider; prefer it over shell `dotnet` commands when a task benefits from Rider's live semantic model (rename/refactor, jump-to-usage, running a specific test from the IDE).
-- **serena** — semantic code navigation (symbols, references, structural edits) via LSP, independent of Rider being open. Prefer for cross-file symbol search/refactor when Rider isn't running or for scripted, repeatable navigation.
-- **csharp-lsp plugin** — wires `csharp-ls` in as the native C#/.cs language server (go-to-definition, references, diagnostics) without needing Rider or Serena.
-- **microsoft-docs plugin** — official Microsoft Learn MCP; use for authoritative .NET BCL/Azure API lookups instead of guessing signatures.
-- **context7** — up-to-date library docs (e.g. `CommunityToolkit.Mvvm`, `Avalonia`, `Octokit`, `ObservableCollections`) — resolve the library id, then fetch docs before assuming an API shape.
+- **rider** — JetBrains MCP Server plugin (SSE, `http://localhost:<port>/sse` — port is whatever Rider's built-in web
+  server picked, shown in Settings → Tools → MCP Server; update with
+  `claude mcp remove rider -s user && claude mcp add rider -s user -t sse http://localhost:<port>/sse` if it changes).
+  Exposes the currently open Rider instance: run/debug configurations, refactorings, project structure, live
+  diagnostics. Only works while StageKit is open in Rider; prefer it over shell `dotnet` commands when a task benefits
+  from Rider's live semantic model (rename/refactor, jump-to-usage, running a specific test from the IDE).
+- **serena** — semantic code navigation (symbols, references, structural edits) via LSP, independent of Rider being
+  open. Prefer for cross-file symbol search/refactor when Rider isn't running or for scripted, repeatable navigation.
+- **csharp-lsp plugin** — wires `csharp-ls` in as the native C#/.cs language server (go-to-definition, references,
+  diagnostics) without needing Rider or Serena.
+- **microsoft-docs plugin** — official Microsoft Learn MCP; use for authoritative .NET BCL/Azure API lookups instead of
+  guessing signatures.
+- **context7** — up-to-date library docs (e.g. `CommunityToolkit.Mvvm`, `Avalonia`, `Octokit`,
+  `ObservableCollections`) — resolve the library id, then fetch docs before assuming an API shape.
 
 ## Project Shape
 
-StageKit is a small standalone .NET infrastructure library for application settings, crash reporting, runtime metadata, backups, support bundles, retention, onboarding state, and single-instance guards.
+StageKit is a small standalone .NET infrastructure library for application settings, crash reporting, runtime metadata,
+backups, support bundles, retention, onboarding state, and single-instance guards.
 
 Main projects:
 
@@ -42,16 +52,23 @@ Use these commands from the repository root:
 ```powershell
 dotnet restore
 dotnet build .\StageKit.slnx --configuration Release -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true
-dotnet run --project .\tests\StageKit.Tests\StageKit.Tests.csproj --framework net10.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none -automated sync
+dotnet run --project .\tests\StageKit.Tests\StageKit.Tests.csproj --framework net11.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none -automated sync
 ```
 
-Run a single test with:
+Run a test class with:
 
 ```powershell
-dotnet run --project .\tests\StageKit.Tests\StageKit.Tests.csproj --framework net10.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none -automated sync -filter "/TestOrClassName/"
+dotnet run --project .\tests\StageKit.Tests\StageKit.Tests.csproj --framework net11.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none -automated sync -class "StageKit.Tests.RuntimeTests"
 ```
 
-The repo multi-targets `net8.0` and `net10.0`. Treat warnings as errors is enabled, documentation files are generated, and assemblies are signed with `StageKit.snk`.
+For a single test, replace the class filter with
+`-method "StageKit.Tests.RuntimeTests.RuntimeDiagnostics_GetInfoDict_IncludesRuntimeAndEntryApplicationInfo"`.
+These simple filters take fully qualified type or method names. Confirm that the selected run executes at least one
+test.
+
+The shared libraries multi-target `net8.0`, `net10.0`, and `net11.0`; StageKit.Fallout targets `net10.0` and `net11.0`.
+The demos, tests, and build entry point target `net11.0`. Treat warnings as errors is enabled, documentation files are
+generated, and assemblies are signed with `StageKit.snk`.
 
 ## Coding Rules
 
@@ -93,9 +110,12 @@ Maintain multi-targeting compatibility when changing library code.
 
 ## Architecture Notes
 
-Core application infrastructure APIs live in `StageKit`. Low-level reusable helpers live in `StageKit.Primitives`. Runtime and entry-application inspection helpers live in `StageKit.Runtime`. Smaller supporting core APIs live in `StageKit.Extensions` and `StageKit.Interfaces`.
+Core application infrastructure APIs live in `StageKit`. Low-level reusable helpers live in `StageKit.Primitives`.
+Runtime and entry-application inspection helpers live in `StageKit.Runtime`. Smaller supporting core APIs live in
+`StageKit.Extensions` and `StageKit.Interfaces`.
 
-`ApplicationKit` is process-wide configuration. It owns app name, args, logger, profile/config/log paths, JSON options, runtime timestamps, birthday helpers, and crash-report flag parsing.
+`ApplicationKit` is process-wide configuration. It owns app name, args, logger, profile/config/log paths, JSON options,
+runtime timestamps, birthday helpers, and crash-report flag parsing.
 
 Settings types follow this hierarchy:
 
@@ -103,19 +123,28 @@ Settings types follow this hierarchy:
 - `RootSettingsFile<T>`
 - `RootCollectionFile<T, TO>`
 
-`RootSettingsFile<T>` handles singleton JSON persistence, migration, validation, autosave, debounced save, corrupt-file backup, unsupported-version backup, and save hooks.
+`RootSettingsFile<T>` handles singleton JSON persistence, migration, validation, autosave, debounced save, corrupt-file
+backup, unsupported-version backup, and save hooks.
 
 `RootCollectionFile<T, TO>` is for list-backed settings files and exposes `Items` plus `ItemsView`.
 
 Crash reporting flows through `ExceptionInfo`, `CrashReport`, `CrashReportsFile`, and `UnhandledExceptions`.
 
-Storage helpers in `StageKit` include `ApplicationBackup`, `SupportBundleExporter`, `ApplicationRetention`, and `OnboardingStateFile`.
+Storage helpers in `StageKit` include `ApplicationBackup`, `SupportBundleExporter`, `ApplicationRetention`, and
+`OnboardingStateFile`.
 
-`StageKit.Primitives` contains `DisposableObject`, `LeaveOpenDisposableObject`, `GCSafeHandle`, `SafeFile`, `SafeFileStream`, `PathUtilities`, `TemporaryDirectory`, `TemporaryFile`, and `ShellScriptFile`. Keep this package dependency-light and suitable for reuse by other libraries. IO-related files may live under the `IO/` folder, but their public namespace should remain `StageKit.Primitives` unless the IO surface becomes large enough to justify a separate namespace.
+`StageKit.Primitives` contains `DisposableObject`, `LeaveOpenDisposableObject`, `GCSafeHandle`, `SafeFile`,
+`SafeFileStream`, `PathUtilities`, `TemporaryDirectory`, `TemporaryFile`, and `ShellScriptFile`. Keep this package
+dependency-light and suitable for reuse by other libraries. IO-related files may live under the `IO/` folder, but their
+public namespace should remain `StageKit.Primitives` unless the IO surface becomes large enough to justify a separate
+namespace.
 
-`StageKit.Runtime` contains `EntryApplication`, `ApplicationPackagingType`, and `RuntimeDiagnostics`. Keep this package focused on runtime, process, entry assembly, packaging detection, relaunch, and diagnostics helpers.
+`StageKit.Runtime` contains `EntryApplication`, `ApplicationPackagingType`, and `RuntimeDiagnostics`. Keep this package
+focused on runtime, process, entry assembly, packaging detection, relaunch, and diagnostics helpers.
 
-`ApplicationInstanceGuard` is a direct named-mutex single-instance helper. Dispose can run on any thread: it closes the mutex handle (instead of calling thread-affine `ReleaseMutex`). If still owned, the OS marks the mutex abandoned and the next `Acquire` treats `AbandonedMutexException` as primary. It intentionally has no IPC or activation forwarding yet.
+`ApplicationInstanceGuard` is a direct named-mutex single-instance helper. Dispose can run on any thread: it closes the
+mutex handle (instead of calling thread-affine `ReleaseMutex`). If still owned, the OS marks the mutex abandoned and the
+next `Acquire` treats `AbandonedMutexException` as primary. It intentionally has no IPC or activation forwarding yet.
 
 ## Behavioral Constraints
 
@@ -124,7 +153,8 @@ Storage helpers in `StageKit` include `ApplicationBackup`, `SupportBundleExporte
 - Corrupt settings files should be preserved on disk with a `.corrupt-<timestampUtc>` suffix.
 - Settings written by a newer app version should be preserved with an `.unsupported-version-<timestampUtc>` suffix.
 - `WaitForDebouncedSaveAsync` must not report success while a save is still in progress.
-- `UnhandledExceptions.IgnoredExceptionList`, `IgnoredExceptionMessages`, and `SettingsFilesToSaveBeforeCrash` should be configured during startup, not concurrently with exception handling.
+- `UnhandledExceptions.IgnoredExceptionList`, `IgnoredExceptionMessages`, and `SettingsFilesToSaveBeforeCrash` should be
+  configured during startup, not concurrently with exception handling.
 
 ## Package Dependencies
 
@@ -134,7 +164,8 @@ Runtime dependencies are intentionally small:
 - `ObservableCollections`
 - `Microsoft.Extensions.Logging.Abstractions`
 
-`StageKit.Primitives` and `StageKit.Runtime` should stay zero-runtime-dependency packages unless there is a strong justification.
+`StageKit.Primitives` and `StageKit.Runtime` should stay zero-runtime-dependency packages unless there is a strong
+justification.
 
 `Microsoft.SourceLink.GitHub` is a private build/package dependency.
 
@@ -146,7 +177,8 @@ Keep package metadata valid when editing project or package settings.
 
 ## Documentation Expectations
 
-Update `README.md` when adding or changing user-facing APIs. Also update package-specific READMEs such as `StageKit.Primitives/README.md` or `StageKit.Runtime/README.md` when those packages change.
+Update `README.md` when adding or changing user-facing APIs. Also update package-specific READMEs such as
+`StageKit.Primitives/README.md` or `StageKit.Runtime/README.md` when those packages change.
 
 Update `CHANGELOG.md` for notable changes. Existing entries are newest-first.
 
@@ -165,9 +197,11 @@ Public API changes usually need:
 
 ## Testing Guidance
 
-Prefer focused tests in `StageKit.Tests` for the changed behavior. For persistence-related tests, assert both in-memory behavior and filesystem side effects when relevant.
+Prefer focused tests in `StageKit.Tests` for the changed behavior. For persistence-related tests, assert both in-memory
+behavior and filesystem side effects when relevant.
 
-Before finishing code changes, run at least the targeted test command. For broad public API changes, run the full test project.
+Before finishing code changes, run at least the targeted test command. For broad public API changes, run the full test
+project.
 
 ## Codex Workflow Hints
 
@@ -175,4 +209,5 @@ Before finishing code changes, run at least the targeted test command. For broad
 - Use existing StageKit patterns instead of introducing new abstractions.
 - Keep public API naming conservative and consistent with current names.
 - Do not rewrite generated artifacts or package metadata unless the task requires it.
-- If NuGet restore/network access fails, retry the same build or test command with approval rather than changing project files to work around the environment.
+- If NuGet restore/network access fails, retry the same build or test command with approval rather than changing project
+  files to work around the environment.

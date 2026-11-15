@@ -31,8 +31,8 @@ exposes ready-made targets to restore, compile, run, and publish an application 
 ## Requirements
 
 - .NET 11 SDK
-- `Fallout.Common` and `Fallout.Utilities` 10.4.0
-- The `fallout` global tool, pinned in `.config/dotnet-tools.json`
+- `Fallout.Common` and `Fallout.Utilities` 10.5.0
+- The `fallout` global tool 10.5.0, pinned in `.config/dotnet-tools.json`
 
 ### Native packaging tools
 
@@ -143,17 +143,17 @@ Run a target:
 
 Declared with Fallout's `[Parameter]` attribute, so each can be supplied on the command line or through the environment.
 
-| Parameter                   | Default                                                     | Description                                                                                      |
-|-----------------------------|-------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
-| `Configuration`             | `Release`                                                   | `Debug` or `Release`.                                                                            |
-| `PackagingTypes`            | `[Portable]`                                                | Unique packaging formats to create; use an empty array to skip packaging.                        |
-| `RIds`                      | `win-x64 win-arm64 osx-x64 osx-arm64 linux-x64 linux-arm64` | Runtime identifiers to publish.                                                                  |
-| `FrameworkDependent`        | `false`                                                     | Publish framework-dependent applications instead of self-contained applications.                 |
-| `PublishMultiArch`          | `false`                                                     | Create one macOS app bundle containing both x64 and arm64 executables. Requires both macOS RIDs. |
-| `DeletePublishDirectories`  | `false`                                                     | Delete raw publish directories after publishing.                                                 |
-| ReadyToRun                  | false                                                       | Publish ReadyToRun (R2R) compiled applications.                                                  |
-| PublishTrimmed              | false                                                       | Publish trimmed applications.                                                                    |
-| AppImageCompression         | null                                                        | Squashfs compression passed to appimagetool. Use 'default' for appimagetool default.             |
+| Parameter                  | Default                                                     | Description                                                                                      |
+|----------------------------|-------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
+| `Configuration`            | `Release`                                                   | `Debug` or `Release`.                                                                            |
+| `PackagingTypes`           | `[Portable]`                                                | Unique packaging formats to create; use an empty array to skip packaging.                        |
+| `RIds`                     | `win-x64 win-arm64 osx-x64 osx-arm64 linux-x64 linux-arm64` | Runtime identifiers to publish.                                                                  |
+| `FrameworkDependent`       | `false`                                                     | Publish framework-dependent applications instead of self-contained applications.                 |
+| `PublishMultiArch`         | `false`                                                     | Create one macOS app bundle containing both x64 and arm64 executables. Requires both macOS RIDs. |
+| `DeletePublishDirectories` | `false`                                                     | Delete raw publish directories after publishing.                                                 |
+| ReadyToRun                 | false                                                       | Publish ReadyToRun (R2R) compiled applications.                                                  |
+| PublishTrimmed             | false                                                       | Publish trimmed applications.                                                                    |
+| AppImageCompression        | null                                                        | Squashfs compression passed to appimagetool. Use 'default' for appimagetool default.             |
 
 ## Software metadata
 
@@ -241,9 +241,11 @@ FileAssociations =
 ];
 ```
 
-- **Windows WiX Installer**: Automatically registers Windows Explorer context menu / "Open with" handlers for each extension.
+- **Windows WiX Installer**: Automatically registers Windows Explorer context menu / "Open with" handlers for each
+  extension.
 - **macOS Bundles (`.app`)**: Automatically configures `CFBundleDocumentTypes` entries in `Info.plist`.
-- **Linux Bundles**: Automatically populates `MimeType` associations in `.desktop` files, adds `%F` arguments to `Exec`, and includes AppStream mediatype metadata.
+- **Linux Bundles**: Automatically populates `MimeType` associations in `.desktop` files, adds `%F` arguments to `Exec`,
+  and includes AppStream mediatype metadata.
 
 ### Windows installer options & WiX project
 
@@ -279,11 +281,14 @@ WindowsInstallerOptions = new WindowsInstallerOptions
 #### Installation scope
 
 `WindowsInstallerOptions.Scope` uses the strongly typed `InstallerScope` enum:
-- `InstallerScope.PerMachineOrUser`: User chooses the installation scope in the wizard, defaulting to non-elevated per-user.
+
+- `InstallerScope.PerMachineOrUser`: User chooses the installation scope in the wizard, defaulting to non-elevated
+  per-user.
 - `InstallerScope.PerUser`: Enforces per-user installation and hides the selector.
 - `InstallerScope.PerMachine`: Enforces per-machine installation and hides the selector.
 
-The scope can also be overridden when building the WiX project with `-p:InstallerScope=perUser` or `-p:InstallerScope=perMachine`.
+The scope can also be overridden when building the WiX project with `-p:InstallerScope=perUser` or
+`-p:InstallerScope=perMachine`.
 The selector is disabled while a previous installation is detected, because Windows Installer keeps a product in the
 context it was first installed in. A silent installation of a `perMachineOrUser` package is per-user unless it is
 invoked with `msiexec /i <package>.msi ALLUSERS=1 /qn`.
@@ -291,6 +296,7 @@ invoked with `msiexec /i <package>.msi ALLUSERS=1 /qn`.
 #### PATH registration
 
 `WindowsInstallerOptions.PathRegistration` uses the strongly typed `PathRegistration` enum:
+
 - `PathRegistration.None`: Disables PATH registration and hides the wizard option.
 - `PathRegistration.Register`: Always appends the installation directory to PATH and hides the option.
 - `PathRegistration.UserDefaultNo`: Shows an unchecked checkbox for the user during setup.
@@ -302,8 +308,10 @@ resolved, not the scope picked in the wizard, because a per-user installation ca
 the installation directory as Windows Installer resolves it, so it carries a trailing separator.
 
 Set `WindowsAuthenticodeCertificateThumbprint` to a SHA-1 certificate thumbprint to sign the staged application
-executable and final MSI. Fallout forwards `WindowsInstallerOptions.AuthenticodeTimestampUrl` (defaulting to DigiCert's RFC 3161 service)
-and `WindowsInstallerOptions.SignToolPath` (defaulting to `signtool.exe`) to the WiX build. The certificate must be available in the
+executable and final MSI. Fallout forwards `WindowsInstallerOptions.AuthenticodeTimestampUrl` (defaulting to DigiCert's
+RFC 3161 service)
+and `WindowsInstallerOptions.SignToolPath` (defaulting to `signtool.exe`) to the WiX build. The certificate must be
+available in the
 current user's certificate store; leaving the thumbprint blank disables signing. Every `.exe` and `.dll` in the payload
 is signed, which for a self-contained publish replaces the signatures the .NET runtime binaries ship with and costs one
 timestamped `signtool` invocation per file; redefine the `InstallerPayloadToSign` item in the WiX project to narrow
@@ -424,8 +432,10 @@ Debian, RPM, and Arch Linux payloads install the application under `/usr/lib/<pa
 strict confinement, common desktop interfaces, and the `libicu74` stage package required by self-contained .NET apps;
 customize `DeveloperId`, `SnapBase`, `SnapConfinement`, `SnapPlugs`, or `SnapStagePackages` through
 `LinuxAppBundleOptions`. `DeveloperId` defaults to `CompanyRDNS` and identifies the publishing organization in AppStream
-metadata. `MinimumDisplayLength` defaults to 760 logical pixels; set it to zero or a negative value to omit the AppStream
-display-length recommendation. Stage-package names are base-specific, so update `SnapStagePackages` when changing `SnapBase`. Native package
+metadata. `MinimumDisplayLength` defaults to 760 logical pixels; set it to zero or a negative value to omit the
+AppStream
+display-length recommendation. Stage-package names are base-specific, so update `SnapStagePackages` when changing
+`SnapBase`. Native package
 tools and the selected Flatpak/Snap runtime bases must already be available on the build host. Debian payloads are
 staged in the operating system's temporary directory so `dpkg-deb` receives valid Unix permissions even when the
 repository is on a Windows-mounted WSL path such as `/mnt/c` or `/mnt/d`.
@@ -518,16 +528,16 @@ internal class Build : StageKitBuild
 
 ### Extension points
 
-| Member                                                                                  | Purpose                                                                                                          |
-|-----------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
-| `SoftwareName`, `SoftwareExecutableName`, `SoftwareVersion`, `MainProject`, `Solution`  | `virtual` — override when auto-detection is wrong                                                                |
-| `ExcludedProjectNameTokens`                                                             | Mutable token list controlling `MainProject` detection                                                           |
-| `BeforePublishRid` / `AfterPublishRid`                                                  | `Action<PublishRidContext>` hooks around each runtime publish                                                    |
-| `AssetName`                                                                             | `Func<PublishRidContext, string>` returning the base artifact name (simple file name, no directory or extension) |
-| `ConfigurePublishRid`                                                                   | `Func<DotNetPublishSettings, PublishRidContext, DotNetPublishSettings>` to adjust publish settings per RID       |
-| `CreateMacAppBundleOptions()` / `CreateLinuxAppBundleOptions()` / `CreateWindowsInstallerOptions()` | Lazily resolved bundle and installer options (`Info.plist`, `.desktop`, WiX MSI)                                 |
-| `ConfigureWindowsInstallerBuildSettings(...)`                                           | Adjusts the MSBuild settings passed to each WiX installer project                                                |
-| `PackagingTypes`, `PublishCleanupExtensions`, `RIds`                                    | Protected setters for build-wide publish configuration                                                           |
+| Member                                                                                                     | Purpose                                                                                                          |
+|------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
+| `SoftwareName`, `SoftwareExecutableName`, `SoftwareVersion`, `MainProject`, `Solution`                     | `virtual` — override when auto-detection is wrong                                                                |
+| `ExcludedProjectNameTokens`                                                                                | Mutable token list controlling `MainProject` detection                                                           |
+| `BeforePublishRid` / `AfterPublishRid`                                                                     | `Action<PublishRidContext>` hooks around each runtime publish                                                    |
+| `AssetName`                                                                                                | `Func<PublishRidContext, string>` returning the base artifact name (simple file name, no directory or extension) |
+| `ConfigurePublishRid`                                                                                      | `Func<DotNetPublishSettings, PublishRidContext, DotNetPublishSettings>` to adjust publish settings per RID       |
+| `CreateMacAppBundleOptions()` / `CreateLinuxAppBundleOptions()` / `CreateWindowsInstallerOptions()`        | Lazily resolved bundle and installer options (`Info.plist`, `.desktop`, WiX MSI)                                 |
+| `ConfigureWindowsInstallerBuildSettings(...)`                                                              | Adjusts the MSBuild settings passed to each WiX installer project                                                |
+| `PackagingTypes`, `PublishCleanupExtensions`, `RIds`                                                       | Protected setters for build-wide publish configuration                                                           |
 | `MediaDirectory`, `WindowsIconFile`, `MacOSIconFile`, `LinuxIconFile`, `ChangelogFile`, `ReleaseNotesFile` | `virtual` path overrides                                                                                         |
 
 Nearly every publish and bundle step (`CreatePublishSettings`, `PublishRuntime`, `CreateBundles`, `CreatePortableZip`,
