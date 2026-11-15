@@ -129,6 +129,57 @@ public class PublishPipelineTests
     }
 
     /// <summary>
+    /// Verifies that .NET 11 assembly conflicts use the next compatible evaluator.
+    /// </summary>
+    /// <param name="allInProcessEvaluatorsConflict">Whether isolated evaluation is required.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void IsRunnableProject_AssemblyVersionConflict_UsesCompatibleEvaluator(
+        bool allInProcessEvaluatorsConflict
+    )
+    {
+        var properties = new Dictionary<string, string?> { ["OutputType"] = "Exe" };
+        var build = new TestBuild
+        {
+            ThrowNuGetFrameworksFromProjectEvaluation = true,
+            ThrowNuGetFrameworksFromMSBuildProjectEvaluation = allInProcessEvaluatorsConflict,
+            ProjectEvaluationFailureMessage =
+                "Could not load file or assembly 'NuGet.Frameworks, Version=7.11.0.0'. "
+                + "The requested assembly version conflicts with what is already bound in the app domain "
+                + "or specified in the manifest. (0x80131053)",
+            TestMSBuildProjectProperties = properties,
+            TestExternallyEvaluatedProjectProperties = properties,
+        };
+
+        Assert.True(build.InvokeIsRunnableProject(CreateProject("Example.csproj")));
+        Assert.Equal(1, build.MSBuildProjectEvaluationCalls);
+        Assert.Equal(allInProcessEvaluatorsConflict ? 1 : 0, build.ExternalProjectEvaluationCalls);
+    }
+
+    /// <summary>
+    /// Verifies that assembly conflicts unrelated to NuGet.Frameworks are not hidden by the fallback.
+    /// </summary>
+    [Fact]
+    public void IsRunnableProject_UnrelatedAssemblyVersionConflict_PropagatesFailure()
+    {
+        var build = new TestBuild
+        {
+            ThrowNuGetFrameworksFromProjectEvaluation = true,
+            ProjectEvaluationFailureMessage =
+                "Could not load file or assembly 'Other.Library'. The requested assembly version conflicts.",
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            build.InvokeIsRunnableProject(CreateProject("Example.csproj"))
+        );
+
+        Assert.Equal(build.ProjectEvaluationFailureMessage, exception.Message);
+        Assert.Equal(0, build.MSBuildProjectEvaluationCalls);
+        Assert.Equal(0, build.ExternalProjectEvaluationCalls);
+    }
+
+    /// <summary>
     /// Verifies that diagnostic output includes all public build variables without materializing targets.
     /// </summary>
     [Fact]
@@ -4090,6 +4141,9 @@ public class PublishPipelineTests
 
         internal bool ThrowNuGetFrameworksFromMSBuildProjectEvaluation { get; set; }
 
+        internal string ProjectEvaluationFailureMessage { get; set; } =
+            "Could not load NuGet.Frameworks because the manifest definition does not match.";
+
         internal IReadOnlyDictionary<string, string?> TestMSBuildProjectProperties { get; set; } =
             new Dictionary<string, string?>();
 
@@ -4521,8 +4575,7 @@ public class PublishPipelineTests
         protected override string? GetProjectPropertyInProcess(Project project, string propertyName)
         {
             if (ThrowNuGetFrameworksFromProjectEvaluation)
-                throw new InvalidOperationException(
-                    "Could not load NuGet.Frameworks because the manifest definition does not match.");
+                throw new InvalidOperationException(ProjectEvaluationFailureMessage);
 
             return base.GetProjectPropertyInProcess(project, propertyName);
         }
@@ -4532,8 +4585,7 @@ public class PublishPipelineTests
             MSBuildProjectEvaluationCalls++;
             if (ThrowNuGetFrameworksFromMSBuildProjectEvaluation)
             {
-                throw new InvalidOperationException(
-                    "Could not load NuGet.Frameworks because the manifest definition does not match.");
+                throw new InvalidOperationException(ProjectEvaluationFailureMessage);
             }
 
             return TestMSBuildProjectProperties.GetValueOrDefault(propertyName);

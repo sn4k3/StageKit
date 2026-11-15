@@ -296,7 +296,8 @@ public partial class StageKitBuild
         for (var current = exception; current is not null; current = current.InnerException)
         {
             if (current.Message.Contains("NuGet.Frameworks", StringComparison.OrdinalIgnoreCase) &&
-                current.Message.Contains("manifest definition does not match", StringComparison.OrdinalIgnoreCase))
+                (current.Message.Contains("manifest definition does not match", StringComparison.OrdinalIgnoreCase) ||
+                 current.Message.Contains("requested assembly version conflicts", StringComparison.OrdinalIgnoreCase)))
                 return true;
         }
 

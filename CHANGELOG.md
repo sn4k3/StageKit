@@ -1,5 +1,6 @@
 # v0.5.0 (15/11/2026)
 
+- Add .NET 11 support
 - Use .NET 8-compatible SourceLink tooling for net8.0 builds to avoid unsupported System.IO.Hashing 11 dependencies
 - Correct contributor test filters, retain symbol packages in release artifacts, and align the Fallout tool with library
   version 10.5.0
@@ -7,7 +8,6 @@
 - Retarget single-target projects to .NET 11, including StageKit.Fallout, demos, tests, and the build entry point
 - Add `Concurrency.GetParallelOptions(CancellationToken token)`
 - Add `Concurrency.DebugParallelOptions`
-- Add .NET 11 support
 
 # v0.4.1 (30/09/2026)
 
