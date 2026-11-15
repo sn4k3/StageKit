@@ -1,21 +1,23 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ProductName>StageKit.Primitives</ProductName>
+    <Description>Dependency-light .NET primitives for reusable library code, including atomic file writes, path and shell helpers, temporary resources, disposable base types, GC handles, and unmanaged memory wrappers.</Description>
+    <PackageTags>stagekit;primitives;disposable;safehandle;atomic-file;utilities</PackageTags>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
 
-    <PropertyGroup>
-        <ProductName>StageKit.Primitives</ProductName>
-        <Description>Dependency-light .NET primitives for reusable library code, including atomic file writes, path and shell helpers, temporary resources, disposable base types, GC handles, and unmanaged memory wrappers.</Description>
-        <PackageTags>stagekit;primitives;disposable;safehandle;atomic-file;utilities</PackageTags>
-        <GenerateDocumentationFile>True</GenerateDocumentationFile>
-        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    </PropertyGroup>
+  <ItemGroup>
+    <PackageReference
+      Include="Microsoft.SourceLink.GitHub"
+      Version="11.0.100"
+      PrivateAssets="All"
+    />
+  </ItemGroup>
 
-    <ItemGroup>
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.401" PrivateAssets="All" />
-    </ItemGroup>
-
-    <ItemGroup>
-        <InternalsVisibleTo Include="StageKit.Tests">
-            <PublicKey>0024000004800000940000000602000000240000525341310004000001000100d15f1e7e8ead128db7121831d28cd2a046d0c460993b46e54d32752e49678d916d823174db6fe17ad9a2a6e79e421de69dad83c3744d7a16c7dcf1565951f41e22278c003f64e433bb202d405999ac90f98c187cc1d2c2f91d152777d0683086f382503e59e2408ac9a23114d156fd100f333ae7a7a092484f43c77413ecfdb8</PublicKey>
-        </InternalsVisibleTo>
-    </ItemGroup>
-
+  <ItemGroup>
+    <InternalsVisibleTo Include="StageKit.Tests">
+      <PublicKey>0024000004800000940000000602000000240000525341310004000001000100d15f1e7e8ead128db7121831d28cd2a046d0c460993b46e54d32752e49678d916d823174db6fe17ad9a2a6e79e421de69dad83c3744d7a16c7dcf1565951f41e22278c003f64e433bb202d405999ac90f98c187cc1d2c2f91d152777d0683086f382503e59e2408ac9a23114d156fd100f333ae7a7a092484f43c77413ecfdb8</PublicKey>
+    </InternalsVisibleTo>
+  </ItemGroup>
 </Project>

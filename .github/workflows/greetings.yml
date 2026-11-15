@@ -2,15 +2,16 @@ name: Greetings
 
 on:
   issues:
-    types: [opened]
+    types: [ opened ]
   pull_request_target:
-    types: [opened]
+    types: [ opened ]
 
-permissions: {}
+permissions: { }
 
 jobs:
   greeting:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       issues: write
       pull-requests: write
@@ -19,7 +20,7 @@ jobs:
       - name: Greet first-time contributors
         uses: actions/first-interaction@v1
         with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          repo-token: ${{ github.token }}
           issue-message: >-
             Thanks for opening your first issue! We’ll review it and get back to
             you as soon as possible.

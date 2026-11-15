@@ -37,7 +37,9 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: |
+            10.0.x
+            11.0.x
 
       - name: Cache NuGet packages
         uses: actions/cache@v6
@@ -74,7 +76,7 @@ jobs:
       - name: Test StageKit.Fallout
         run: >-
           dotnet run --project tests/StageKit.Fallout.Tests/StageKit.Fallout.Tests.csproj
-          --framework net10.0 --configuration Release --no-build --no-restore --
+          --framework net11.0 --configuration Release --no-build --no-restore --
           -noLogo -noColor -parallelMode none -automated sync
 
       - name: Read package metadata
@@ -165,7 +167,9 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: |
+            10.0.x
+            11.0.x
 
       - name: Install Linux packaging tools
         if: ${{ startsWith(matrix.os, 'ubuntu-') }}
@@ -209,7 +213,7 @@ jobs:
 
   publish_registries:
     name: Publish package registries
-    needs: [publish_packages, publish_assets]
+    needs: [ publish_packages, publish_assets ]
     if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -221,7 +225,9 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: |
+            10.0.x
+            11.0.x
 
       - name: Download packages
         uses: actions/download-artifact@v8
@@ -247,9 +253,10 @@ jobs:
 
   create_tag:
     name: Create release tag
-    needs: [publish_packages, publish_assets, publish_registries]
+    needs: [ publish_packages, publish_assets, publish_registries ]
     if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: write
 
@@ -273,9 +280,10 @@ jobs:
 
   create_release:
     name: Create GitHub release
-    needs: [publish_packages, publish_assets, create_tag]
+    needs: [ publish_packages, publish_assets, create_tag ]
     if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
 
@@ -301,5 +309,6 @@ jobs:
           body_path: release-notes.md
           draft: false
           files: release-artifacts/**/*
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

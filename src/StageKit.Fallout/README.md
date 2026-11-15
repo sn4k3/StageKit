@@ -30,7 +30,7 @@ exposes ready-made targets to restore, compile, run, and publish an application 
 
 ## Requirements
 
-- .NET 10 SDK
+- .NET 11 SDK
 - `Fallout.Common` and `Fallout.Utilities` 10.4.0
 - The `fallout` global tool, pinned in `.config/dotnet-tools.json`
 

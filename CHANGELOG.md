@@ -1,3 +1,10 @@
+# v0.5.0 (/11/2026)
+
+- Retarget single-target projects to .NET 11, including StageKit.Fallout, demos, tests, and the build entry point
+- Add `Concurrency.GetParallelOptions(CancellationToken token)`
+- Add `Concurrency.DebugParallelOptions`
+- Add .NET 11 support
+
 # v0.4.1 (30/09/2026)
 
 - Make `LinuxAppBundleOptions.MinimumDisplayLength` non-nullable and omit the AppStream display-length recommendation

@@ -1,10 +1,11 @@
 name: .NET CI
 
 on:
+  workflow_dispatch:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
-    branches: [main]
+    branches: [ main ]
 
 permissions:
   contents: read
@@ -21,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
 
     env:
       NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
@@ -33,7 +34,9 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: |
+            10.0.x
+            11.0.x
 
       - name: Cache NuGet packages
         uses: actions/cache@v6
@@ -70,5 +73,5 @@ jobs:
       - name: Test StageKit.Fallout
         run: >-
           dotnet run --project tests/StageKit.Fallout.Tests/StageKit.Fallout.Tests.csproj
-          --framework net10.0 --configuration Release --no-build --no-restore --
+          --framework net11.0 --configuration Release --no-build --no-restore --
           -noLogo -noColor -parallelMode none -automated sync

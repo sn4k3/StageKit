@@ -3,7 +3,7 @@
     <OutputType>WinExe</OutputType>
     <Description>Avalonia desktop showcase for StageKit application infrastructure and Updatum.</Description>
     <TargetFrameworks></TargetFrameworks>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net11.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
 
@@ -15,10 +15,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="12.1.3" />
-    <PackageReference Include="Avalonia.Desktop" Version="12.1.3" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.3" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3" />
+    <PackageReference Include="Avalonia" Version="12.1.6" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.6" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.6" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.6" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
     <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />

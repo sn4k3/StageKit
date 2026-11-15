@@ -713,10 +713,10 @@ Restore, build, and test:
 ```powershell
 dotnet restore
 dotnet build .\StageKit.slnx --configuration Release -p:NuGetAudit=false -p:RestoreIgnoreFailedSources=true
-dotnet run --project .\tests\StageKit.Tests\StageKit.Tests.csproj --framework net10.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none
-dotnet run --project .\tests\StageKit.Demo.Tests\StageKit.Demo.Tests.csproj --framework net10.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none
-dotnet run --project .\tests\StageKit.Updatum.Tests\StageKit.Updatum.Tests.csproj --framework net10.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none
-dotnet run --project .\tests\StageKit.Fallout.Tests\StageKit.Fallout.Tests.csproj --framework net10.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none
+dotnet run --project .\tests\StageKit.Tests\StageKit.Tests.csproj --framework net11.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none
+dotnet run --project .\tests\StageKit.Demo.Tests\StageKit.Demo.Tests.csproj --framework net11.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none
+dotnet run --project .\tests\StageKit.Updatum.Tests\StageKit.Updatum.Tests.csproj --framework net11.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none
+dotnet run --project .\tests\StageKit.Fallout.Tests\StageKit.Fallout.Tests.csproj --framework net11.0 --configuration Release --no-build --no-restore -- -noLogo -noColor -parallelMode none
 ```
 
 ## Build Pipeline

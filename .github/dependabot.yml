@@ -1,0 +1,14 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    ignore:
+      # v3 requires separately authenticated Copilot CLI; keep GitHub Models.
+      - dependency-name: actions/ai-inference
+        update-types: [ version-update:semver-major ]

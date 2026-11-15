@@ -6,9 +6,15 @@
 public static class Concurrency
 {
     /// <summary>
-    /// Gets or sets the optimal maximum degree of parallelism.
-    /// -1 means use .net default, -2 means auto-detect based on processor count less a few cores for responsiveness.
+    /// Gets the ParallelOptions with <c>MaxDegreeOfParallelism</c> set to 1 for debug purposes
     /// </summary>
+    public static ParallelOptions DebugParallelOptions => new() { MaxDegreeOfParallelism = 1 };
+
+    /// <summary>
+    /// Gets or sets the optimal maximum degree of parallelism.
+    /// -1 means use .net default, 0 means use <see cref="Environment.ProcessorCount"/>, -2 means auto-detect based on processor count less a few cores for responsiveness.
+    /// </summary>
+    /// <remarks>Default: -2</remarks>
     public static int OptimalMaxDegreeOfParallelism
     {
         get
@@ -31,20 +37,30 @@ public static class Concurrency
         }
         set
         {
-            if (value <= 0)
+            if (value == 0)
             {
-                throw new ArgumentOutOfRangeException(
-                    nameof(value),
-                    "OptimalMaxDegreeOfParallelism must not be 0."
-                );
+                field = Environment.ProcessorCount;
             }
-            field = Math.Min(value, Environment.ProcessorCount);
+            else
+            {
+                field = Math.Min(value, Environment.ProcessorCount);
+            }
         }
     } = -2;
 
     /// <summary>Options for <see cref="Parallel"/> loops, capped at <see cref="OptimalMaxDegreeOfParallelism"/>.</summary>
     public static ParallelOptions ParallelOptions =>
         new() { MaxDegreeOfParallelism = OptimalMaxDegreeOfParallelism };
+
+    /// <summary>
+    /// Gets the ParallelOptions with <see cref="OptimalMaxDegreeOfParallelism"/> and the <see cref="CancellationToken"/> set
+    /// </summary>
+    public static ParallelOptions GetParallelOptions(CancellationToken token = default)
+    {
+        var options = ParallelOptions;
+        options.CancellationToken = token;
+        return options;
+    }
 
     /// <summary>
     /// Caps a PLINQ query at <see cref="OptimalMaxDegreeOfParallelism"/>. Apply after

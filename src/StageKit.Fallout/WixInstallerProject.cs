@@ -1,7 +1,11 @@
+#region
+
 using System.Buffers.Binary;
 using System.Globalization;
 using System.IO.Compression;
 using System.Text;
+
+#endregion
 
 namespace StageKit.Fallout;
 
@@ -43,8 +47,16 @@ internal static class WixInstallerProject
     internal static string CreateProjectFile(Guid x64UpgradeCode, Guid arm64UpgradeCode)
     {
         return ProjectTemplate
-            .Replace("{{UPGRADE_CODE_X64}}", FormatUpgradeCode(x64UpgradeCode), StringComparison.Ordinal)
-            .Replace("{{UPGRADE_CODE_ARM64}}", FormatUpgradeCode(arm64UpgradeCode), StringComparison.Ordinal);
+            .Replace(
+                "{{UPGRADE_CODE_X64}}",
+                FormatUpgradeCode(x64UpgradeCode),
+                StringComparison.Ordinal
+            )
+            .Replace(
+                "{{UPGRADE_CODE_ARM64}}",
+                FormatUpgradeCode(arm64UpgradeCode),
+                StringComparison.Ordinal
+            );
     }
 
     /// <summary>
@@ -107,7 +119,8 @@ internal static class WixInstallerProject
         return CreatePng(ImageWidth, BannerImageHeight, static (x, _) =>
             x >= ImageWidth - BannerImageHeight
                 ? Accent
-                : Blend(SurfaceLight, SurfaceDark, (double)x / ImageWidth));
+                : Blend(SurfaceLight, SurfaceDark, (double)x / ImageWidth)
+        );
     }
 
     /// <summary>
@@ -120,7 +133,8 @@ internal static class WixInstallerProject
         return CreatePng(ImageWidth, DialogImageHeight, static (x, y) =>
             x < DialogArtworkWidth
                 ? Blend(Accent, AccentDark, (double)y / DialogImageHeight)
-                : Blend(SurfaceLight, SurfaceDark, (double)y / DialogImageHeight));
+                : Blend(SurfaceLight, SurfaceDark, (double)y / DialogImageHeight)
+        );
     }
 
     private static readonly (byte R, byte G, byte B) SurfaceLight = (0xF7, 0xF9, 0xFC);
@@ -128,14 +142,18 @@ internal static class WixInstallerProject
     private static readonly (byte R, byte G, byte B) Accent = (0x33, 0x41, 0x5C);
     private static readonly (byte R, byte G, byte B) AccentDark = (0x1E, 0x27, 0x38);
 
-    private static (byte R, byte G, byte B) Blend((byte R, byte G, byte B) from, (byte R, byte G, byte B) to,
-        double amount)
+    private static (byte R, byte G, byte B) Blend(
+        (byte R, byte G, byte B) from,
+        (byte R, byte G, byte B) to,
+        double amount
+    )
     {
         amount = Math.Clamp(amount, 0, 1);
         return (
             (byte)Math.Round(from.R + (to.R - from.R) * amount),
             (byte)Math.Round(from.G + (to.G - from.G) * amount),
-            (byte)Math.Round(from.B + (to.B - from.B) * amount));
+            (byte)Math.Round(from.B + (to.B - from.B) * amount)
+        );
     }
 
     /// <summary>
@@ -145,7 +163,11 @@ internal static class WixInstallerProject
     /// <param name="height">The image height in pixels.</param>
     /// <param name="shader">The callback that returns the color of one pixel.</param>
     /// <returns>The encoded PNG bytes.</returns>
-    private static byte[] CreatePng(int width, int height, Func<int, int, (byte R, byte G, byte B)> shader)
+    private static byte[] CreatePng(
+        int width,
+        int height,
+        Func<int, int, (byte R, byte G, byte B)> shader
+    )
     {
         var stride = 1 + width * 3;
         var raw = new byte[height * stride];
@@ -198,10 +220,14 @@ internal static class WixInstallerProject
     {
         var crc = 0xFFFFFFFFu;
         foreach (var value in type)
+        {
             crc = Crc32Table[(crc ^ value) & 0xFF] ^ (crc >> 8);
+        }
 
         foreach (var value in data)
+        {
             crc = Crc32Table[(crc ^ value) & 0xFF] ^ (crc >> 8);
+        }
 
         return crc ^ 0xFFFFFFFFu;
     }
@@ -215,7 +241,9 @@ internal static class WixInstallerProject
         {
             var value = i;
             for (var bit = 0; bit < 8; bit++)
+            {
                 value = (value & 1) != 0 ? 0xEDB88320u ^ (value >> 1) : value >> 1;
+            }
 
             table[i] = value;
         }
@@ -239,7 +267,10 @@ internal static class WixInstallerProject
     /// <returns>The RTF-safe text.</returns>
     internal static string EscapeRtf(string? text)
     {
-        if (string.IsNullOrEmpty(text)) return string.Empty;
+        if (string.IsNullOrEmpty(text))
+        {
+            return string.Empty;
+        }
 
         var builder = new StringBuilder(text.Length);
         foreach (var character in text)
@@ -257,10 +288,18 @@ internal static class WixInstallerProject
                 case '\r':
                     break;
                 default:
-                    if (character < 128) builder.Append(character);
+                    if (character < 128)
+                    {
+                        builder.Append(character);
+                    }
                     else
-                        builder.Append("\\u").Append(((short)character).ToString(CultureInfo.InvariantCulture))
+                    {
+                        builder
+                            .Append("\\u")
+                            .Append(((short)character).ToString(CultureInfo.InvariantCulture))
                             .Append('?');
+                    }
+
                     break;
             }
         }
@@ -272,9 +311,8 @@ internal static class WixInstallerProject
 
     #region Templates
 
-    private const string ProjectTemplate =
-        """
-        <Project Sdk="WixToolset.Sdk/7.0.0">
+    private const string ProjectTemplate = """
+        <Project Sdk="WixToolset.Sdk/7.0.1">
 
             <PropertyGroup>
                 <TargetFrameworks></TargetFrameworks>
@@ -312,11 +350,11 @@ internal static class WixInstallerProject
                 <SignToolPath Condition="'$(SignToolPath)' == ''">signtool.exe</SignToolPath>
                 <SignOutput Condition="'$(AuthenticodeCertificateThumbprint)' != ''">true</SignOutput>
             </PropertyGroup>
-            
+
             <ItemGroup>
                 <BindPath Include="$(PublishDirectory)" BindName="Publish"/>
-                <PackageReference Include="WixToolset.UI.wixext" Version="7.0.0"/>
-                <PackageReference Include="WixToolset.Util.wixext" Version="7.0.0"/>
+                <PackageReference Include="WixToolset.UI.wixext" Version="7.0.1"/>
+                <PackageReference Include="WixToolset.Util.wixext" Version="7.0.1"/>
             </ItemGroup>
 
             <PropertyGroup Condition="'$(ArtifactsPath)' != ''">
@@ -472,8 +510,7 @@ internal static class WixInstallerProject
 
         """;
 
-    private const string PackageTemplate =
-        """
+    private const string PackageTemplate = """
         <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
              xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
              xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
@@ -949,8 +986,7 @@ internal static class WixInstallerProject
 
         """;
 
-    private const string LocalizationTemplate =
-        """
+    private const string LocalizationTemplate = """
         <WixLocalization xmlns="http://wixtoolset.org/schemas/v4/wxl" Culture="en-US">
             <String Id="BrowseDlg_Title" Value="[ProductName] v[ProductVersion] Setup"/>
             <String Id="CancelDlg_Title" Value="[ProductName] v[ProductVersion] Setup"/>
@@ -976,8 +1012,7 @@ internal static class WixInstallerProject
 
         """;
 
-    private const string LicenseTemplate =
-        """
+    private const string LicenseTemplate = """
         {\rtf1\ansi\deff0
         {\fonttbl{\f0 Segoe UI;}}
         \fs18
@@ -992,8 +1027,7 @@ internal static class WixInstallerProject
 
         """;
 
-    private const string ReadmeTemplate =
-        """
+    private const string ReadmeTemplate = """
         # Installer
 
         `{{PROJECT_NAME}}.wixproj` was scaffolded by the Fallout `GenerateWindowsWixInstaller` target. The publish

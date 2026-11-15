@@ -1,23 +1,23 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks></TargetFrameworks>
+    <TargetFramework>net11.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- xunit.v3 supplies the in-process test entry point; no separate MTP entry point is required. -->
+    <OutputType>Exe</OutputType>
+    <GenerateTestingPlatformEntryPoint>false</GenerateTestingPlatformEntryPoint>
+  </PropertyGroup>
 
-    <PropertyGroup>
-        <TargetFrameworks></TargetFrameworks>
-        <TargetFramework>net10.0</TargetFramework>
-        <IsPackable>false</IsPackable>
-        <IsTestProject>true</IsTestProject>
-        <!-- xunit.v3 supplies the in-process test entry point; no separate MTP entry point is required. -->
-        <OutputType>Exe</OutputType>
-        <GenerateTestingPlatformEntryPoint>false</GenerateTestingPlatformEntryPoint>
-    </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" Version="4.0.3" />
+  </ItemGroup>
 
-    <ItemGroup>
-        <PackageReference Include="xunit.v3" Version="4.0.1"/>
-    </ItemGroup>
-
-    <ItemGroup>
-        <ProjectReference Include="..\..\src\StageKit.Fallout\StageKit.Fallout.csproj"/>
-        <AssemblyMetadata Include="RepositoryRoot"
-                          Value="$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', '..', '..'))"/>
-    </ItemGroup>
-
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\StageKit.Fallout\StageKit.Fallout.csproj" />
+    <AssemblyMetadata
+      Include="RepositoryRoot"
+      Value="$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', '..', '..'))"
+    />
+  </ItemGroup>
 </Project>
