@@ -238,6 +238,12 @@ jobs:
           name: nuget-packages
           path: artifacts/packages
 
+      - name: Authenticate to NuGet.org with OIDC
+        uses: NuGet/login@v1
+        id: nuget_login
+        with:
+          user: ${{ vars.NUGET_USER || 'sn4k3' }}
+
       - name: Publish to GitHub Packages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -246,16 +252,10 @@ jobs:
           --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
           --api-key "$GITHUB_TOKEN" --skip-duplicate --no-symbols
 
-      - name: Authenticate to NuGet.org
-        uses: NuGet/login@v1
-        id: nuget-login
-        with:
-          user: ${{ vars.NUGET_USER }}
-
       - name: Publish to NuGet.org
         # NuGet also pushes the adjacent .snupkg files retained in the artifact.
         env:
-          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+          NUGET_API_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
         run: >-
           dotnet nuget push "artifacts/packages/*.nupkg"
           --source https://api.nuget.org/v3/index.json

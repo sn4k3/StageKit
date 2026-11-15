@@ -73,9 +73,12 @@ curl -fsSL https://raw.githubusercontent.com/sn4k3/StageKit/refs/heads/main/scri
 - Dependency-light primitives package for atomic file writes, host URL/file-manager launching, and disposable/resource
   helpers
 - Cross-platform host memory snapshots through `HostSystem.GetMemoryStatus()` and `TryGetMemoryStatus(out var memory)`
-- Cross-platform sleep prevention and battery/power status snapshots through `HostSystem.PreventSleep()` and `HostPowerStatus`
-- Host theme detection for dark mode and accessibility high contrast through `HostSystem.IsDarkMode` and `HostSystem.IsHighContrast`
-- Cross-platform drive capacity and free disk space queries through `HostSystem.GetAvailableFreeSpace()`, `HostSystem.GetDiskStatus()`, and `HostDiskStatus`
+- Cross-platform sleep prevention and battery/power status snapshots through `HostSystem.PreventSleep()` and
+  `HostPowerStatus`
+- Host theme detection for dark mode and accessibility high contrast through `HostSystem.IsDarkMode` and
+  `HostSystem.IsHighContrast`
+- Cross-platform drive capacity and free disk space queries through `HostSystem.GetAvailableFreeSpace()`,
+  `HostSystem.GetDiskStatus()`, and `HostDiskStatus`
 - Interactive terminal window launching through `HostSystem.OpenTerminal()` and `HostSystem.OpenInTerminal()`
 - Standard Downloads directory resolution through `PathUtilities.DownloadsDirectoryPath`
 - First-run and onboarding state persistence
@@ -722,8 +725,10 @@ dotnet run --project .\tests\StageKit.Fallout.Tests\StageKit.Fallout.Tests.cspro
 ## Build Pipeline
 
 NuGet.org publishing uses [trusted publishing](https://learn.microsoft.com/nuget/nuget-org/trusted-publishing)
-through GitHub OIDC. Set the GitHub repository variable `NUGET_USER` to the NuGet.org profile username that owns the
-trusted publisher (not an email address). Configure its policy for repository `sn4k3/StageKit` and workflow file
+through GitHub OIDC. The login defaults to the NuGet.org package owner `sn4k3`. To use a different trusted-publisher
+profile, set the optional GitHub repository variable `NUGET_USER` to its NuGet.org username (not an email address).
+Authentication completes before either registry push. Configure the policy for repository `sn4k3/StageKit` and workflow
+file
 `release.yml`, with the optional environment left empty. The publishing job exchanges OIDC for a short-lived key used
 for both packages and symbols; the `NUGET_TOKEN` secret is no longer required. GitHub Packages uses the workflow's
 automatic `GITHUB_TOKEN`. Dry runs skip authentication and registry publishing.
