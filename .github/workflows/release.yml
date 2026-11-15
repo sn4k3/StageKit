@@ -222,6 +222,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
 
     steps:
       - name: Set up .NET
@@ -245,14 +246,20 @@ jobs:
           --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
           --api-key "$GITHUB_TOKEN" --skip-duplicate --no-symbols
 
+      - name: Authenticate to NuGet.org
+        uses: NuGet/login@v1
+        id: nuget-login
+        with:
+          user: ${{ vars.NUGET_USER }}
+
       - name: Publish to NuGet.org
         # NuGet also pushes the adjacent .snupkg files retained in the artifact.
         env:
-          NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
         run: >-
           dotnet nuget push "artifacts/packages/*.nupkg"
           --source https://api.nuget.org/v3/index.json
-          --api-key "$NUGET_TOKEN" --symbol-api-key "$NUGET_TOKEN" --skip-duplicate
+          --api-key "$NUGET_API_KEY" --symbol-api-key "$NUGET_API_KEY" --skip-duplicate
 
   create_tag:
     name: Create release tag

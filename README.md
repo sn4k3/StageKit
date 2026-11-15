@@ -721,6 +721,13 @@ dotnet run --project .\tests\StageKit.Fallout.Tests\StageKit.Fallout.Tests.cspro
 
 ## Build Pipeline
 
+NuGet.org publishing uses [trusted publishing](https://learn.microsoft.com/nuget/nuget-org/trusted-publishing)
+through GitHub OIDC. Set the GitHub repository variable `NUGET_USER` to the NuGet.org profile username that owns the
+trusted publisher (not an email address). Configure its policy for repository `sn4k3/StageKit` and workflow file
+`release.yml`, with the optional environment left empty. The publishing job exchanges OIDC for a short-lived key used
+for both packages and symbols; the `NUGET_TOKEN` secret is no longer required. GitHub Packages uses the workflow's
+automatic `GITHUB_TOKEN`. Dry runs skip authentication and registry publishing.
+
 Release publishing is driven by [`StageKit.Fallout`](src/StageKit.Fallout/README.md), a reusable Fallout (NUKE-style)
 build library. The manual GitHub Actions release workflow packages the libraries, publishes runtime assets for each
 supported platform, and attaches both to a GitHub release. `build.ps1` / `build.sh` bootstrap the .NET SDK when needed,
